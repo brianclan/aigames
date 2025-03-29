@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<!-- saved from url=(0049)https://www.qingmiao.cloud/page/game/yangyan.html -->
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>20-20-20 远眺花园</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            background-color: #e8f4f2;
+            color: #3a5a5b;
+        }
+        
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #garden-view {
+            position: relative;
+            width: 90%;
+            height: 70%;
+            max-width: 800px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        #scene {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform-origin: center center;
+        }
+        
+        #focus-point {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.8);
+            border-radius: 50%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        #focus-point::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background-color: rgba(255,255,255,0.8);
+            border-radius: 50%;
+        }
+        
+        #butterfly {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50,10 C60,20 70,25 80,30 C90,35 95,40 95,50 C95,60 90,65 80,70 C70,75 60,80 50,90 C40,80 30,75 20,70 C10,65 5,60 5,50 C5,40 10,35 20,30 C30,25 40,20 50,10" fill="%23ffffff" opacity="0.8"/></svg>');
+            background-size: contain;
+            z-index: 5;
+            filter: drop-shadow(0 0 5px rgba(255,255,200,0.7));
+        }
+        
+        #timer-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        #timer {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #3a5a5b;
+            margin-bottom: 10px;
+        }
+        
+        #instructions {
+            font-size: 1.2rem;
+            max-width: 500px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        #start-btn {
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            background-color: #4b8178;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(75,129,120,0.3);
+        }
+        
+        #start-btn:hover {
+            background-color: #3a5a5b;
+            transform: translateY(-2px);
+        }
+        
+        #start-btn:active {
+            transform: translateY(0);
+        }
+        
+        #completion-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 100;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        
+        #completion-message h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        
+        #completion-message p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        .nature-sound {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            opacity: 0;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { opacity: 0.4; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        
+        .zoom-in {
+            animation: zoomIn 20s linear forwards;
+        }
+        
+        @keyframes zoomIn {
+            from { transform: scale(1); }
+            to { transform: scale(1.3); }
+        }
+        
+        .butterfly-fly {
+            animation: butterflyMove 5s infinite alternate ease-in-out;
+        }
+        
+        @keyframes butterflyMove {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            25% { transform: translate(-30%, -60%) rotate(5deg); }
+            50% { transform: translate(-70%, -40%) rotate(-5deg); }
+            75% { transform: translate(-40%, -30%) rotate(3deg); }
+            100% { transform: translate(-60%, -50%) rotate(-2deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="instructions">
+            <h2>20-20-20 远眺花园</h2>
+            <p>根据眼科医生的建议，每20分钟应该花20秒时间注视20英尺(约6米)外的景物，让眼睛得到休息。</p>
+            <p>请盯着画面中心的蝴蝶，跟随它放松您的眼睛20秒。</p>
+        </div>
+        
+        <div id="garden-view">
+            <img id="scene" src="./yangyan_files/photo-1500382017468-9049fed747ef" alt="远眺花园">
+            <div id="focus-point"></div>
+            <div id="butterfly"></div>
+        </div>
+        
+        <div id="timer-container">
+            <div id="timer">20</div>
+            <button id="start-btn">开始远眺练习</button>
+        </div>
+    </div>
+    
+    <div id="completion-message">
+        <h2>做得好！👏</h2>
+        <p>您已经完成了20秒的远眺练习，眼睛得到了很好的放松。</p>
+        <p>建议每20分钟进行一次这样的练习。</p>
+    </div>
+    
+    <audio id="nature-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-nature-ambience-1189.mp3" loop=""></audio>
+    <audio id="complete-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3"></audio>
+
+    <script>
+        // 获取DOM元素
+        const startBtn = document.getElementById('start-btn');
+        const timer = document.getElementById('timer');
+        const scene = document.getElementById('scene');
+        const butterfly = document.getElementById('butterfly');
+        const gardenView = document.getElementById('garden-view');
+        const natureSound = document.getElementById('nature-sound');
+        const completeSound = document.getElementById('complete-sound');
+        const completionMessage = document.getElementById('completion-message');
+        
+        // 场景图片数组（多种自然景观）
+        const scenes = [
+            'https://images.unsplash.com/photo-1588392382834-a891154bca4d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', // 森林
+            'https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', // 山脉
+            'https://images.unsplash.com/photo-1476231682828-37e571bc172f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', // 湖泊
+            'https://images.unsplash.com/photo-1500382017468-9049fed747ef?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80'  // 田野
+        ];
+        
+        // 随机选择场景
+        scene.src = scenes[Math.floor(Math.random() * scenes.length)];
+        
+        // 开始练习
+        startBtn.addEventListener('click', startExercise);
+        
+        function startExercise() {
+            // 隐藏按钮
+            startBtn.style.display = 'none';
+            
+            // 开始放大动画
+            scene.classList.add('zoom-in');
+            
+            // 开始蝴蝶动画
+            butterfly.classList.add('butterfly-fly');
+            
+            // 播放自然音效
+            natureSound.play();
+            
+            // 创建环境音效点
+            createSoundDots();
+            
+            // 开始倒计时
+            let seconds = 20;
+            timer.textContent = seconds;
+            
+            const countdown = setInterval(() => {
+                seconds--;
+                timer.textContent = seconds;
+                
+                if (seconds <= 0) {
+                    clearInterval(countdown);
+                    exerciseComplete();
+                }
+            }, 1000);
+        }
+        
+        function exerciseComplete() {
+            // 停止动画
+            scene.classList.remove('zoom-in');
+            butterfly.classList.remove('butterfly-fly');
+            
+            // 停止音效
+            natureSound.pause();
+            natureSound.currentTime = 0;
+            
+            // 播放完成音效
+            completeSound.play();
+            
+            // 显示完成消息
+            completionMessage.style.display = 'flex';
+            
+            // 3秒后重置
+            setTimeout(() => {
+                completionMessage.style.display = 'none';
+                startBtn.style.display = 'block';
+                timer.textContent = '20';
+                
+                // 选择新场景
+                scene.src = scenes[Math.floor(Math.random() * scenes.length)];
+            }, 5000);
+        }
+        
+        function createSoundDots() {
+            // 创建环境音效视觉点
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    const dot = document.createElement('div');
+                    dot.className = 'nature-sound';
+                    dot.style.left = Math.random() * 80 + 10 + '%';
+                    dot.style.top = Math.random() * 80 + 10 + '%';
+                    gardenView.appendChild(dot);
+                    
+                    // 移除点
+                    setTimeout(() => {
+                        dot.remove();
+                    }, 2000);
+                }, i * 3000);
+            }
+        }
+        
+        // 每20分钟提醒
+        setInterval(() => {
+            if (!completionMessage.style.display || completionMessage.style.display === 'none') {
+                alert('👀 您已经使用屏幕20分钟了，建议现在进行远眺练习！');
+            }
+        }, 20 * 60 * 1000);
+    </script>
+
+</body></html>

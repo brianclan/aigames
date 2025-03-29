@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- saved from url=(0041)https://www.qingmiao.cloud/page/game.html -->
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>数学冒险岛</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #87CEEB;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 600px;
+            margin: auto;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px;
+            padding: 10px;
+            background: #F0F8FF;
+            border-radius: 10px;
+        }
+
+        .key {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            margin: 5px;
+            background: #gray;
+            border-radius: 50%;
+            line-height: 30px;
+        }
+
+        .key-collected {
+            background: #FFD700;
+        }
+
+        .question {
+            font-size: 24px;
+            margin: 20px;
+            padding: 15px;
+            background: #E6E6FA;
+            border-radius: 10px;
+        }
+
+        .answers {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 20px;
+        }
+
+        button {
+            padding: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            background: #98FB98;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            background: #90EE90;
+        }
+
+        .life {
+            color: red;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🏝️ 数学冒险岛 🏝️</h1>
+        <div class="status-bar">
+            <div>得分: <span id="score">0</span></div>
+            <div>生命: <span id="lives">❤️❤️❤️</span></div>
+            <div>钥匙: 
+                <span class="key">🗝️</span>
+                <span class="key">🗝️</span>
+                <span class="key">🗝️</span>
+            </div>
+        </div>
+        <div id="gameArea">
+        <div class="question">🌳 加法森林</div>
+        <div class="question">18 + 11 = ?</div>
+        <div class="answers">
+            <button onclick="checkAnswer(29, 29)">29</button><button onclick="checkAnswer(25, 29)">25</button><button onclick="checkAnswer(32, 29)">32</button><button onclick="checkAnswer(30, 29)">30</button>
+        </div>
+    </div>
+    </div>
+
+<script>
+let score = 0;
+let lives = 3;
+let currentLevel = 1;
+let keys = 0;
+
+const levels = [
+    { name: "🌳 加法森林", operator: "+", range: [1, 50] },
+    { name: "🕳️ 减法山洞", operator: "-", range: [20, 60] },
+    { name: "🏰 乘法城堡", operator: "×", range: [1, 10] }
+];
+
+function updateStatus() {
+    document.getElementById('score').textContent = score;
+    document.getElementById('lives').innerHTML = '❤️'.repeat(lives);
+    document.querySelectorAll('.key').forEach((key, index) => {
+        key.style.color = index < keys ? "#FFD700" : "#gray";
+    });
+}
+
+function generateQuestion() {
+    const level = levels[currentLevel-1];
+    let num1 = Math.floor(Math.random()*(level.range[1]-level.range[0]+1)) + level.range[0];
+    let num2 = Math.floor(Math.random()*(level.range[1]-level.range[0]+1)) + level.range[0];
+    
+    if (level.operator === "-" && num1 < num2) [num1, num2] = [num2, num1];
+    
+    let correctAnswer;
+    switch(level.operator) {
+        case "+": correctAnswer = num1 + num2; break;
+        case "-": correctAnswer = num1 - num2; break;
+        case "×": correctAnswer = num1 * num2; break;
+    }
+    
+    const answers = [correctAnswer];
+    while(answers.length < 4) {
+        const wrong = correctAnswer + Math.floor(Math.random()*10)-5;
+        if (!answers.includes(wrong) && wrong > 0) answers.push(wrong);
+    }
+    answers.sort(() => Math.random()-0.5);
+    
+    document.getElementById('gameArea').innerHTML = `
+        <div class="question">${level.name}</div>
+        <div class="question">${num1} ${level.operator} ${num2} = ?</div>
+        <div class="answers">
+            ${answers.map(ans => 
+                `<button onclick="checkAnswer(${ans}, ${correctAnswer})">${ans}</button>`
+            ).join('')}
+        </div>
+    `;
+}
+
+function checkAnswer(selected, correct) {
+    if (selected === correct) {
+        score += 10;
+        if (Math.random() < 0.7) showEffect("🎉 +10分!");
+        if (document.querySelectorAll('button').length === 4) {
+            keys++;
+            if (keys >= 3) {
+                endGame(true);
+                return;
+            }
+            currentLevel++;
+        }
+        generateQuestion();
+    } else {
+        lives--;
+        showEffect("💔 生命值-1");
+        if (lives <= 0) endGame(false);
+    }
+    updateStatus();
+}
+
+function showEffect(text) {
+    const effect = document.createElement('div');
+    effect.textContent = text;
+    effect.style = "position: absolute; font-size: 24px; animation: float 2s;";
+    document.body.appendChild(effect);
+    setTimeout(() => effect.remove(), 2000);
+}
+
+function endGame(success) {
+    document.getElementById('gameArea').innerHTML = `
+        <h2>${success ? '🎉 通关成功！ 🎁' : '😢 游戏结束'}</h2>
+        <p>最终得分：${score}分</p>
+        <button onclick="location.reload()">再玩一次</button>
+        ${success ? '<div style="font-size:60px">🏆</div>' : ''}
+    `;
+}
+
+// 开始游戏
+generateQuestion();
+updateStatus();
+</script>
+
+
+</body></html>
