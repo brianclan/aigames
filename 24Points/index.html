@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24点基础版</title>
+  <script type="module" crossorigin>
+(function(){const t=document.createElement("link").relList;if(t&&t.supports&&t.supports("modulepreload"))return;for(const s of document.querySelectorAll('link[rel="modulepreload"]'))r(s);new MutationObserver(s=>{for(const o of s)if(o.type==="childList")for(const a of o.addedNodes)a.tagName==="LINK"&&a.rel==="modulepreload"&&r(a)}).observe(document,{childList:!0,subtree:!0});function n(s){const o={};return s.integrity&&(o.integrity=s.integrity),s.referrerPolicy&&(o.referrerPolicy=s.referrerPolicy),s.crossOrigin==="use-credentials"?o.credentials="include":s.crossOrigin==="anonymous"?o.credentials="omit":o.credentials="same-origin",o}function r(s){if(s.ep)return;s.ep=!0;const o=n(s);fetch(s.href,o)}})();const suits=["hearts","diamonds","clubs","spades"],suitSymbols={hearts:"♥",diamonds:"♦",clubs:"♣",spades:"♠"},values=["A","2","3","4","5","6","7","8","9","10","J","Q","K"],valueMap={A:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,J:11,Q:12,K:13},STORAGE_KEY="24points_game_state";function getRandomCards(e){const t=[];for(const n of suits)for(const r of values)t.push({suit:n,value:r});for(let n=t.length-1;n>0;n--){const r=Math.floor(Math.random()*(n+1));[t[n],t[r]]=[t[r],t[n]]}return t.slice(0,e)}function renderCards(e,t){e.innerHTML="",t.forEach(n=>{const r=document.createElement("div");r.className=`card ${n.suit}`,r.innerHTML=`${n.value}<br>${suitSymbols[n.suit]}`,r.setAttribute("data-value",valueMap[n.value]),e.appendChild(r)})}function saveGameState(e,t){const n={cards:e,values:t,timestamp:new Date().getTime()};try{localStorage.setItem(STORAGE_KEY,JSON.stringify(n))}catch(r){console.error("保存游戏状态失败:",r)}}function loadGameState(){try{const e=localStorage.getItem(STORAGE_KEY);if(e)return JSON.parse(e)}catch(e){console.error("加载游戏状态失败:",e)}return null}function clearGameState(){try{localStorage.removeItem(STORAGE_KEY)}catch(e){console.error("清除游戏状态失败:",e)}}function containsNegativeIntermediate(expr){try{function checkNestedNegative(expression){const bracketPattern=/\(([^()]+)\)/g;let match,foundNegative=!1,modifiedExpr=expression;const checked=new Map;for(;(match=bracketPattern.exec(expression))!==null;){const subExpr=match[1];if(checked.has(subExpr)){checked.get(subExpr)&&(foundNegative=!0);continue}const subHasNegative=checkNestedNegative(subExpr);if(subHasNegative){foundNegative=!0,checked.set(subExpr,!0);continue}try{const subExprValue=eval(subExpr);if(subExprValue<0){foundNegative=!0,checked.set(subExpr,!0);continue}}catch(e){}if(subExpr.includes("-")){const subParts=subExpr.split("-");if(subParts.length===2){const e=parseFloat(subParts[0].trim()),t=parseFloat(subParts[1].trim());if(!isNaN(e)&&!isNaN(t)&&e<t){foundNegative=!0,checked.set(subExpr,!0);continue}}try{const subValue=eval(subExpr);if(subValue<0){foundNegative=!0,checked.set(subExpr,!0);continue}}catch(e){}}checked.set(subExpr,!1)}return foundNegative}const nestedPattern=/\d+\-\(\d+\-\([\d\+\-\*\/\(\)]+\)\)/;if(nestedPattern.test(expr)){const innerMatch=expr.match(/\d+\-\((\d+)\-\(([\d\+\-\*\/\(\)]+)\)\)/);if(innerMatch){const b=parseInt(innerMatch[1]),innerExpr=innerMatch[2];try{const innerValue=eval(innerExpr);if(innerValue>b)return!0}catch(e){}}}const specialPattern=/\((\d+)\-(\d+)\)\*\((\d+)\-(\d+)\)/g;let specialMatch;for(;(specialMatch=specialPattern.exec(expr))!==null;){const e=parseInt(specialMatch[1]),t=parseInt(specialMatch[2]),n=parseInt(specialMatch[3]),r=parseInt(specialMatch[4]);if(e<t||n<r)return!0}return checkNestedNegative(expr)}catch(e){return console.error("检查负数中间结果时出错:",e),!1}}function isValidExpression(expr,numbers){try{const cleanExpr=expr.replace(/[^0-9\+\-\*\/\(\)\.]/g,"");if(cleanExpr!==expr)return!1;const exprNumbers=expr.match(/\d+(\.\d+)?/g)||[],numbersCount={};numbers.forEach(e=>{numbersCount[e]=(numbersCount[e]||0)+1});const exprNumbersCount={};exprNumbers.forEach(e=>{const t=Number(e);exprNumbersCount[t]=(exprNumbersCount[t]||0)+1});for(const e in numbersCount)if(exprNumbersCount[e]!==numbersCount[e])return!1;for(const e in exprNumbersCount)if(!numbersCount[e]||exprNumbersCount[e]>numbersCount[e])return!1;const result=eval(expr);return typeof result=="number"&&!isNaN(result)&&isFinite(result)}catch(e){return!1}}function checkAnswer(expr,currentValues){try{const result=eval(expr);if(typeof result!="number"||isNaN(result)||!isFinite(result))return{valid:!1,message:"表达式结果必须是有效数字"};const exprNumbers=expr.match(/\d+(\.\d+)?/g)||[],exprNumberValues=exprNumbers.map(Number),numbersCount={};currentValues.forEach(e=>{numbersCount[e]=(numbersCount[e]||0)+1});const exprNumbersCount={};exprNumberValues.forEach(e=>{exprNumbersCount[e]=(exprNumbersCount[e]||0)+1});for(const e in numbersCount)if(exprNumbersCount[e]!==numbersCount[e])return{valid:!1,message:"表达式必须使用所有4个数字，每个数字恰好使用一次"};for(const e in exprNumbersCount)if(!numbersCount[e]||exprNumbersCount[e]>numbersCount[e])return{valid:!1,message:`表达式中使用了不可用的数字: ${e}`};const isCorrect=Math.abs(result-24)<1e-4;return{valid:!0,isCorrect,message:isCorrect?"恭喜！你的答案正确！":`答案不正确，结果是 ${result}，不是 24`}}catch(e){return{valid:!1,message:"表达式无效："+e.message}}}function generatePermutations(e){if(e.length<=1)return[e];const t=[];for(let n=0;n<e.length;n++){const r=e[n],s=[...e.slice(0,n),...e.slice(n+1)],o=generatePermutations(s);for(const a of o)t.push([r,...a])}return t}function tryExpressionPatterns(e,t,n,r,s){const o=e[0],a=e[1],c=e[2],u=e[3];tryExpression(`${o}${t}${a}${n}${c}${r}${u}`,s),tryExpression(`(${o}${t}${a})${n}${c}${r}${u}`,s),tryExpression(`${o}${t}(${a}${n}${c})${r}${u}`,s),tryExpression(`${o}${t}${a}${n}(${c}${r}${u})`,s),tryExpression(`(${o}${t}${a})${n}(${c}${r}${u})`,s),tryExpression(`((${o}${t}${a})${n}${c})${r}${u}`,s),tryExpression(`${o}${t}((${a}${n}${c})${r}${u})`,s),tryExpression(`${o}${t}(${a}${n}(${c}${r}${u}))`,s)}function tryExpression(expr,solutions){try{if(containsNegativeIntermediate(expr))return;const result=eval(expr);Math.abs(result-24)<1e-4&&solutions.push(expr)}catch(e){}}function findAllSolutions(e){const t=[],n=generatePermutations(e);for(const r of n){const s=["+","-","*","/"];for(const o of s)for(const a of s)for(const c of s)tryExpressionPatterns(r,o,a,c,t)}return[...new Set(t)].sort()}function formatExpression(e){let t=e.replace(/\//g,'<span class="operator">÷</span>').replace(/\*/g,'<span class="operator">×</span>').replace(/\+/g,'<span class="operator">+</span>').replace(/\-/g,'<span class="operator">-</span>').replace(/\(/g,'<span class="bracket">(</span>').replace(/\)/g,'<span class="bracket">)</span>');return t=t.replace(/\d+/g,'<span class="number">$&</span>'),t}function displaySolutions(e,t){if(!t&&(t=document.getElementById("answersContainer"),!t)){console.error("目标元素未提供");return}t.innerHTML="",addSolutionStyles();const n=[...e];if(!n||n.length===0){const u=document.createElement("div");u.className="no-solutions",u.textContent="没有找到解法",t.appendChild(u);return}const r=n.filter(u=>{try{return!containsNegativeIntermediate(u)}catch(i){return console.error("检查负数中间结果失败:",i),!0}}),s=r.length>0?r:n,o=findOptimalSolution(s),a=document.createElement("div");a.className="optimal-solution-container";const c=document.createElement("div");c.className="solution optimal-solution",!o.includes("(")&&!o.includes(")")&&c.classList.add("no-brackets"),c.innerHTML=formatExpression(o),a.appendChild(c),t.appendChild(a)}function findOptimalSolution(e){if(!e||e.length===0)return"";if(e.length===1)return e[0];const t=e.map(n=>{const r=(n.match(/\(/g)||[]).length+(n.match(/\)/g)||[]).length;let s=!1;try{const c=/(\d+)\/(\d+)/g;let u;for(;(u=c.exec(n))!==null;){const i=parseInt(u[1]),l=parseInt(u[2]);if(i<l){s=!0;break}}}catch(c){console.error("检查真分数失败:",c)}const o=n.length,a=r*1e3+(s?100:0)+o;return{solution:n,score:a}});return t.sort((n,r)=>n.score-r.score),t[0].solution}function addSolutionStyles(){if(document.getElementById("solution-styles"))return;const e=document.createElement("style");e.id="solution-styles",e.textContent=`
+        .total-solutions {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .optimal-solution-container {
+            margin: 20px 0;
+        }
+        
+        .solution.optimal-solution {
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            font-size: 24px;
+            text-align: center;
+            border-left: 5px solid #3498db;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .solution.optimal-solution:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+        
+        .solution.optimal-solution.no-brackets {
+            background-color: #f0fff0;
+            border-left: 5px solid #2ecc71;
+        }
+        
+        .no-solutions {
+            padding: 20px;
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+        }
+        
+        /* 表达式格式化样式 */
+        .number {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .operator {
+            color: #3498db;
+            font-weight: bold;
+            margin: 0 2px;
+        }
+        
+        .bracket {
+            color: #8e44ad;
+            font-weight: bold;
+        }
+    `,document.head.appendChild(e)}const cardsContainer=document.getElementById("cardsContainer"),expressionInput=document.getElementById("expressionInput"),submitBtn=document.getElementById("submitBtn"),showAnswersBtn=document.getElementById("showAnswersBtn"),newGameBtn=document.getElementById("newGameBtn"),resultContainer=document.getElementById("resultContainer"),answersContainer=document.getElementById("answersContainer");let currentCards=[],currentValues=[],solutions=[];function generateCardsWithSolution(){let e=0,t,n,r;do{if(e++,e>20){console.warn("尝试生成有解的牌组超过20次，使用当前牌组");break}t=getRandomCards(4),n=t.map(s=>valueMap[s.value]),r=findAllSolutions(n)}while(r.length===0);return{cards:t,values:n,solutions:r}}function initGame(){const e=loadGameState();if(e){if(currentCards=e.cards,currentValues=e.values,solutions=findAllSolutions(currentValues),solutions.length===0){const{cards:t,values:n,solutions:r}=generateCardsWithSolution();currentCards=t,currentValues=n,solutions=r,saveGameState(currentCards,currentValues)}}else{const{cards:t,values:n,solutions:r}=generateCardsWithSolution();currentCards=t,currentValues=n,solutions=r,saveGameState(currentCards,currentValues)}renderCards(cardsContainer,currentCards),expressionInput.value="",submitBtn.disabled=!0,resultContainer.innerHTML="",resultContainer.className="result-container",answersContainer.innerHTML="",answersContainer.classList.remove("show")}expressionInput.addEventListener("input",()=>{const e=expressionInput.value.trim();submitBtn.disabled=!isValidExpression(e,currentValues)});submitBtn.addEventListener("click",()=>{const e=expressionInput.value.trim(),t=checkAnswer(e,currentValues);resultContainer.innerHTML=t.message,resultContainer.className="result-container "+(t.isCorrect?"success":"error")});showAnswersBtn.addEventListener("click",()=>{displaySolutions(solutions,answersContainer),answersContainer.classList.add("show")});newGameBtn.addEventListener("click",()=>{clearGameState();const{cards:e,values:t,solutions:n}=generateCardsWithSolution();currentCards=e,currentValues=t,solutions=n,saveGameState(currentCards,currentValues),renderCards(cardsContainer,currentCards),expressionInput.value="",submitBtn.disabled=!0,resultContainer.innerHTML="",resultContainer.className="result-container",answersContainer.innerHTML="",answersContainer.classList.remove("show")});window.addEventListener("DOMContentLoaded",initGame);
+
+</script>
+  <style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}body{background-color:#f0f8ff;padding:20px}.container{max-width:800px;margin:0 auto;background-color:#fff;border-radius:10px;padding:20px;box-shadow:0 0 10px #0000001a}h1{text-align:center;color:#2c3e50;margin-bottom:20px}.cards-container{display:flex;justify-content:center;flex-wrap:wrap;gap:15px;margin-bottom:30px}.card{width:100px;height:140px;background-color:#fff;border-radius:10px;box-shadow:0 4px 8px #0003;display:flex;justify-content:center;align-items:center;font-size:24px;font-weight:700;position:relative;border:1px solid #ddd}.card.hearts,.card.diamonds{color:red}.card.clubs,.card.spades{color:#000}.card:before,.card:after{position:absolute;font-size:18px}.card:before{top:5px;left:5px}.card:after{bottom:5px;right:5px;transform:rotate(180deg)}.input-container{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;justify-content:center}input{flex:1;min-width:200px;padding:10px;border:1px solid #ddd;border-radius:5px;font-size:16px}button{padding:10px 15px;background-color:#3498db;color:#fff;border:none;border-radius:5px;cursor:pointer;transition:background-color .3s}button:hover{background-color:#2980b9}button:disabled{background-color:#bdc3c7;cursor:not-allowed}.result-container{margin:20px 0;padding:15px;border-radius:5px;text-align:center;min-height:30px}.answers-container{margin-top:20px;padding:15px;border:1px solid #ddd;border-radius:5px;max-height:500px;overflow-y:auto;display:none}.answers-container.show{display:block}.solution-count{font-weight:700;margin:10px 0;color:#3498db;text-align:center;font-size:16px}.category-container{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:15px 0}.category-tab{padding:8px 15px;background-color:#f2f2f2;border:1px solid #ddd;border-radius:20px;cursor:pointer;transition:all .2s ease;color:#555;font-size:14px}.category-tab:hover{background-color:#e6e6e6}.category-tab.active{background-color:#3498db;color:#fff;border-color:#2980b9}.solutions-wrapper{margin-top:15px;border:1px solid #eee;border-radius:5px}.category-content{padding:10px}.solution-group:last-child{margin-bottom:0}.main-solution{display:flex;justify-content:space-between;align-items:center;background-color:#f0f8ff;border-left:3px solid #3498db;padding:10px 12px;font-size:15px;font-weight:500}.main-solution span{letter-spacing:.5px;font-size:inherit}.equivalent-solutions{margin-left:20px;border-left:2px solid #ddd;padding-left:15px;margin-top:5px;background-color:#fafafa;padding-top:8px;padding-bottom:8px;max-height:200px;overflow-y:auto}.equivalent-item{background-color:#f9f9f9;padding:6px 12px;font-size:14px;border-bottom:1px solid #f0f0f0}.equivalent-item:last-child{border-bottom:none}.toggle-btn,.placeholder-btn{background-color:#e0e0e0;color:#333;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer;transition:all .2s ease;min-width:100px;text-align:center}.toggle-btn:hover{background-color:#3498db;color:#fff}.answer-item{padding:8px;background-color:#f9f9f9;margin-bottom:5px;border-radius:3px;line-height:1.5;font-size:15px}.answer-item .operator{margin:0 3px;font-weight:700;font-size:inherit}.answer-item .number{color:#2c3e50;font-weight:500;font-size:inherit}.answer-item .bracket{color:#7f8c8d;margin:0 1px;font-size:inherit}.success{background-color:#d4edda;color:#155724;border:1px solid #c3e6cb}.error{background-color:#f8d7da;color:#721c24;border:1px solid #f5c6cb}.solutions-container{max-height:500px;overflow-y:auto;border:1px solid #eee;border-radius:5px;padding:10px;margin-bottom:15px}.pagination-container{display:flex;justify-content:center;align-items:center;margin-top:15px;gap:10px}.page-info{margin:0 10px;color:#666}.pagination-btn{padding:5px 15px;background-color:#3498db;color:#fff;border:none;border-radius:4px;cursor:pointer}.pagination-btn:disabled{background-color:#ccc;cursor:not-allowed}.pagination-btn:hover:not(:disabled){background-color:#2980b9}.show-more-btn{display:block;width:100%;padding:8px;margin-top:8px;background-color:#f2f2f2;border:1px solid #ddd;border-radius:4px;color:#555;text-align:center;cursor:pointer;transition:background-color .2s}.show-more-btn:hover{background-color:#e6e6e6}.solution-group{margin-bottom:10px;border-radius:6px;overflow:hidden;box-shadow:0 1px 3px #0000001a}.main-solution{padding:10px 12px;font-size:15px}.equivalent-item{padding:6px 12px;font-size:14px}.equivalent-solutions{max-height:300px;overflow-y:auto}.number,.operator,.bracket{font-size:inherit}
+
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1>24点基础版</h1>
+        <div id="cardsContainer" class="cards-container"></div>
+        <div class="input-container">
+            <input type="text" id="expressionInput" placeholder="输入表达式，例如: (3+1)*6">
+            <button id="submitBtn" disabled>提交</button>
+            <button id="showAnswersBtn">查看答案</button>
+            <button id="newGameBtn">新游戏</button>
+        </div>
+        <div id="resultContainer" class="result-container"></div>
+        <div id="answersContainer" class="answers-container"></div>
+    </div>
+</body>
+</html> 
