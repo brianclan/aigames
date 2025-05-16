@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JuStack Balance Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: manipulation;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: 70vh;
+            margin: 0 auto;
+            background-color: #fff;
+            border: 2px solid #333;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        #score-display {
+            font-size: 24px;
+            margin: 10px 0;
+            color: #333;
+        }
+        
+        #jucoin-display {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #FF9800;
+            font-weight: bold;
+        }
+        
+        #shape-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .shape-btn {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .shape-btn.active {
+            background-color: #2196F3;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            z-index: 100;
+        }
+        
+        .block {
+            position: absolute;
+            background-color: #FF5252;
+            border: 2px solid #D32F2F;
+            box-sizing: border-box;
+        }
+        
+        .rectangle {
+            background-color: #2196F3;
+            border: 2px solid #1976D2;
+        }
+        
+        #base {
+            position: absolute;
+            bottom: 0;
+            width: 200px;
+            height: 20px;
+            background-color: #795548;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        #instructions {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 16px;
+            color: #666;
+            padding: 0 20px;
+        }
+        
+        @media (max-height: 600px) {
+            #game-container {
+                height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>JuStack Balance Game</h1>
+    <div id="instructions">Tap anywhere to drop shapes. Stack carefully to earn JuCoins!</div>
+    <div id="score-display">Stack Height: 0</div>
+    <div id="jucoin-display">JuCoins: 0</div>
+    <div id="shape-selector">
+        <button id="square-btn" class="shape-btn active">Square</button>
+        <button id="rectangle-btn" class="shape-btn">Rectangle</button>
+    </div>
+    <div id="game-container">
+        <div id="base"></div>
+        <div id="game-over">
+            <h2>Game Over!</h2>
+            <p id="final-score">Stack Height: 0</p>
+            <p id="final-jucoin">JuCoins Earned: 0</p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.18.0/matter.min.js"></script>
+    <script>
+        // Game variables
+        let score = 0;
+        let juCoins = 0;
+        let gameActive = false;
+        let selectedShape = 'square';
+        let engine;
+        let render;
+        let world;
+        let base;
+        let blocks = [];
+        let canDrop = true;
+        
+        // DOM elements
+        const gameContainer = document.getElementById('game-container');
+        const scoreDisplay = document.getElementById('score-display');
+        const juCoinDisplay = document.getElementById('jucoin-display');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const finalJuCoinDisplay = document.getElementById('final-jucoin');
+        const restartBtn = document.getElementById('restart-btn');
+        const squareBtn = document.getElementById('square-btn');
+        const rectangleBtn = document.getElementById('rectangle-btn');
+        
+        // Game dimensions
+        const gameWidth = gameContainer.clientWidth;
+        const gameHeight = gameContainer.clientHeight;
+        
+        // Initialize physics engine
+        function initPhysics() {
+            // Create physics engine
+            engine = Matter.Engine.create({
+                gravity: { x: 0, y: 1 }
+            });
+            world = engine.world;
+            
+            // Create renderer
+            render = Matter.Render.create({
+                element: gameContainer,
+                engine: engine,
+                options: {
+                    width: gameWidth,
+                    height: gameHeight,
+                    wireframes: false,
+                    background: '#fff'
+                }
+            });
+            Matter.Render.run(render);
+            
+            // Create base platform
+            base = Matter.Bodies.rectangle(
+                gameWidth / 2, 
+                gameHeight - 10, 
+                200, 20, 
+                { 
+                    isStatic: true,
+                    render: {
+                        fillStyle: '#795548',
+                        strokeStyle: '#5D4037',
+                        lineWidth: 2
+                    }
+                }
+            );
+            Matter.World.add(world, base);
+            
+            // Add walls to prevent objects from escaping
+            const wallOptions = { isStatic: true, render: { visible: false } };
+            const leftWall = Matter.Bodies.rectangle(0, gameHeight/2, 10, gameHeight, wallOptions);
+            const rightWall = Matter.Bodies.rectangle(gameWidth, gameHeight/2, 10, gameHeight, wallOptions);
+            Matter.World.add(world, [leftWall, rightWall]);
+            
+            // Run physics engine
+            Matter.Runner.run(engine);
+        }
+        
+        // Initialize game
+        function initGame() {
+            // Reset variables
+            score = 0;
+            juCoins = 0;
+            gameActive = true;
+            canDrop = true;
+            blocks = [];
+            
+            // Clear existing blocks
+            Matter.Composite.clear(world, false);
+            
+            // Re-add base platform and walls
+            base = Matter.Bodies.rectangle(
+                gameWidth / 2, 
+                gameHeight - 10, 
+                200, 20, 
+                { 
+                    isStatic: true,
+                    render: {
+                        fillStyle: '#795548',
+                        strokeStyle: '#5D4037',
+                        lineWidth: 2
+                    }
+                }
+            );
+            const wallOptions = { isStatic: true, render: { visible: false } };
+            const leftWall = Matter.Bodies.rectangle(0, gameHeight/2, 10, gameHeight, wallOptions);
+            const rightWall = Matter.Bodies.rectangle(gameWidth, gameHeight/2, 10, gameHeight, wallOptions);
+            Matter.World.add(world, [base, leftWall, rightWall]);
+            
+            // Update displays
+            scoreDisplay.textContent = `Stack Height: ${score}`;
+            juCoinDisplay.textContent = `JuCoins: ${juCoins}`;
+            
+            // Hide game over screen
+            gameOverScreen.style.display = 'none';
+            
+            // Start game loop
+            gameLoop();
+        }
+        
+        // Game loop
+        function gameLoop() {
+            if (!gameActive) return;
+            
+            // Check if game over
+            checkGameOver();
+            
+            // Continue game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Create new block
+        function createBlock(x, y, shape) {
+            let width, height;
+            let color, borderColor;
+            
+            if (shape === 'square') {
+                width = height = 50;
+                color = '#FF5252';
+                borderColor = '#D32F2F';
+            } else { // rectangle
+                width = 80;
+                height = 30;
+                color = '#2196F3';
+                borderColor = '#1976D2';
+            }
+            
+            const block = Matter.Bodies.rectangle(x, y, width, height, {
+                restitution: 0.3,
+                friction: 0.5,
+                render: {
+                    fillStyle: color,
+                    strokeStyle: borderColor,
+                    lineWidth: 2
+                }
+            });
+            
+            Matter.World.add(world, block);
+            blocks.push(block);
+            
+            // Increase score and JuCoins
+            score++;
+            juCoins++;
+            scoreDisplay.textContent = `Stack Height: ${score}`;
+            juCoinDisplay.textContent = `JuCoins: ${juCoins}`;
+            
+            // Bonus JuCoins for every 5 blocks
+            if (score % 5 === 0) {
+                juCoins += 2;
+                juCoinDisplay.textContent = `JuCoins: ${juCoins}`;
+            }
+            
+            // Set cooldown
+            canDrop = false;
+            setTimeout(() => {
+                canDrop = true;
+            }, 500);
+        }
+        
+        // Check if game over
+        function checkGameOver() {
+            if (!gameActive) return;
+            
+            // Check if any block fell out
+            for (const block of blocks) {
+                if (block.position.y > gameHeight + 100) {
+                    endGame();
+                    return;
+                }
+            }
+            
+            // Check if base is tilted too much
+            const baseAngle = Math.abs(base.angle);
+            if (baseAngle > 0.3) { // ~17 degrees
+                endGame();
+                return;
+            }
+        }
+        
+        // End the game
+        function endGame() {
+            gameActive = false;
+            finalScoreDisplay.textContent = `Stack Height: ${score}`;
+            finalJuCoinDisplay.textContent = `JuCoins Earned: ${juCoins}`;
+            gameOverScreen.style.display = 'block';
+        }
+        
+        // Handle drop event
+        function handleDrop(e) {
+            if (!gameActive || !canDrop) return;
+            
+            let clientX;
+            if (e.type.includes('touch')) {
+                clientX = e.touches[0].clientX;
+            } else {
+                clientX = e.clientX;
+            }
+            
+            const rect = gameContainer.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = 50; // Drop from top
+            
+            createBlock(x, y, selectedShape);
+        }
+        
+        // Initialize game
+        window.onload = function() {
+            initPhysics();
+            initGame();
+            
+            // Event listeners
+            gameContainer.addEventListener('click', handleDrop);
+            gameContainer.addEventListener('touchstart', handleDrop);
+            
+            // Shape selection
+            squareBtn.addEventListener('click', function() {
+                selectedShape = 'square';
+                squareBtn.classList.add('active');
+                rectangleBtn.classList.remove('active');
+            });
+            
+            rectangleBtn.addEventListener('click', function() {
+                selectedShape = 'rectangle';
+                rectangleBtn.classList.add('active');
+                squareBtn.classList.remove('active');
+            });
+            
+            // Restart game
+            restartBtn.addEventListener('click', initGame);
+        };
+    </script>
+</body>
+</html>
