@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Speed Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .game-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        
+        .word-display {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #2c3e50;
+            min-height: 48px;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            border: 2px solid #3498db;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            min-width: 100px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        
+        .correct {
+            color: #2ecc71;
+        }
+        
+        .incorrect {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <h1>Typing Speed Test</h1>
+    
+    <div class="game-container">
+        <div class="word-display" id="word-display">Click Start to begin</div>
+        <input type="text" class="input-field" id="input-field" placeholder="Type the word here..." disabled>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-label">Time</div>
+                <div class="stat-value" id="time">0s</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">WPM</div>
+                <div class="stat-value" id="wpm">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Correct</div>
+                <div class="stat-value" id="correct">0</div>
+            </div>
+        </div>
+        
+        <button id="start-btn">Start Game</button>
+        <button id="reset-btn" style="background-color: #e74c3c;">Reset</button>
+        
+        <div class="instructions">
+            Type the word shown above and press Enter. Your typing speed (WPM) will be calculated automatically.
+        </div>
+    </div>
+
+    <script>
+        // Game elements
+        const wordDisplay = document.getElementById('word-display');
+        const inputField = document.getElementById('input-field');
+        const timeDisplay = document.getElementById('time');
+        const wpmDisplay = document.getElementById('wpm');
+        const correctDisplay = document.getElementById('correct');
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        
+        // Game state
+        let currentWord = '';
+        let startTime;
+        let timer;
+        let correctCount = 0;
+        let totalTypedWords = 0;
+        let gameActive = false;
+        
+        // Word bank (common English words)
+        const words = [
+            'hello', 'world', 'apple', 'banana', 'computer', 'keyboard', 'programming', 
+            'javascript', 'internet', 'website', 'developer', 'coding', 'algorithm',
+            'function', 'variable', 'console', 'browser', 'document', 'element',
+            'event', 'listener', 'object', 'array', 'string', 'number', 'boolean',
+            'conditional', 'iteration', 'database', 'network', 'responsive', 'mobile',
+            'desktop', 'laptop', 'monitor', 'keyboard', 'mouse', 'printer', 'scanner',
+            'camera', 'speaker', 'microphone', 'headphones', 'charger', 'battery'
+        ];
+        
+        // Initialize game
+        function initGame() {
+            inputField.value = '';
+            inputField.disabled = true;
+            wordDisplay.textContent = 'Click Start to begin';
+            wordDisplay.className = 'word-display';
+            timeDisplay.textContent = '0s';
+            wpmDisplay.textContent = '0';
+            correctDisplay.textContent = '0';
+            correctCount = 0;
+            totalTypedWords = 0;
+            clearInterval(timer);
+            gameActive = false;
+        }
+        
+        // Start the game
+        function startGame() {
+            initGame();
+            gameActive = true;
+            inputField.disabled = false;
+            inputField.focus();
+            startTime = new Date();
+            timer = setInterval(updateTimer, 1000);
+            newWord();
+        }
+        
+        // Update timer display
+        function updateTimer() {
+            const currentTime = new Date();
+            const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+            timeDisplay.textContent = `${elapsedSeconds}s`;
+            
+            // Calculate WPM every 5 seconds
+            if (elapsedSeconds > 0 && elapsedSeconds % 5 === 0) {
+                calculateWPM();
+            }
+        }
+        
+        // Calculate words per minute
+        function calculateWPM() {
+            const currentTime = new Date();
+            const elapsedMinutes = (currentTime - startTime) / (1000 * 60);
+            const wpm = Math.round(correctCount / elapsedMinutes);
+            wpmDisplay.textContent = isNaN(wpm) ? '0' : wpm;
+        }
+        
+        // Display new random word
+        function newWord() {
+            currentWord = words[Math.floor(Math.random() * words.length)];
+            wordDisplay.textContent = currentWord;
+            wordDisplay.className = 'word-display';
+            inputField.value = '';
+        }
+        
+        // Check typed word
+        function checkWord() {
+            const typedWord = inputField.value.trim();
+            
+            if (typedWord === currentWord) {
+                wordDisplay.className = 'word-display correct';
+                correctCount++;
+            } else {
+                wordDisplay.className = 'word-display incorrect';
+            }
+            
+            totalTypedWords++;
+            correctDisplay.textContent = correctCount;
+            calculateWPM();
+            newWord();
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        resetBtn.addEventListener('click', initGame);
+        
+        inputField.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && gameActive) {
+                checkWord();
+            }
+        });
+        
+        // Initialize on load
+        initGame();
+    </script>
+</body>
+</html>
