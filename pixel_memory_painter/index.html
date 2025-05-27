@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Memory Painter</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 10px;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            max-width: 100%;
+        }
+        .info-panel {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 5px;
+        }
+        .info-item {
+            font-size: 14px;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 15px;
+            background-color: rgba(255,255,255,0.8);
+        }
+        .score { color: #2c3e50; }
+        .level { color: #27ae60; }
+        .time { color: #e74c3c; }
+        .pixel-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+        .pixel-grid {
+            display: grid;
+            grid-gap: 1px;
+            margin: 0 5px;
+            background-color: #ddd;
+            border: 2px solid #bbb;
+            border-radius: 3px;
+        }
+        .pixel {
+            background-color: white;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+        .pixel:hover {
+            opacity: 0.9;
+        }
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+        button:hover {
+            background-color: #2980b9;
+            transform: translateY(-1px);
+        }
+        button:active {
+            transform: translateY(1px);
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .timer-bar {
+            width: 100%;
+            max-width: 400px;
+            height: 6px;
+            background-color: #ecf0f1;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .timer-progress {
+            height: 100%;
+            background-color: #2ecc71;
+            width: 100%;
+            transition: width 0.1s linear;
+        }
+        .demo-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+        }
+        .demo-grid {
+            display: grid;
+            grid-gap: 2px;
+            margin-bottom: 20px;
+        }
+        .demo-pixel {
+            background-color: white;
+        }
+        .demo-text {
+            max-width: 300px;
+            text-align: center;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .demo-arrow {
+            font-size: 30px;
+            margin: 10px 0;
+            animation: bounce 1s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .demo-button {
+            background-color: #2ecc71;
+            padding: 10px 25px;
+            font-size: 16px;
+        }
+        .flash {
+            animation: flash 0.3s;
+        }
+        @keyframes flash {
+            0% { opacity: 0.5; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="info-panel">
+            <div class="info-item score">Score: <span id="score">0</span></div>
+            <div class="info-item level">Level: <span id="level">1</span></div>
+            <div class="info-item time">Time: <span id="time">0</span>s</div>
+        </div>
+        
+        <div class="timer-bar">
+            <div class="timer-progress" id="timer"></div>
+        </div>
+        
+        <div class="pixel-container">
+            <div id="preview-container" class="pixel-grid"></div>
+            <div id="grid-container" class="pixel-grid"></div>
+        </div>
+        
+        <div class="controls">
+            <button id="start-btn">Start</button>
+            <button id="check-btn" disabled>Check</button>
+        </div>
+    </div>
+
+    <div id="demo-overlay" class="demo-overlay" style="display: flex;">
+        <div class="demo-text">Memorize the pattern, then recreate it on the right</div>
+        
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <div class="demo-grid" id="demo-preview" style="grid-template-columns: repeat(3, 40px);">
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #2c3e50;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #2c3e50;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #2c3e50;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #2c3e50;"></div>
+            </div>
+            
+            <div class="demo-arrow">➜</div>
+            
+            <div class="demo-grid" id="demo-grid" style="grid-template-columns: repeat(3, 40px);">
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #3498db;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #3498db;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #3498db;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px;"></div>
+                <div class="demo-pixel" style="width: 40px; height: 40px; background-color: #3498db;"></div>
+            </div>
+        </div>
+        
+        <button id="demo-start" class="demo-button">Got it, start game!</button>
+    </div>
+
+    <script>
+        // Game variables
+        let score = 0;
+        let level = 1;
+        let timeTaken = 0;
+        let timerInterval;
+        let startTime;
+        let currentPattern = [];
+        let playerPattern = [];
+        let gridSize = 3;
+        let previewTime = 3;
+        let gameActive = false;
+        
+        // DOM elements
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const timeElement = document.getElementById('time');
+        const timerElement = document.getElementById('timer');
+        const previewContainer = document.getElementById('preview-container');
+        const gridContainer = document.getElementById('grid-container');
+        const startBtn = document.getElementById('start-btn');
+        const checkBtn = document.getElementById('check-btn');
+        const demoOverlay = document.getElementById('demo-overlay');
+        const demoStartBtn = document.getElementById('demo-start');
+        
+        // Initialize game
+        function initGame() {
+            score = 0;
+            level = 1;
+            gridSize = getGridSizeForLevel(level);
+            previewTime = getPreviewTimeForLevel(level);
+            updateUI();
+            createEmptyGrid();
+        }
+        
+        // Get grid size based on level
+        function getGridSizeForLevel(lvl) {
+            if (lvl <= 3) return 3;
+            if (lvl <= 6) return 4;
+            if (lvl <= 9) return 5;
+            if (lvl <= 12) return 6;
+            if (lvl <= 15) return 7;
+            if (lvl <= 18) return 8;
+            if (lvl <= 21) return 9;
+            if (lvl <= 24) return 10;
+            return Math.min(12, 8 + Math.floor(lvl / 5));
+        }
+        
+        // Get preview time based on level
+        function getPreviewTimeForLevel(lvl) {
+            return Math.max(1, 3 - Math.floor(lvl / 6));
+        }
+        
+        // Start new level
+        function startLevel() {
+            gameActive = false;
+            checkBtn.disabled = true;
+            
+            // Generate random pattern
+            currentPattern = generateRandomPattern();
+            playerPattern = Array(gridSize * gridSize).fill(0);
+            
+            // Show preview
+            showPreview();
+            
+            // Hide preview after time and start game
+            setTimeout(() => {
+                hidePreview();
+                startGame();
+            }, previewTime * 1000);
+        }
+        
+        // Generate random pattern
+        function generateRandomPattern() {
+            const pattern = [];
+            const cells = gridSize * gridSize;
+            const fillRatio = Math.min(0.5, 0.2 + (level * 0.02));
+            
+            do {
+                for (let i = 0; i < cells; i++) {
+                    pattern[i] = Math.random() < fillRatio ? 1 : 0;
+                }
+            } while (pattern.every(cell => cell === 0) || pattern.every(cell => cell === 1));
+            
+            return pattern;
+        }
+        
+        // Show preview
+        function showPreview() {
+            previewContainer.innerHTML = '';
+            previewContainer.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            previewContainer.style.width = `${gridSize * 30}px`;
+            previewContainer.style.height = `${gridSize * 30}px`;
+            
+            currentPattern.forEach((cell, index) => {
+                const pixel = document.createElement('div');
+                pixel.className = 'pixel';
+                pixel.style.backgroundColor = cell ? '#2c3e50' : 'white';
+                previewContainer.appendChild(pixel);
+            });
+            
+            // Flash animation
+            previewContainer.classList.add('flash');
+            setTimeout(() => previewContainer.classList.remove('flash'), 300);
+        }
+        
+        // Hide preview
+        function hidePreview() {
+            previewContainer.innerHTML = '';
+            previewContainer.style.width = '0';
+            previewContainer.style.height = '0';
+        }
+        
+        // Start game (player can draw)
+        function startGame() {
+            gameActive = true;
+            checkBtn.disabled = false;
+            startTimer();
+            renderPlayerGrid();
+        }
+        
+        // Create empty grid
+        function createEmptyGrid() {
+            gridContainer.innerHTML = '';
+            gridContainer.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            gridContainer.style.width = `${gridSize * 30}px`;
+            gridContainer.style.height = `${gridSize * 30}px`;
+            
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                const pixel = document.createElement('div');
+                pixel.className = 'pixel';
+                pixel.dataset.index = i;
+                pixel.addEventListener('click', () => {
+                    if (gameActive) {
+                        playerPattern[i] = playerPattern[i] ? 0 : 1;
+                        pixel.style.backgroundColor = playerPattern[i] ? '#3498db' : 'white';
+                        pixel.classList.add('flash');
+                        setTimeout(() => pixel.classList.remove('flash'), 300);
+                    }
+                });
+                gridContainer.appendChild(pixel);
+            }
+        }
+        
+        // Render player grid
+        function renderPlayerGrid() {
+            const pixels = gridContainer.querySelectorAll('.pixel');
+            pixels.forEach((pixel, index) => {
+                pixel.style.backgroundColor = playerPattern[index] ? '#3498db' : 'white';
+            });
+        }
+        
+        // Start timer
+        function startTimer() {
+            startTime = Date.now();
+            clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                timeTaken = (Date.now() - startTime) / 1000;
+                timeElement.textContent = timeTaken.toFixed(1);
+                
+                // Update timer bar
+                const timeLimit = Math.max(10, 30 - level);
+                const timeLeft = Math.max(0, timeLimit - timeTaken);
+                const percentage = (timeLeft / timeLimit) * 100;
+                timerElement.style.width = `${percentage}%`;
+                
+                // Change timer color
+                if (percentage < 30) {
+                    timerElement.style.backgroundColor = '#e74c3c';
+                } else if (percentage < 60) {
+                    timerElement.style.backgroundColor = '#f39c12';
+                } else {
+                    timerElement.style.backgroundColor = '#2ecc71';
+                }
+                
+                // Auto-check when time's up
+                if (timeTaken >= timeLimit) {
+                    checkAnswer();
+                }
+            }, 100);
+        }
+        
+        // Check answer
+        function checkAnswer() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            checkBtn.disabled = true;
+            
+            // Calculate accuracy
+            let correct = 0;
+            for (let i = 0; i < currentPattern.length; i++) {
+                if (currentPattern[i] === playerPattern[i]) {
+                    correct++;
+                }
+            }
+            
+            const accuracy = (correct / currentPattern.length) * 100;
+            const timeLimit = Math.max(10, 30 - level);
+            const timeBonus = Math.max(0, timeLimit - timeTaken);
+            
+            // Calculate score
+            const levelMultiplier = level * 0.5;
+            const baseScore = 100 * levelMultiplier;
+            const accuracyBonus = baseScore * (accuracy / 100);
+            const timeScore = timeBonus * 5 * levelMultiplier;
+            const roundScore = Math.round(accuracyBonus + timeScore);
+            
+            score += roundScore;
+            
+            // Show correct answers
+            showAnswerComparison();
+            
+            // Update UI
+            updateUI();
+            
+            // Prepare next level
+            setTimeout(() => {
+                nextLevel();
+            }, 1500);
+        }
+        
+        // Show answer comparison
+        function showAnswerComparison() {
+            const pixels = gridContainer.querySelectorAll('.pixel');
+            pixels.forEach((pixel, index) => {
+                if (currentPattern[index] === 1) {
+                    if (playerPattern[index] === 1) {
+                        pixel.style.backgroundColor = '#2ecc71'; // Correct
+                    } else {
+                        pixel.style.backgroundColor = '#e74c3c'; // Missed
+                    }
+                } else if (playerPattern[index] === 1) {
+                    pixel.style.backgroundColor = '#f39c12'; // Wrong
+                }
+                
+                pixel.classList.add('flash');
+                setTimeout(() => pixel.classList.remove('flash'), 300);
+            });
+        }
+        
+        // Next level
+        function nextLevel() {
+            level++;
+            gridSize = getGridSizeForLevel(level);
+            previewTime = getPreviewTimeForLevel(level);
+            
+            updateUI();
+            createEmptyGrid();
+            startLevel();
+        }
+        
+        // Update UI
+        function updateUI() {
+            scoreElement.textContent = score;
+            levelElement.textContent = level;
+            timeElement.textContent = '0';
+            timerElement.style.width = '100%';
+            timerElement.style.backgroundColor = '#2ecc71';
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', () => {
+            initGame();
+            startLevel();
+        });
+        
+        checkBtn.addEventListener('click', checkAnswer);
+        
+        demoStartBtn.addEventListener('click', () => {
+            demoOverlay.style.display = 'none';
+            initGame();
+            startLevel();
+        });
+        
+        // Initial demo animation
+        setTimeout(() => {
+            const demoPixels = document.querySelectorAll('#demo-grid .demo-pixel');
+            let delay = 0;
+            
+            demoPixels.forEach(pixel => {
+                if (pixel.style.backgroundColor) {
+                    setTimeout(() => {
+                        pixel.classList.add('flash');
+                        setTimeout(() => pixel.classList.remove('flash'), 300);
+                    }, delay);
+                    delay += 300;
+                }
+            });
+        }, 500);
+    </script>
+</body>
+</html>
