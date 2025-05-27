@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odd One Out</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 20px;
+        }
+        .game-container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px auto;
+            max-width: 300px;
+        }
+        .item {
+            font-size: 40px;
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.1);
+        }
+        .item:hover {
+            transform: scale(1.05);
+        }
+        .item:active {
+            transform: scale(0.95);
+        }
+        .info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .score {
+            color: #2e8b57;
+        }
+        .timer {
+            color: #d9534f;
+        }
+        .level {
+            color: #5bc0de;
+        }
+        .message {
+            height: 24px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .correct {
+            background-color: #dff0d8 !important;
+        }
+        .incorrect {
+            background-color: #f2dede !important;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #5cb85c;
+            border-radius: 5px;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Odd One Out</h1>
+        <div class="info">
+            <div class="score">Score: <span id="score">0</span></div>
+            <div class="level">Level: <span id="level">1</span></div>
+            <div class="timer">Time: <span id="time">10</span>s</div>
+        </div>
+        
+        <div class="progress-container">
+            <div id="progress" class="progress-bar" style="width: 100%"></div>
+        </div>
+        
+        <div class="message" id="message"></div>
+        
+        <div id="grid" class="grid"></div>
+        
+        <button id="start-btn">Start Game</button>
+    </div>
+
+    <script>
+        // Game elements
+        const grid = document.getElementById('grid');
+        const scoreDisplay = document.getElementById('score');
+        const levelDisplay = document.getElementById('level');
+        const timeDisplay = document.getElementById('time');
+        const messageDisplay = document.getElementById('message');
+        const startBtn = document.getElementById('start-btn');
+        const progressBar = document.getElementById('progress');
+        
+        // Game variables
+        let score = 0;
+        let level = 1;
+        let timeLeft = 10;
+        let timer;
+        let oddItemIndex;
+        let gameActive = false;
+        
+        // Emoji categories
+        const emojiCategories = [
+            ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'], // Animals
+            ['🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓'], // Fruits
+            ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎', '🚓', '🚑'], // Vehicles
+            ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱'], // Sports
+            ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍']  // Colors
+        ];
+        
+        // Start game
+        function startGame() {
+            score = 0;
+            level = 1;
+            scoreDisplay.textContent = score;
+            levelDisplay.textContent = level;
+            startBtn.textContent = 'Restart Game';
+            gameActive = true;
+            createGrid();
+            startTimer();
+        }
+        
+        // Create the game grid
+        function createGrid() {
+            grid.innerHTML = '';
+            messageDisplay.textContent = '';
+            
+            // Determine grid size (3x3 for first 5 levels, then 4x4, etc.)
+            const gridSize = Math.min(5, 3 + Math.floor(level / 5));
+            grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            
+            // Select a random emoji category
+            const categoryIndex = Math.floor(Math.random() * emojiCategories.length);
+            const category = emojiCategories[categoryIndex];
+            
+            // Select a random emoji from the category (will be the common one)
+            const commonEmoji = category[Math.floor(Math.random() * category.length)];
+            
+            // Create all items with the common emoji
+            const totalItems = gridSize * gridSize;
+            for (let i = 0; i < totalItems; i++) {
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.textContent = commonEmoji;
+                item.addEventListener('click', () => checkAnswer(i));
+                grid.appendChild(item);
+            }
+            
+            // Select a random odd item (different from common emoji)
+            oddItemIndex = Math.floor(Math.random() * totalItems);
+            let oddEmoji;
+            
+            do {
+                const randomCategoryIndex = Math.floor(Math.random() * emojiCategories.length);
+                const randomCategory = emojiCategories[randomCategoryIndex];
+                oddEmoji = randomCategory[Math.floor(Math.random() * randomCategory.length)];
+            } while (oddEmoji === commonEmoji);
+            
+            grid.children[oddItemIndex].textContent = oddEmoji;
+            
+            // Set timer based on level (decreases as level increases)
+            timeLeft = Math.max(3, 10 - Math.floor(level / 3));
+            timeDisplay.textContent = timeLeft;
+            progressBar.style.width = '100%';
+            progressBar.style.backgroundColor = '#5cb85c';
+        }
+        
+        // Check if selected item is the odd one
+        function checkAnswer(selectedIndex) {
+            if (!gameActive) return;
+            
+            clearTimeout(timer);
+            
+            if (selectedIndex === oddItemIndex) {
+                // Correct answer
+                score += level * 10;
+                scoreDisplay.textContent = score;
+                grid.children[selectedIndex].classList.add('correct');
+                messageDisplay.textContent = 'Correct! +' + (level * 10) + ' points';
+                messageDisplay.style.color = '#2e8b57';
+                
+                // Level up every 3 correct answers
+                if (score >= level * 30) {
+                    level++;
+                    levelDisplay.textContent = level;
+                    messageDisplay.textContent += ' - Level Up!';
+                }
+            } else {
+                // Wrong answer
+                grid.children[selectedIndex].classList.add('incorrect');
+                grid.children[oddItemIndex].classList.add('correct');
+                messageDisplay.textContent = 'Wrong! Try again';
+                messageDisplay.style.color = '#d9534f';
+            }
+            
+            // Disable further clicks
+            gameActive = false;
+            
+            // Next round after short delay
+            setTimeout(() => {
+                createGrid();
+                startTimer();
+            }, 1500);
+        }
+        
+        // Start the countdown timer
+        function startTimer() {
+            gameActive = true;
+            let timePassed = 0;
+            const timeLimit = timeLeft;
+            
+            timer = setInterval(() => {
+                timePassed++;
+                timeLeft = timeLimit - timePassed;
+                timeDisplay.textContent = timeLeft;
+                
+                // Update progress bar
+                const progressPercent = (timeLeft / timeLimit) * 100;
+                progressBar.style.width = progressPercent + '%';
+                
+                // Change color when time is running out
+                if (timeLeft <= timeLimit * 0.3) {
+                    progressBar.style.backgroundColor = '#d9534f';
+                } else if (timeLeft <= timeLimit * 0.6) {
+                    progressBar.style.backgroundColor = '#f0ad4e';
+                }
+                
+                // Time's up
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    timeDisplay.textContent = '0';
+                    progressBar.style.width = '0%';
+                    messageDisplay.textContent = 'Time\'s up!';
+                    messageDisplay.style.color = '#d9534f';
+                    
+                    // Highlight the correct answer
+                    grid.children[oddItemIndex].classList.add('correct');
+                    
+                    // Disable further clicks
+                    gameActive = false;
+                    
+                    // Next round after short delay
+                    setTimeout(() => {
+                        createGrid();
+                        startTimer();
+                    }, 1500);
+                }
+            }, 1000);
+        }
+        
+        // Event listener for start button
+        startBtn.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
