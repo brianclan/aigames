@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pixel Fishing</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1a2f4b;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+        }
+        canvas {
+            border: 4px solid #3a5a80;
+            margin-top: 20px;
+            image-rendering: pixelated;
+        }
+        #ui {
+            display: flex;
+            justify-content: space-between;
+            width: 400px;
+            margin-top: 10px;
+            font-size: 18px;
+        }
+        #start-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        button {
+            background: #4a6fa5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #5a8ac5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Pixel Fishing</h1>
+    <canvas id="gameCanvas" width="400" height="500"></canvas>
+    <div id="ui">
+        <div>Score: <span id="score">0</span></div>
+        <div>Time: <span id="time">60</span>s</div>
+    </div>
+    <div id="start-screen">
+        <h2>Pixel Fishing</h2>
+        <p>Click to cast your line!</p>
+        <p>Avoid trash and catch fish</p>
+        <button id="start-btn">Start Fishing</button>
+    </div>
+
+    <script>
+        // Game elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const timeElement = document.getElementById('time');
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-btn');
+
+        // Game state
+        const state = {
+            score: 0,
+            timeLeft: 60,
+            gameActive: false,
+            hook: {
+                x: 200,
+                y: 50,
+                depth: 0,
+                movingDown: false,
+                speed: 0,
+                maxDepth: 400
+            },
+            fish: [],
+            trash: [],
+            bubbles: [],
+            lastTime: 0
+        };
+
+        // Fish types (size, speed, points, color)
+        const fishTypes = [
+            { size: 20, speed: 1, points: 10, color: '#ff5555' }, // Small red
+            { size: 30, speed: 0.8, points: 20, color: '#55aaff' }, // Medium blue
+            { size: 40, speed: 0.6, points: 50, color: '#ffff55' }  // Large yellow
+        ];
+
+        // Trash types
+        const trashTypes = [
+            { size: 20, speed: 0.5, color: '#888888' }, // Can
+            { size: 25, speed: 0.4, color: '#654321' }, // Boot
+            { size: 30, speed: 0.3, color: '#333333' }  // Tire
+        ];
+
+        // Initialize game
+        function initGame() {
+            state.score = 0;
+            state.timeLeft = 60;
+            state.gameActive = true;
+            state.hook = {
+                x: 200,
+                y: 50,
+                depth: 0,
+                movingDown: false,
+                speed: 0,
+                maxDepth: 400
+            };
+            state.fish = [];
+            state.trash = [];
+            state.bubbles = [];
+            
+            scoreElement.textContent = '0';
+            timeElement.textContent = '60';
+            
+            startScreen.style.display = 'none';
+        }
+
+        // Generate random fish
+        function generateFish() {
+            if (Math.random() < 0.02) {
+                const type = fishTypes[Math.floor(Math.random() * fishTypes.length)];
+                state.fish.push({
+                    x: Math.random() < 0.5 ? -50 : 450,
+                    y: 100 + Math.random() * 350,
+                    size: type.size,
+                    speed: type.speed * (Math.random() < 0.5 ? 1 : -1),
+                    points: type.points,
+                    color: type.color,
+                    direction: Math.random() < 0.5 ? 1 : -1
+                });
+            }
+        }
+
+        // Generate random trash
+        function generateTrash() {
+            if (Math.random() < 0.01) {
+                const type = trashTypes[Math.floor(Math.random() * trashTypes.length)];
+                state.trash.push({
+                    x: Math.random() < 0.5 ? -50 : 450,
+                    y: 100 + Math.random() * 350,
+                    size: type.size,
+                    speed: type.speed * (Math.random() < 0.5 ? 1 : -1),
+                    color: type.color,
+                    direction: Math.random() < 0.5 ? 1 : -1
+                });
+            }
+        }
+
+        // Generate bubbles
+        function generateBubbles() {
+            if (Math.random() < 0.1) {
+                state.bubbles.push({
+                    x: 50 + Math.random() * 300,
+                    y: 500,
+                    size: 5 + Math.random() * 10,
+                    speed: 1 + Math.random() * 2
+                });
+            }
+        }
+
+        // Update game state
+        function update(deltaTime) {
+            if (!state.gameActive) return;
+            
+            // Update time
+            state.timeLeft -= deltaTime;
+            timeElement.textContent = Math.max(0, Math.floor(state.timeLeft));
+            
+            // End game if time runs out
+            if (state.timeLeft <= 0) {
+                state.gameActive = false;
+                startScreen.style.display = 'block';
+                startScreen.querySelector('p').textContent = `Game Over! Score: ${state.score}`;
+                startButton.textContent = 'Play Again';
+                return;
+            }
+            
+            // Update hook
+            if (state.hook.movingDown) {
+                state.hook.speed += 0.2;
+                state.hook.depth += state.hook.speed;
+                
+                // Check if reached bottom
+                if (state.hook.depth >= state.hook.maxDepth) {
+                    state.hook.movingDown = false;
+                }
+            } else {
+                // Reeling up
+                state.hook.depth -= 2;
+                if (state.hook.depth <= 0) {
+                    state.hook.depth = 0;
+                }
+            }
+            state.hook.y = 50 + state.hook.depth;
+            
+            // Generate fish and trash
+            generateFish();
+            generateTrash();
+            generateBubbles();
+            
+            // Update fish
+            for (let i = state.fish.length - 1; i >= 0; i--) {
+                const fish = state.fish[i];
+                fish.x += fish.speed;
+                
+                // Remove if off screen
+                if ((fish.direction > 0 && fish.x > 450) || (fish.direction < 0 && fish.x < -50)) {
+                    state.fish.splice(i, 1);
+                    continue;
+                }
+                
+                // Check collision with hook
+                const dist = Math.sqrt(
+                    Math.pow(fish.x - state.hook.x, 2) + 
+                    Math.pow(fish.y - state.hook.y, 2)
+                );
+                
+                if (dist < fish.size/2 + 10 && state.hook.movingDown) {
+                    state.score += fish.points;
+                    scoreElement.textContent = state.score;
+                    state.fish.splice(i, 1);
+                    state.hook.movingDown = false;
+                }
+            }
+            
+            // Update trash
+            for (let i = state.trash.length - 1; i >= 0; i--) {
+                const trash = state.trash[i];
+                trash.x += trash.speed;
+                
+                // Remove if off screen
+                if ((trash.direction > 0 && trash.x > 450) || (trash.direction < 0 && trash.x < -50)) {
+                    state.trash.splice(i, 1);
+                    continue;
+                }
+                
+                // Check collision with hook
+                const dist = Math.sqrt(
+                    Math.pow(trash.x - state.hook.x, 2) + 
+                    Math.pow(trash.y - state.hook.y, 2)
+                );
+                
+                if (dist < trash.size/2 + 10 && state.hook.movingDown) {
+                    state.score = Math.max(0, state.score - 5);
+                    scoreElement.textContent = state.score;
+                    state.trash.splice(i, 1);
+                    state.hook.movingDown = false;
+                }
+            }
+            
+            // Update bubbles
+            for (let i = state.bubbles.length - 1; i >= 0; i--) {
+                const bubble = state.bubbles[i];
+                bubble.y -= bubble.speed;
+                
+                // Remove if off screen
+                if (bubble.y < 0) {
+                    state.bubbles.splice(i, 1);
+                }
+            }
+        }
+
+        // Render game
+        function render() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw water background
+            ctx.fillStyle = '#1a3f6b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw water surface
+            ctx.fillStyle = '#2a5f8b';
+            ctx.beginPath();
+            ctx.moveTo(0, 50);
+            for (let x = 0; x < canvas.width; x += 20) {
+                ctx.lineTo(x, 50 + Math.sin(x/20 + Date.now()/500) * 5);
+            }
+            ctx.lineTo(canvas.width, 50);
+            ctx.lineTo(canvas.width, 0);
+            ctx.lineTo(0, 0);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Draw bubbles
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            state.bubbles.forEach(bubble => {
+                ctx.beginPath();
+                ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Draw fish
+            state.fish.forEach(fish => {
+                ctx.fillStyle = fish.color;
+                
+                // Fish body
+                ctx.save();
+                ctx.translate(fish.x, fish.y);
+                ctx.scale(fish.direction, 1);
+                
+                ctx.beginPath();
+                ctx.ellipse(0, 0, fish.size, fish.size/2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Fish tail
+                ctx.beginPath();
+                ctx.moveTo(-fish.size, 0);
+                ctx.lineTo(-fish.size - 10, -fish.size/2);
+                ctx.lineTo(-fish.size - 10, fish.size/2);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Fish eye
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(fish.size/2, -fish.size/4, fish.size/5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+            
+            // Draw trash
+            state.trash.forEach(trash => {
+                ctx.fillStyle = trash.color;
+                
+                if (trash.size === 20) {
+                    // Can
+                    ctx.fillRect(trash.x - trash.size/2, trash.y - trash.size/2, trash.size, trash.size);
+                } else if (trash.size === 25) {
+                    // Boot
+                    ctx.beginPath();
+                    ctx.moveTo(trash.x - trash.size/2, trash.y);
+                    ctx.lineTo(trash.x - trash.size/4, trash.y + trash.size/2);
+                    ctx.lineTo(trash.x + trash.size/4, trash.y + trash.size/2);
+                    ctx.lineTo(trash.x + trash.size/2, trash.y);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // Tire
+                    ctx.beginPath();
+                    ctx.arc(trash.x, trash.y, trash.size/2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#222222';
+                    ctx.beginPath();
+                    ctx.arc(trash.x, trash.y, trash.size/3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+            
+            // Draw fishing line
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(200, 0);
+            ctx.lineTo(state.hook.x, state.hook.y);
+            ctx.stroke();
+            
+            // Draw hook
+            ctx.fillStyle = '#aaaaaa';
+            ctx.beginPath();
+            ctx.arc(state.hook.x, state.hook.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw hook point
+            ctx.fillStyle = '#666666';
+            ctx.beginPath();
+            ctx.moveTo(state.hook.x + 10, state.hook.y);
+            ctx.lineTo(state.hook.x + 5, state.hook.y + 5);
+            ctx.lineTo(state.hook.x + 10, state.hook.y + 10);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Game loop
+        function gameLoop(timestamp) {
+            if (!state.lastTime) state.lastTime = timestamp;
+            const deltaTime = (timestamp - state.lastTime) / 1000;
+            state.lastTime = timestamp;
+            
+            update(deltaTime);
+            render();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listeners
+        canvas.addEventListener('click', () => {
+            if (state.gameActive && !state.hook.movingDown && state.hook.depth === 0) {
+                state.hook.movingDown = true;
+                state.hook.speed = 0;
+            }
+        });
+
+        startButton.addEventListener('click', initGame);
+
+        // Start game
+        gameLoop(0);
+    </script>
+</body>
+</html>
