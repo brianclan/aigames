@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💥 Explosive Fireworks Art Creator</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            cursor: none;
+        }
+        canvas {
+            display: block;
+        }
+        h1 {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>💥 Move your mouse/finger to create fireworks!</h1>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        // Set canvas to full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Store all particles
+        let particles = [];
+
+        // Generate random colors
+        function randomColor() {
+            const colors = [
+                "#FF0000", "#FF7F00", "#FFFF00", "#00FF00", 
+                "#0000FF", "#4B0082", "#9400D3", "#FF1493"
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Particle class
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 3 + 1;
+                this.speedX = Math.random() * 6 - 3;
+                this.speedY = Math.random() * 6 - 3;
+                this.life = 100; // Particle lifespan
+            }
+
+            // Update particle position
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life--; // Decrease lifespan
+                this.radius *= 0.98; // Shrink particle
+            }
+
+            // Draw particle
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life / 100; // Fade-out effect
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        // Create explosion effect
+        function createExplosion(x, y) {
+            const particleCount = 50;
+            const color = randomColor();
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            // Semi-transparent background (creates trailing effect)
+            ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw all particles
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+
+                // Remove dead particles
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                    i--;
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Trigger explosion on mouse/touch movement
+        canvas.addEventListener("mousemove", (e) => {
+            createExplosion(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener("touchmove", (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            createExplosion(touch.clientX, touch.clientY);
+        });
+
+        // Reset canvas on window resize
+        window.addEventListener("resize", () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
