@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>MineSweeper</title>
     <style>
       body {
-        font-family: Arial, sans-serif;
+        font-family: Arial, "Microsoft YaHei", "SimHei", sans-serif;
         margin: 20px;
       }
       #game {
@@ -55,9 +57,15 @@
   <body>
     <div id="game">
       <div class="controls">
-        <a class="restart" onclick="restartGame()">{{restart}}</a>
-        <div class="language-selector" onclick="toggleLanguage()">
-          {{switchLanguage}}
+        <a id="restart-btn" class="restart" onclick="restartGame()"
+          >Restart Game</a
+        >
+        <div
+          id="language-switch"
+          class="language-selector"
+          onclick="toggleLanguage()"
+        >
+          切换到中文
         </div>
       </div>
       <div id="canvas">
@@ -66,10 +74,16 @@
         </table>
       </div>
       <h2>
-        {{minesLeft}}:
+        <span id="mines-left-text">Remaining Mines</span>:
         <div style="display: inline" id="score"></div>
       </h2>
-      <div class="info"><b>{{howToPlay}}</b>: {{instructions}}</div>
+      <div class="info">
+        <b id="how-to-play">HOW TO PLAY</b>:
+        <span id="instructions-text"
+          >Left click on unknown cell: Reveal cell; Left click on number:
+          Auto-reveal surrounding cells; Right click: Mark/unmark mine.</span
+        >
+      </div>
     </div>
 
     <script>
@@ -82,6 +96,8 @@
           howToPlay: "HOW TO PLAY",
           instructions:
             "Left click on unknown cell: Reveal cell; Left click on number: Auto-reveal surrounding cells; Right click: Mark/unmark mine.",
+          youWin: "You Win!",
+          gameOver: "Game Over!",
         },
         zh: {
           restart: "重新开始",
@@ -90,6 +106,8 @@
           howToPlay: "游戏说明",
           instructions:
             "左键点击未知方块：探测地雷；左键点击数字方块：自动探测周围地雷；右键点击：标记地雷/取消标记地雷。",
+          youWin: "游戏胜利！",
+          gameOver: "游戏失败！",
         },
       };
 
@@ -144,19 +162,15 @@
       }
 
       function makeGame(rowCount, columnCount, mineCount) {
-        const game = new Array(rowCount)
-          .fill(null)
-          .map((_, i) =>
-            new Array(columnCount)
-              .fill(null)
-              .map((_, j) => ({
-                mineCount: 0,
-                markedMine: false,
-                revealed: false,
-                i,
-                j,
-              }))
-          );
+        const game = new Array(rowCount).fill(null).map((_, i) =>
+          new Array(columnCount).fill(null).map((_, j) => ({
+            mineCount: 0,
+            markedMine: false,
+            revealed: false,
+            i,
+            j,
+          }))
+        );
         game.forEach((row) =>
           row.forEach((cell) => {
             cell.game = game;
@@ -208,7 +222,7 @@
           game.revealed = false;
           return;
         }
-        alert(currentLang === "en" ? "You Win!" : "游戏胜利！");
+        alert(lang[currentLang].youWin);
         game.revealed = true;
         updateBoard();
       }
@@ -222,7 +236,7 @@
           return;
         }
         if (cell.isMine) {
-          alert(currentLang === "en" ? "Game Over!" : "游戏失败！");
+          alert(lang[currentLang].gameOver);
           game.revealed = true;
         } else {
           cell.revealed = true;
@@ -324,18 +338,15 @@
       }
 
       function updateLanguage() {
-        document.querySelector(".restart").textContent =
+        document.getElementById("restart-btn").textContent =
           lang[currentLang].restart;
-        document.querySelector(".language-selector").textContent =
+        document.getElementById("language-switch").textContent =
           lang[currentLang].switchLanguage;
-        document.querySelector("h2").childNodes[0].textContent =
-          lang[currentLang].minesLeft + ": ";
-        const infoElement = document.querySelector(".info");
-        infoElement.querySelector("b").textContent =
+        document.getElementById("mines-left-text").textContent =
+          lang[currentLang].minesLeft;
+        document.getElementById("how-to-play").textContent =
           lang[currentLang].howToPlay;
-        infoElement.innerHTML =
-          infoElement.innerHTML.split(": ")[0] +
-          ": " +
+        document.getElementById("instructions-text").textContent =
           lang[currentLang].instructions;
       }
 
