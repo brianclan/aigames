@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>InversusLiteFinal - Inversus-Style Arena Shooter</title>
+    <title>SuperShooter - Inversus-Style Arena Shooter</title>
 
     <style>
       :root {
@@ -76918,7 +76918,7 @@ return new ` +
           createLoadingScreen() {
             const {width: O, height: B} = this.cameras.main;
             this.add
-              .text(O / 2, B / 2 - 100, "InversusLiteFinalWithAI", {
+              .text(O / 2, B / 2 - 100, "SuperShooterWithAI", {
                 fontSize: "48px",
                 color: "#ffffff",
                 fontFamily: "Arial, sans-serif",
@@ -77000,7 +77000,7 @@ return new ` +
                 .rectangle(O / 2, B / 2, O - 10, B - 10)
                 .setStrokeStyle(2, 3355443),
               this.add
-                .text(O / 2, B / 4, "InversusLiteFinalWithAI", {
+                .text(O / 2, B / 4, "SuperShooterWithAI", {
                   fontSize: `${Q.UI.FONT_SIZES.TITLE}px`,
                   color: "#ffffff",
                   fontFamily: Q.UI.FONT_FAMILY,
@@ -79615,11 +79615,11 @@ return new ` +
                 }),
                 {
                   severity: "EMERGENCY",
-                  message: "🚨 你被困住了！无法移动！",
+                  message: "🚨 You are trapped! Cannot move!",
                   suggestedActions: [
-                    "射击开辟新道路",
-                    "等待对手移动改变地形",
-                    "寻找射击角度翻转附近瓷砖",
+                    "Shoot to create new paths",
+                    "Wait for opponent to change terrain",
+                    "Find shooting angles to flip nearby tiles",
                   ],
                   affectedPlayer: {color: B, position: O},
                   turnsUntilTrapped: 0,
@@ -79627,11 +79627,11 @@ return new ` +
               : v.totalArea <= 3
               ? {
                   severity: "CRITICAL",
-                  message: "⚠️ 活动空间极其有限！",
+                  message: "⚠️ Extremely limited movement space!",
                   suggestedActions: [
-                    "立即射击扩展领域",
-                    "避免进入死角",
-                    "保持在中心区域",
+                    "Shoot immediately to expand area",
+                    "Avoid dead ends",
+                    "Stay in central areas",
                   ],
                   affectedPlayer: {color: B, position: O},
                   turnsUntilTrapped: 1,
@@ -79639,11 +79639,11 @@ return new ` +
               : v.escapeRoutes.length === 1
               ? {
                   severity: "WARNING",
-                  message: "⚡ 只有一条逃生路线！",
+                  message: "⚡ Only one escape route left!",
                   suggestedActions: [
-                    "保护当前逃生路线",
-                    "寻找新的突破口",
-                    "小心对手的封锁射击",
+                    "Protect current escape route",
+                    "Look for new breakthroughs",
+                    "Watch out for blocking shots from opponent",
                   ],
                   affectedPlayer: {color: B, position: O},
                   turnsUntilTrapped: 2,
@@ -79651,8 +79651,11 @@ return new ` +
               : v.totalArea <= 8
               ? {
                   severity: "INFO",
-                  message: "💡 活动空间偏小，建议扩展",
-                  suggestedActions: ["寻找扩展机会", "主动射击开辟道路"],
+                  message: "💡 Limited movement space, expansion recommended",
+                  suggestedActions: [
+                    "Look for expansion opportunities",
+                    "Shoot to create new paths",
+                  ],
                   affectedPlayer: {color: B, position: O},
                 }
               : null;
@@ -80896,8 +80899,8 @@ return new ` +
     <div class="app-container">
       <!-- 顶部标题 -->
       <div class="header">
-        <h1 class="game-title" data-en="InversusLiteFinal" data-zh="超级射击">
-          InversusLiteFinal
+        <h1 class="game-title" data-en="SuperShooter" data-zh="超级射击">
+          SuperShooter
         </h1>
         <p
           class="game-subtitle"
