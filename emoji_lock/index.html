@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emoji Lock</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #f0f2f5;
+            touch-action: manipulation;
+            overflow: hidden;
+        }
+        
+        #game-container {
+            text-align: center;
+            max-width: 100%;
+            width: 400px;
+            padding: 20px;
+        }
+        
+        #emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 30px auto;
+        }
+        
+        .emoji-cell {
+            font-size: 2.5rem;
+            width: 100%;
+            aspect-ratio: 1/1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s, background 0.2s;
+        }
+        
+        .emoji-cell:active {
+            transform: scale(0.95);
+        }
+        
+        .emoji-cell.selected {
+            background: #e3f2fd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .emoji-cell.wrong {
+            background: #ffcdd2;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        
+        #pattern-display {
+            height: 40px;
+            font-size: 1.8rem;
+            letter-spacing: 5px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #message {
+            height: 30px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+        }
+        
+        .correct {
+            color: #388e3c;
+            animation: pulse 0.5s;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .wrong {
+            color: #e53935;
+        }
+        
+        #controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: #1976d2;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #1565c0;
+        }
+        
+        button:disabled {
+            background: #90caf9;
+            cursor: not-allowed;
+        }
+        
+        #level-display {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        #timer {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        @media (max-width: 500px) {
+            .emoji-cell {
+                font-size: 2rem;
+            }
+            
+            #pattern-display {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Emoji Lock</h1>
+        <div id="level-display">Level: 1</div>
+        <div id="timer">Time: 30s</div>
+        <div id="message"></div>
+        <div id="pattern-display"></div>
+        <div id="emoji-grid"></div>
+        <div id="controls">
+            <button id="check-btn" disabled>Check</button>
+            <button id="reset-btn">Reset</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        const state = {
+            level: 1,
+            timeLeft: 30,
+            targetPattern: [],
+            userPattern: [],
+            emojiSet: [],
+            gameActive: false,
+            showingPattern: false,
+            timer: null,
+            allowInput: true
+        };
+
+        // DOM elements
+        const emojiGrid = document.getElementById('emoji-grid');
+        const patternDisplay = document.getElementById('pattern-display');
+        const messageDisplay = document.getElementById('message');
+        const checkButton = document.getElementById('check-btn');
+        const resetButton = document.getElementById('reset-btn');
+        const levelDisplay = document.getElementById('level-display');
+        const timerDisplay = document.getElementById('timer');
+
+        // Emoji collections
+        const emojiCategories = [
+            ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨'],
+            ['🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🍒'],
+            ['⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🏓'],
+            ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎', '🚓', '🚑', '🚒'],
+            ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎']
+        ];
+
+        // Initialize game
+        function initGame() {
+            state.level = 1;
+            state.timeLeft = 30;
+            startLevel();
+        }
+
+        // Start a new level
+        function startLevel() {
+            clearTimeout(state.timer);
+            state.gameActive = false;
+            state.showingPattern = true;
+            state.allowInput = true;
+            state.userPattern = [];
+            state.targetPattern = [];
+            messageDisplay.textContent = '';
+            messageDisplay.className = '';
+            checkButton.disabled = true;
+            levelDisplay.textContent = `Level: ${state.level}`;
+            
+            // Select random emoji category
+            const categoryIndex = Math.min(state.level - 1, emojiCategories.length - 1);
+            state.emojiSet = [...emojiCategories[categoryIndex]];
+            
+            // Generate target pattern (length increases with level)
+            const patternLength = Math.min(3 + Math.floor(state.level / 2), 9);
+            for (let i = 0; i < patternLength; i++) {
+                const randomIndex = Math.floor(Math.random() * state.emojiSet.length);
+                state.targetPattern.push(state.emojiSet[randomIndex]);
+            }
+            
+            // Display target pattern
+            showTargetPattern();
+        }
+
+        // Show target pattern for memorization
+        function showTargetPattern() {
+            emojiGrid.innerHTML = '';
+            patternDisplay.textContent = state.targetPattern.join(' ');
+            messageDisplay.textContent = 'Memorize this pattern!';
+            
+            // Hide after delay and start game
+            setTimeout(() => {
+                state.showingPattern = false;
+                state.gameActive = true;
+                patternDisplay.textContent = '';
+                messageDisplay.textContent = 'Repeat the pattern';
+                renderEmojiGrid();
+                
+                // Start timer
+                state.timeLeft = 30 + state.level * 5;
+                updateTimerDisplay();
+                state.timer = setInterval(updateTimer, 1000);
+            }, 2000 + state.level * 500);
+        }
+
+        // Render emoji grid
+        function renderEmojiGrid() {
+            emojiGrid.innerHTML = '';
+            
+            // Shuffle emojis
+            const shuffledEmojis = [...state.emojiSet].sort(() => Math.random() - 0.5);
+            
+            shuffledEmojis.forEach((emoji, index) => {
+                const cell = document.createElement('div');
+                cell.className = 'emoji-cell';
+                cell.textContent = emoji;
+                cell.dataset.index = index;
+                
+                // Add event listeners for both mouse and touch
+                cell.addEventListener('click', () => handleEmojiClick(emoji, cell));
+                cell.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    handleEmojiClick(emoji, cell);
+                }, { passive: false });
+                
+                emojiGrid.appendChild(cell);
+            });
+        }
+
+        // Handle emoji selection
+        function handleEmojiClick(emoji, cell) {
+            if (!state.gameActive || state.showingPattern || !state.allowInput) return;
+            
+            // Reset if user starts new attempt after wrong answer
+            if (state.userPattern.length === 0) {
+                resetEmojiCells();
+            }
+            
+            state.userPattern.push(emoji);
+            cell.classList.add('selected');
+            
+            // Update pattern display
+            patternDisplay.textContent = state.userPattern.join(' ');
+            
+            // Enable check button if pattern complete
+            if (state.userPattern.length === state.targetPattern.length) {
+                checkButton.disabled = false;
+                checkPattern(); // Automatically check when pattern is complete
+            }
+        }
+
+        // Reset emoji cells visual state
+        function resetEmojiCells() {
+            document.querySelectorAll('.emoji-cell').forEach(cell => {
+                cell.classList.remove('selected', 'wrong');
+            });
+        }
+
+        // Check user's pattern against target
+        function checkPattern() {
+            clearInterval(state.timer);
+            state.gameActive = false;
+            state.allowInput = false;
+            checkButton.disabled = true;
+            
+            // Compare patterns
+            const isCorrect = state.userPattern.length === state.targetPattern.length &&
+                state.userPattern.every((emoji, index) => emoji === state.targetPattern[index]);
+            
+            if (isCorrect) {
+                // Correct pattern
+                messageDisplay.textContent = 'Correct! Level Complete!';
+                messageDisplay.className = 'correct';
+                
+                // Highlight all cells
+                document.querySelectorAll('.emoji-cell').forEach(cell => {
+                    cell.classList.add('selected');
+                });
+                
+                // Proceed to next level after delay
+                setTimeout(() => {
+                    state.level++;
+                    startLevel();
+                }, 1500);
+            } else {
+                // Wrong pattern
+                messageDisplay.textContent = 'Wrong Pattern! Try again.';
+                messageDisplay.className = 'wrong';
+                
+                // Highlight wrong choices (without showing correct answer)
+                highlightIncorrect();
+                
+                // Allow user to try again
+                setTimeout(() => {
+                    state.allowInput = true;
+                    state.userPattern = [];
+                    patternDisplay.textContent = '';
+                    messageDisplay.textContent = 'Try again';
+                    resetEmojiCells();
+                    state.gameActive = true;
+                    
+                    // Restart timer
+                    state.timer = setInterval(updateTimer, 1000);
+                }, 1000);
+            }
+        }
+
+        // Highlight incorrect emoji choices
+        function highlightIncorrect() {
+            const cells = document.querySelectorAll('.emoji-cell');
+            cells.forEach(cell => {
+                cell.classList.remove('selected');
+                
+                const index = state.userPattern.indexOf(cell.textContent);
+                if (index !== -1 && cell.textContent !== state.targetPattern[index]) {
+                    cell.classList.add('wrong');
+                }
+            });
+        }
+
+        // Reset current level
+        function resetLevel() {
+            clearInterval(state.timer);
+            startLevel();
+        }
+
+        // Update timer
+        function updateTimer() {
+            state.timeLeft--;
+            updateTimerDisplay();
+            
+            if (state.timeLeft <= 0) {
+                clearInterval(state.timer);
+                state.gameActive = false;
+                state.allowInput = false;
+                messageDisplay.textContent = 'Time\'s up!';
+                messageDisplay.className = 'wrong';
+                checkButton.disabled = true;
+                
+                // No longer show correct pattern on timeout
+                patternDisplay.textContent = '';
+                highlightIncorrect();
+            }
+        }
+
+        // Update timer display
+        function updateTimerDisplay() {
+            timerDisplay.textContent = `Time: ${state.timeLeft}s`;
+            
+            // Color coding for time
+            if (state.timeLeft < 10) {
+                timerDisplay.style.color = '#e53935';
+            } else if (state.timeLeft < 20) {
+                timerDisplay.style.color = '#fb8c00';
+            } else {
+                timerDisplay.style.color = '#666';
+            }
+        }
+
+        // Event listeners
+        checkButton.addEventListener('click', checkPattern);
+        resetButton.addEventListener('click', resetLevel);
+
+        // Initialize game
+        initGame();
+    </script>
+</body>
+</html>
