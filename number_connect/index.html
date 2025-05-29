@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Number Connect</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f0f0f0;
+        padding: 20px;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+
+      .game-info {
+        display: flex;
+        justify-content: space-between;
+        width: 400px;
+        margin-bottom: 15px;
+        font-size: 18px;
+      }
+
+      .game-board {
+        display: grid;
+        grid-template-columns: repeat(8, 50px);
+        grid-template-rows: repeat(8, 50px);
+        gap: 2px;
+        background-color: #333;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      }
+
+      .cell {
+        width: 50px;
+        height: 50px;
+        background-color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 3px;
+        transition: all 0.2s;
+      }
+
+      .cell:hover {
+        background-color: #e0e0e0;
+      }
+
+      .cell.selected {
+        background-color: #ffcc00;
+      }
+
+      .cell.empty {
+        background-color: #333;
+        cursor: default;
+      }
+
+      .controls {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+      }
+
+      button {
+        padding: 8px 15px;
+        font-size: 16px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      button:hover {
+        background-color: #45a049;
+      }
+
+      .path {
+        position: absolute;
+        background-color: rgba(255, 204, 0, 0.5);
+        z-index: 10;
+      }
+
+      .game-over {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        display: none;
+      }
+
+      .game-over-content {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+      }
+
+      .game-over h2 {
+        color: #4caf50;
+        margin-top: 0;
+      }
+
+      .language-switch {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+      }
+
+      .language-switch button {
+        background-color: #2196f3;
+      }
+
+      .language-switch button:hover {
+        background-color: #0b7dda;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="language-switch">
+      <button id="lang-toggle">中文</button>
+    </div>
+    <h1 id="title">Number Connect</h1>
+    <div class="game-info">
+      <div>
+        <span id="remaining-label">Remaining:</span>
+        <span id="remaining">0</span>
+      </div>
+      <div><span id="time-label">Time:</span> <span id="time">00:00</span></div>
+    </div>
+    <div class="game-board" id="board"></div>
+    <div class="controls">
+      <button id="hint">Hint</button>
+      <button id="shuffle">Shuffle</button>
+      <button id="new-game">New Game</button>
+    </div>
+
+    <div class="game-over" id="game-over">
+      <div class="game-over-content">
+        <h2 id="game-complete">Game Complete!</h2>
+        <p>
+          <span id="time-used">Time used:</span>
+          <span id="final-time">00:00</span>
+        </p>
+        <button id="play-again">Play Again</button>
+      </div>
+    </div>
+
+    <script>
+      // Language settings
+      const languages = {
+        en: {
+          title: "Number Connect",
+          remainingLabel: "Remaining:",
+          timeLabel: "Time:",
+          hint: "Hint",
+          shuffle: "Shuffle",
+          newGame: "New Game",
+          gameComplete: "Game Complete!",
+          timeUsed: "Time used:",
+          playAgain: "Play Again",
+          switchLang: "中文",
+        },
+        zh: {
+          title: "数字连连看",
+          remainingLabel: "剩余:",
+          timeLabel: "时间:",
+          hint: "提示",
+          shuffle: "重排",
+          newGame: "新游戏",
+          gameComplete: "游戏完成!",
+          timeUsed: "用时:",
+          playAgain: "再玩一次",
+          switchLang: "English",
+        },
+      };
+
+      // Current language
+      let currentLang = "en";
+
+      // Function to update UI text based on selected language
+      function updateLanguage() {
+        const lang = languages[currentLang];
+
+        document.getElementById("title").textContent = lang.title;
+        document.getElementById("remaining-label").textContent =
+          lang.remainingLabel;
+        document.getElementById("time-label").textContent = lang.timeLabel;
+        document.getElementById("hint").textContent = lang.hint;
+        document.getElementById("shuffle").textContent = lang.shuffle;
+        document.getElementById("new-game").textContent = lang.newGame;
+        document.getElementById("game-complete").textContent =
+          lang.gameComplete;
+        document.getElementById("time-used").textContent = lang.timeUsed;
+        document.getElementById("play-again").textContent = lang.playAgain;
+        document.getElementById("lang-toggle").textContent = lang.switchLang;
+
+        // Update document language
+        document.documentElement.lang = currentLang;
+      }
+
+      // Toggle language
+      function toggleLanguage() {
+        currentLang = currentLang === "en" ? "zh" : "en";
+        updateLanguage();
+      }
+
+      // Event listener for language toggle button
+      document
+        .getElementById("lang-toggle")
+        .addEventListener("click", toggleLanguage);
+
+      // 游戏配置
+      const config = {
+        rows: 8,
+        cols: 8,
+        pairs: 24, // 总对数 (8x8=64, 64/2=32, 但为了留空位，设置为24对=48个数字)
+        numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], // 可用的数字
+      };
+
+      // 游戏状态
+      let gameState = {
+        board: [],
+        selected: null,
+        remainingPairs: 0,
+        startTime: null,
+        timer: null,
+        hintTimeout: null,
+      };
+
+      // DOM元素
+      const boardElement = document.getElementById("board");
+      const remainingElement = document.getElementById("remaining");
+      const timeElement = document.getElementById("time");
+      const hintButton = document.getElementById("hint");
+      const shuffleButton = document.getElementById("shuffle");
+      const newGameButton = document.getElementById("new-game");
+      const gameOverElement = document.getElementById("game-over");
+      const finalTimeElement = document.getElementById("final-time");
+      const playAgainButton = document.getElementById("play-again");
+
+      // 初始化游戏
+      function initGame() {
+        // 清除之前的游戏状态
+        clearTimeout(gameState.hintTimeout);
+        clearInterval(gameState.timer);
+
+        // 初始化游戏板
+        gameState.board = createBoard();
+        gameState.selected = null;
+        gameState.remainingPairs = config.pairs;
+        gameState.startTime = new Date();
+
+        // 更新UI
+        updateBoard();
+        remainingElement.textContent = gameState.remainingPairs;
+        timeElement.textContent = "00:00";
+
+        // 启动计时器
+        gameState.timer = setInterval(updateTimer, 1000);
+
+        // 隐藏游戏结束界面
+        gameOverElement.style.display = "none";
+      }
+
+      // 检查坐标是否在板内
+      function isInBoard(row, col) {
+        return row >= 0 && row < config.rows && col >= 0 && col < config.cols;
+      }
+
+      // 检查坐标是否在虚拟外圈
+      function isInVirtualOuter(row, col) {
+        return (
+          (row === -1 && col >= -1 && col <= config.cols) ||
+          (row === config.rows && col >= -1 && col <= config.cols) ||
+          (col === -1 && row >= -1 && row <= config.rows) ||
+          (col === config.cols && row >= -1 && row <= config.rows)
+        );
+      }
+
+      // 检查单元格是否为空（包括虚拟外圈）
+      function isEmpty(row, col, board) {
+        // 如果是虚拟外圈，视为空
+        if (isInVirtualOuter(row, col)) {
+          return true;
+        }
+
+        // 如果不在板内也不在虚拟外圈，视为不可通过
+        if (!isInBoard(row, col)) {
+          return false;
+        }
+
+        // 如果在板内，检查是否为空
+        return board[row][col] === 0;
+      }
+
+      // 创建游戏板
+      function createBoard() {
+        // 创建数字对
+        let numbers = [];
+        for (let i = 0; i < config.pairs; i++) {
+          const num =
+            config.numbers[Math.floor(Math.random() * config.numbers.length)];
+          numbers.push(num, num);
+        }
+
+        // 填充剩余空格
+        const emptyCells = config.rows * config.cols - numbers.length;
+        for (let i = 0; i < emptyCells; i++) {
+          numbers.push(0); // 0表示空
+        }
+
+        // 随机打乱
+        numbers = shuffleArray(numbers);
+
+        // 转换为二维数组
+        const board = [];
+        for (let i = 0; i < config.rows; i++) {
+          const row = [];
+          for (let j = 0; j < config.cols; j++) {
+            row.push(numbers[i * config.cols + j]);
+          }
+          board.push(row);
+        }
+
+        // 确保游戏有解，如果没有则重新生成
+        if (!hasSolution(board)) {
+          return createBoard();
+        }
+
+        return board;
+      }
+
+      // 检查游戏板是否有解
+      function hasSolution(board) {
+        // 复制棋盘以避免修改原数组
+        const tempBoard = JSON.parse(JSON.stringify(board));
+
+        // 检查所有可能的配对
+        for (let i = 0; i < config.rows; i++) {
+          for (let j = 0; j < config.cols; j++) {
+            if (tempBoard[i][j] === 0) continue;
+
+            for (let x = 0; x < config.rows; x++) {
+              for (let y = 0; y < config.cols; y++) {
+                if (
+                  (i !== x || j !== y) &&
+                  tempBoard[x][y] === tempBoard[i][j]
+                ) {
+                  if (canConnect({x: i, y: j}, {x: x, y: y}, tempBoard)) {
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        return false;
+      }
+
+      // 随机打乱数组
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+      }
+
+      // 更新游戏板显示
+      function updateBoard() {
+        boardElement.innerHTML = "";
+
+        for (let i = 0; i < config.rows; i++) {
+          for (let j = 0; j < config.cols; j++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+
+            if (gameState.board[i][j] === 0) {
+              cell.classList.add("empty");
+            } else {
+              cell.textContent = gameState.board[i][j];
+
+              // 检查是否是选中的单元格
+              if (
+                gameState.selected &&
+                gameState.selected.x === i &&
+                gameState.selected.y === j
+              ) {
+                cell.classList.add("selected");
+              }
+
+              // 添加点击事件
+              cell.addEventListener("click", () => handleCellClick(i, j));
+            }
+
+            boardElement.appendChild(cell);
+          }
+        }
+      }
+
+      // 处理单元格点击
+      function handleCellClick(row, col) {
+        // 忽略空单元格或已选中的单元格
+        if (
+          gameState.board[row][col] === 0 ||
+          (gameState.selected &&
+            gameState.selected.x === row &&
+            gameState.selected.y === col)
+        ) {
+          return;
+        }
+
+        // 如果没有选中任何单元格，选中当前单元格
+        if (!gameState.selected) {
+          gameState.selected = {x: row, y: col};
+          updateBoard();
+          return;
+        }
+
+        // 如果已经选中了一个单元格，检查是否可以连接
+        const first = gameState.selected;
+        const second = {x: row, y: col};
+
+        // 检查是否是相同的数字
+        if (
+          gameState.board[first.x][first.y] !==
+          gameState.board[second.x][second.y]
+        ) {
+          // 不是相同的数字，取消选中第一个，选中第二个
+          gameState.selected = second;
+          updateBoard();
+          return;
+        }
+
+        // 检查是否可以连接
+        if (canConnect(first, second, gameState.board)) {
+          // 可以连接，显示连接线
+          showConnectionPath(first, second);
+
+          // 消除这对数字
+          setTimeout(() => {
+            gameState.board[first.x][first.y] = 0;
+            gameState.board[second.x][second.y] = 0;
+            gameState.selected = null;
+            gameState.remainingPairs--;
+            remainingElement.textContent = gameState.remainingPairs;
+
+            // 检查游戏是否结束
+            if (gameState.remainingPairs === 0) {
+              endGame();
+            } else {
+              updateBoard();
+            }
+          }, 300);
+        } else {
+          // 不能连接，选中新的单元格
+          gameState.selected = second;
+          updateBoard();
+        }
+      }
+
+      // 检查两个单元格是否可以连接
+      function canConnect(a, b, board) {
+        // 基本条件检查
+        if (a.x === b.x && a.y === b.y) return false; // 同一个点
+        if (board[a.x][a.y] !== board[b.x][b.y]) return false; // 数字不同
+        if (board[a.x][a.y] === 0 || board[b.x][b.y] === 0) return false; // 有空单元格
+
+        // 检查直线连接
+        if (checkStraightLine(a, b, board)) return true;
+
+        // 检查一折连接
+        if (checkOneTurn(a, b, board)) return true;
+
+        // 检查二折连接
+        if (checkTwoTurns(a, b, board)) return true;
+
+        // 检查通过虚拟外圈的连接
+        if (checkOuterConnection(a, b, board)) return true;
+
+        return false;
+      }
+
+      // 检查直线连接
+      function checkStraightLine(a, b, board) {
+        // 水平直线
+        if (a.x === b.x) {
+          const minY = Math.min(a.y, b.y);
+          const maxY = Math.max(a.y, b.y);
+
+          for (let y = minY + 1; y < maxY; y++) {
+            if (!isEmpty(a.x, y, board)) return false;
+          }
+          return true;
+        }
+
+        // 垂直直线
+        if (a.y === b.y) {
+          const minX = Math.min(a.x, b.x);
+          const maxX = Math.max(a.x, b.x);
+
+          for (let x = minX + 1; x < maxX; x++) {
+            if (!isEmpty(x, a.y, board)) return false;
+          }
+          return true;
+        }
+
+        return false;
+      }
+
+      // 检查一折连接
+      function checkOneTurn(a, b, board) {
+        // 尝试两个可能的拐点
+        const corner1 = {x: a.x, y: b.y};
+        const corner2 = {x: b.x, y: a.y};
+
+        // 检查第一个拐点路径
+        if (isEmpty(corner1.x, corner1.y, board)) {
+          if (
+            checkStraightLine(a, corner1, board) &&
+            checkStraightLine(corner1, b, board)
+          ) {
+            return true;
+          }
+        }
+
+        // 检查第二个拐点路径
+        if (isEmpty(corner2.x, corner2.y, board)) {
+          if (
+            checkStraightLine(a, corner2, board) &&
+            checkStraightLine(corner2, b, board)
+          ) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      // 检查外圈连接（通过虚拟外圈的连接）
+      function checkOuterConnection(a, b, board) {
+        // 检查通过上方外圈的连接
+        if (canConnectThroughOuterSide(a, b, "top", board)) return true;
+
+        // 检查通过下方外圈的连接
+        if (canConnectThroughOuterSide(a, b, "bottom", board)) return true;
+
+        // 检查通过左侧外圈的连接
+        if (canConnectThroughOuterSide(a, b, "left", board)) return true;
+
+        // 检查通过右侧外圈的连接
+        if (canConnectThroughOuterSide(a, b, "right", board)) return true;
+
+        return false;
+      }
+
+      // 检查通过某一侧外圈的连接
+      function canConnectThroughOuterSide(a, b, side, board) {
+        let outerRow1, outerCol1, outerRow2, outerCol2;
+
+        // 确定外圈上的两个点
+        switch (side) {
+          case "top":
+            outerRow1 = -1;
+            outerCol1 = a.y;
+            outerRow2 = -1;
+            outerCol2 = b.y;
+            break;
+          case "bottom":
+            outerRow1 = config.rows;
+            outerCol1 = a.y;
+            outerRow2 = config.rows;
+            outerCol2 = b.y;
+            break;
+          case "left":
+            outerRow1 = a.x;
+            outerCol1 = -1;
+            outerRow2 = b.x;
+            outerCol2 = -1;
+            break;
+          case "right":
+            outerRow1 = a.x;
+            outerCol1 = config.cols;
+            outerRow2 = b.x;
+            outerCol2 = config.cols;
+            break;
+        }
+
+        // 检查a到外圈的路径是否通畅
+        if (!checkStraightLine(a, {x: outerRow1, y: outerCol1}, board))
+          return false;
+
+        // 检查b到外圈的路径是否通畅
+        if (!checkStraightLine(b, {x: outerRow2, y: outerCol2}, board))
+          return false;
+
+        // 检查外圈上两点之间的路径是否通畅
+        const outerPoint1 = {x: outerRow1, y: outerCol1};
+        const outerPoint2 = {x: outerRow2, y: outerCol2};
+
+        // 检查是否可以沿着外圈连接（直线或一折）
+        if (checkStraightLine(outerPoint1, outerPoint2, board)) return true;
+
+        // 尝试通过外圈拐角连接
+        const corners = [];
+
+        if (side === "top" || side === "bottom") {
+          // 添加左右拐角
+          corners.push({x: outerRow1, y: -1}); // 左上/左下角
+          corners.push({x: outerRow1, y: config.cols}); // 右上/右下角
+        } else {
+          // 添加上下拐角
+          corners.push({x: -1, y: outerCol1}); // 左上/右上角
+          corners.push({x: config.rows, y: outerCol1}); // 左下/右下角
+        }
+
+        // 检查通过拐角的连接
+        for (const corner of corners) {
+          if (
+            checkStraightLine(outerPoint1, corner, board) &&
+            checkStraightLine(corner, outerPoint2, board)
+          ) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      // 检查二折连接
+      function checkTwoTurns(a, b, board) {
+        // 检查a所在行和列的所有点
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: a.y};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(a, p, board) && checkOneTurn(p, b, board)) {
+              return true;
+            }
+          }
+        }
+
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: a.x, y: j};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(a, p, board) && checkOneTurn(p, b, board)) {
+              return true;
+            }
+          }
+        }
+
+        // 对称地检查b点
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: b.y};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(b, p, board) && checkOneTurn(p, a, board)) {
+              return true;
+            }
+          }
+        }
+
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: b.x, y: j};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(b, p, board) && checkOneTurn(p, a, board)) {
+              return true;
+            }
+          }
+        }
+
+        // 检查外圈中间点的连接
+        // 上方外圈
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: -1, y: j};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return true;
+          }
+        }
+
+        // 下方外圈
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: config.rows, y: j};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return true;
+          }
+        }
+
+        // 左侧外圈
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: -1};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return true;
+          }
+        }
+
+        // 右侧外圈
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: config.cols};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      // 显示连接路径
+      function showConnectionPath(a, b) {
+        // 清除之前的路径
+        document.querySelectorAll(".path").forEach((el) => el.remove());
+
+        // 计算单元格位置
+        const cellSize = 50;
+        const gap = 2;
+        const padding = 10; // game-board的padding
+        const boardRect = boardElement.getBoundingClientRect();
+        const offsetX = boardRect.left + window.scrollX;
+        const offsetY = boardRect.top + window.scrollY;
+
+        // 计算游戏板的总宽高
+        const boardWidth = config.cols * (cellSize + gap) - gap;
+        const boardHeight = config.rows * (cellSize + gap) - gap;
+
+        // 获取起点和终点坐标（加上padding）
+        const startX =
+          offsetX + padding + a.y * (cellSize + gap) + cellSize / 2;
+        const startY =
+          offsetY + padding + a.x * (cellSize + gap) + cellSize / 2;
+        const endX = offsetX + padding + b.y * (cellSize + gap) + cellSize / 2;
+        const endY = offsetY + padding + b.x * (cellSize + gap) + cellSize / 2;
+
+        // 直线连接
+        if (checkStraightLine(a, b, gameState.board)) {
+          drawLine(startX, startY, endX, endY);
+          return;
+        }
+
+        // 一折连接
+        if (checkOneTurn(a, b, gameState.board)) {
+          // 尝试两个可能的拐点
+          const corner1 = {x: a.x, y: b.y};
+          const corner2 = {x: b.x, y: a.y};
+
+          // 计算拐点坐标
+          const getCornerCoords = (corner) => {
+            // 处理虚拟外圈坐标
+            let cornerX, cornerY;
+
+            if (corner.x === -1) {
+              // 上方外圈
+              cornerX =
+                offsetX + padding + corner.y * (cellSize + gap) + cellSize / 2;
+              cornerY = offsetY; // 游戏板上边缘
+            } else if (corner.x === config.rows) {
+              // 下方外圈
+              cornerX =
+                offsetX + padding + corner.y * (cellSize + gap) + cellSize / 2;
+              cornerY = offsetY + padding + boardHeight; // 游戏板下边缘
+            } else if (corner.y === -1) {
+              // 左侧外圈
+              cornerX = offsetX; // 游戏板左边缘
+              cornerY =
+                offsetY + padding + corner.x * (cellSize + gap) + cellSize / 2;
+            } else if (corner.y === config.cols) {
+              // 右侧外圈
+              cornerX = offsetX + padding + boardWidth; // 游戏板右边缘
+              cornerY =
+                offsetY + padding + corner.x * (cellSize + gap) + cellSize / 2;
+            } else {
+              // 游戏板内的点
+              cornerX =
+                offsetX + padding + corner.y * (cellSize + gap) + cellSize / 2;
+              cornerY =
+                offsetY + padding + corner.x * (cellSize + gap) + cellSize / 2;
+            }
+
+            return {x: cornerX, y: cornerY};
+          };
+
+          if (
+            isEmpty(corner1.x, corner1.y, gameState.board) &&
+            checkStraightLine(a, corner1, gameState.board) &&
+            checkStraightLine(corner1, b, gameState.board)
+          ) {
+            const cornerCoords = getCornerCoords(corner1);
+            drawLine(startX, startY, cornerCoords.x, cornerCoords.y);
+            drawLine(cornerCoords.x, cornerCoords.y, endX, endY);
+            return;
+          } else if (
+            isEmpty(corner2.x, corner2.y, gameState.board) &&
+            checkStraightLine(a, corner2, gameState.board) &&
+            checkStraightLine(corner2, b, gameState.board)
+          ) {
+            const cornerCoords = getCornerCoords(corner2);
+            drawLine(startX, startY, cornerCoords.x, cornerCoords.y);
+            drawLine(cornerCoords.x, cornerCoords.y, endX, endY);
+            return;
+          }
+        }
+
+        // 检查通过外圈的连接
+        if (checkOuterConnection(a, b, gameState.board)) {
+          // 尝试所有可能的外圈连接
+          const sides = ["top", "bottom", "left", "right"];
+
+          for (const side of sides) {
+            let outerRow1, outerCol1, outerRow2, outerCol2;
+
+            // 确定外圈上的两个点
+            switch (side) {
+              case "top":
+                outerRow1 = -1;
+                outerCol1 = a.y;
+                outerRow2 = -1;
+                outerCol2 = b.y;
+                break;
+              case "bottom":
+                outerRow1 = config.rows;
+                outerCol1 = a.y;
+                outerRow2 = config.rows;
+                outerCol2 = b.y;
+                break;
+              case "left":
+                outerRow1 = a.x;
+                outerCol1 = -1;
+                outerRow2 = b.x;
+                outerCol2 = -1;
+                break;
+              case "right":
+                outerRow1 = a.x;
+                outerCol1 = config.cols;
+                outerRow2 = b.x;
+                outerCol2 = config.cols;
+                break;
+            }
+
+            const outerPoint1 = {x: outerRow1, y: outerCol1};
+            const outerPoint2 = {x: outerRow2, y: outerCol2};
+
+            // 检查路径是否通畅
+            if (
+              checkStraightLine(a, outerPoint1, gameState.board) &&
+              checkStraightLine(b, outerPoint2, gameState.board)
+            ) {
+              // 坐标转换函数
+              const getPointCoords = (point) => {
+                let pointX, pointY;
+
+                if (point.x === -1) {
+                  // 上方外圈
+                  pointX =
+                    offsetX +
+                    padding +
+                    point.y * (cellSize + gap) +
+                    cellSize / 2;
+                  pointY = offsetY; // 游戏板上边缘
+                } else if (point.x === config.rows) {
+                  // 下方外圈
+                  pointX =
+                    offsetX +
+                    padding +
+                    point.y * (cellSize + gap) +
+                    cellSize / 2;
+                  pointY = offsetY + padding + boardHeight; // 游戏板下边缘
+                } else if (point.y === -1) {
+                  // 左侧外圈
+                  pointX = offsetX; // 游戏板左边缘
+                  pointY =
+                    offsetY +
+                    padding +
+                    point.x * (cellSize + gap) +
+                    cellSize / 2;
+                } else if (point.y === config.cols) {
+                  // 右侧外圈
+                  pointX = offsetX + padding + boardWidth; // 游戏板右边缘
+                  pointY =
+                    offsetY +
+                    padding +
+                    point.x * (cellSize + gap) +
+                    cellSize / 2;
+                } else {
+                  // 游戏板内的点
+                  pointX =
+                    offsetX +
+                    padding +
+                    point.y * (cellSize + gap) +
+                    cellSize / 2;
+                  pointY =
+                    offsetY +
+                    padding +
+                    point.x * (cellSize + gap) +
+                    cellSize / 2;
+                }
+
+                return {x: pointX, y: pointY};
+              };
+
+              // 计算外圈点的坐标
+              const outer1Coords = getPointCoords(outerPoint1);
+              const outer2Coords = getPointCoords(outerPoint2);
+
+              // 绘制从起点到外圈的线
+              drawLine(startX, startY, outer1Coords.x, outer1Coords.y);
+
+              // 如果外圈两点可以直接连接
+              if (
+                checkStraightLine(outerPoint1, outerPoint2, gameState.board)
+              ) {
+                drawLine(
+                  outer1Coords.x,
+                  outer1Coords.y,
+                  outer2Coords.x,
+                  outer2Coords.y
+                );
+              } else {
+                // 尝试通过拐角连接
+                const corners = [];
+
+                if (side === "top" || side === "bottom") {
+                  // 添加左右拐角
+                  corners.push({x: outerPoint1.x, y: -1}); // 左上/左下角
+                  corners.push({x: outerPoint1.x, y: config.cols}); // 右上/右下角
+                } else {
+                  // 添加上下拐角
+                  corners.push({x: -1, y: outerPoint1.y}); // 左上/右上角
+                  corners.push({x: config.rows, y: outerPoint1.y}); // 左下/右下角
+                }
+
+                // 检查通过拐角的连接
+                for (const corner of corners) {
+                  if (
+                    checkStraightLine(outerPoint1, corner, gameState.board) &&
+                    checkStraightLine(corner, outerPoint2, gameState.board)
+                  ) {
+                    const cornerCoords = getPointCoords(corner);
+                    drawLine(
+                      outer1Coords.x,
+                      outer1Coords.y,
+                      cornerCoords.x,
+                      cornerCoords.y
+                    );
+                    drawLine(
+                      cornerCoords.x,
+                      cornerCoords.y,
+                      outer2Coords.x,
+                      outer2Coords.y
+                    );
+                    break;
+                  }
+                }
+              }
+
+              // 绘制从外圈到终点的线
+              drawLine(outer2Coords.x, outer2Coords.y, endX, endY);
+              return;
+            }
+          }
+        }
+
+        // 二折连接
+        if (checkTwoTurns(a, b, gameState.board)) {
+          // 查找连接路径
+          let path = findTwoTurnPath(a, b, gameState.board);
+          if (path) {
+            // 坐标转换函数
+            const getPointCoords = (point) => {
+              let pointX, pointY;
+
+              if (point.x === -1) {
+                // 上方外圈
+                pointX =
+                  offsetX + padding + point.y * (cellSize + gap) + cellSize / 2;
+                pointY = offsetY; // 游戏板上边缘
+              } else if (point.x === config.rows) {
+                // 下方外圈
+                pointX =
+                  offsetX + padding + point.y * (cellSize + gap) + cellSize / 2;
+                pointY = offsetY + padding + boardHeight; // 游戏板下边缘
+              } else if (point.y === -1) {
+                // 左侧外圈
+                pointX = offsetX; // 游戏板左边缘
+                pointY =
+                  offsetY + padding + point.x * (cellSize + gap) + cellSize / 2;
+              } else if (point.y === config.cols) {
+                // 右侧外圈
+                pointX = offsetX + padding + boardWidth; // 游戏板右边缘
+                pointY =
+                  offsetY + padding + point.x * (cellSize + gap) + cellSize / 2;
+              } else {
+                // 游戏板内的点
+                pointX =
+                  offsetX + padding + point.y * (cellSize + gap) + cellSize / 2;
+                pointY =
+                  offsetY + padding + point.x * (cellSize + gap) + cellSize / 2;
+              }
+
+              return {x: pointX, y: pointY};
+            };
+
+            // 绘制路径
+            const point1Coords = getPointCoords(path[0]);
+            const point2Coords = getPointCoords(path[1]);
+
+            drawLine(startX, startY, point1Coords.x, point1Coords.y);
+            drawLine(
+              point1Coords.x,
+              point1Coords.y,
+              point2Coords.x,
+              point2Coords.y
+            );
+            drawLine(point2Coords.x, point2Coords.y, endX, endY);
+          }
+        }
+      }
+
+      // 查找二折连接路径
+      function findTwoTurnPath(a, b, board) {
+        // 检查棋盘内所有可能的中转点
+        // 检查a所在行和列的所有点
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: a.y};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(a, p, board) && checkOneTurn(p, b, board)) {
+              const corner = findCornerPoint(p, b, board);
+              return [p, corner];
+            }
+          }
+        }
+
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: a.x, y: j};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(a, p, board) && checkOneTurn(p, b, board)) {
+              const corner = findCornerPoint(p, b, board);
+              return [p, corner];
+            }
+          }
+        }
+
+        // 对称地检查b点
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: b.y};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(b, p, board) && checkOneTurn(p, a, board)) {
+              const corner = findCornerPoint(p, a, board);
+              return [corner, p];
+            }
+          }
+        }
+
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: b.x, y: j};
+          if (
+            isEmpty(p.x, p.y, board) &&
+            !(p.x === a.x && p.y === a.y) &&
+            !(p.x === b.x && p.y === b.y)
+          ) {
+            if (checkStraightLine(b, p, board) && checkOneTurn(p, a, board)) {
+              const corner = findCornerPoint(p, a, board);
+              return [corner, p];
+            }
+          }
+        }
+
+        // 检查虚拟外圈上的点
+        // 上方外圈
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: -1, y: j};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return [
+              {x: p.x, y: p.y},
+              {x: p.x, y: p.y},
+            ]; // 返回同一个点作为两个拐点（实际上是直接连接）
+          }
+        }
+
+        // 下方外圈
+        for (let j = 0; j < config.cols; j++) {
+          const p = {x: config.rows, y: j};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return [
+              {x: p.x, y: p.y},
+              {x: p.x, y: p.y},
+            ];
+          }
+        }
+
+        // 左侧外圈
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: -1};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return [
+              {x: p.x, y: p.y},
+              {x: p.x, y: p.y},
+            ];
+          }
+        }
+
+        // 右侧外圈
+        for (let i = 0; i < config.rows; i++) {
+          const p = {x: i, y: config.cols};
+          if (
+            checkStraightLine(a, p, board) &&
+            checkStraightLine(p, b, board)
+          ) {
+            return [
+              {x: p.x, y: p.y},
+              {x: p.x, y: p.y},
+            ];
+          }
+        }
+
+        return null;
+      }
+
+      // 查找拐点
+      function findCornerPoint(a, b, board) {
+        // 尝试两个可能的拐点
+        const corner1 = {x: a.x, y: b.y};
+        const corner2 = {x: b.x, y: a.y};
+
+        if (
+          isEmpty(corner1.x, corner1.y, board) &&
+          checkStraightLine(a, corner1, board) &&
+          checkStraightLine(corner1, b, board)
+        ) {
+          return corner1;
+        } else if (
+          isEmpty(corner2.x, corner2.y, board) &&
+          checkStraightLine(a, corner2, board) &&
+          checkStraightLine(corner2, b, board)
+        ) {
+          return corner2;
+        }
+
+        // 尝试使用虚拟外圈拐点
+        // 上方外圈
+        const topCorner = {x: -1, y: b.y};
+        if (
+          isEmpty(topCorner.x, topCorner.y, board) &&
+          checkStraightLine(a, {x: -1, y: a.y}, board) &&
+          checkStraightLine({x: -1, y: a.y}, topCorner, board) &&
+          checkStraightLine(topCorner, b, board)
+        ) {
+          return topCorner;
+        }
+
+        // 下方外圈
+        const bottomCorner = {x: config.rows, y: b.y};
+        if (
+          isEmpty(bottomCorner.x, bottomCorner.y, board) &&
+          checkStraightLine(a, {x: config.rows, y: a.y}, board) &&
+          checkStraightLine({x: config.rows, y: a.y}, bottomCorner, board) &&
+          checkStraightLine(bottomCorner, b, board)
+        ) {
+          return bottomCorner;
+        }
+
+        // 左侧外圈
+        const leftCorner = {x: b.x, y: -1};
+        if (
+          isEmpty(leftCorner.x, leftCorner.y, board) &&
+          checkStraightLine(a, {x: a.x, y: -1}, board) &&
+          checkStraightLine({x: a.x, y: -1}, leftCorner, board) &&
+          checkStraightLine(leftCorner, b, board)
+        ) {
+          return leftCorner;
+        }
+
+        // 右侧外圈
+        const rightCorner = {x: b.x, y: config.cols};
+        if (
+          isEmpty(rightCorner.x, rightCorner.y, board) &&
+          checkStraightLine(a, {x: a.x, y: config.cols}, board) &&
+          checkStraightLine({x: a.x, y: config.cols}, rightCorner, board) &&
+          checkStraightLine(rightCorner, b, board)
+        ) {
+          return rightCorner;
+        }
+
+        // 没有找到有效的拐点，返回默认值
+        return corner2;
+      }
+
+      // 绘制线段
+      function drawLine(x1, y1, x2, y2) {
+        const line = document.createElement("div");
+        line.className = "path";
+
+        // 计算线的位置和尺寸
+        const left = Math.min(x1, x2);
+        const top = Math.min(y1, y2);
+        const width = Math.abs(x2 - x1);
+        const height = Math.abs(y2 - y1);
+
+        // 水平线
+        if (height < 2) {
+          line.style.left = `${left}px`;
+          line.style.top = `${top}px`;
+          line.style.width = `${width}px`;
+          line.style.height = "4px";
+        }
+        // 垂直线
+        else if (width < 2) {
+          line.style.left = `${left}px`;
+          line.style.top = `${top}px`;
+          line.style.width = "4px";
+          line.style.height = `${height}px`;
+        }
+        // 斜线（理论上连连看不会有斜线）
+
+        document.body.appendChild(line);
+      }
+
+      // 更新计时器
+      function updateTimer() {
+        const now = new Date();
+        const elapsed = Math.floor((now - gameState.startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60)
+          .toString()
+          .padStart(2, "0");
+        const seconds = (elapsed % 60).toString().padStart(2, "0");
+        timeElement.textContent = `${minutes}:${seconds}`;
+      }
+
+      // 结束游戏
+      function endGame() {
+        clearInterval(gameState.timer);
+
+        // 显示游戏结束界面
+        finalTimeElement.textContent = timeElement.textContent;
+        gameOverElement.style.display = "flex";
+      }
+
+      // 提示功能
+      function showHint() {
+        // 查找可连接的对
+        const pairs = findConnectablePairs();
+
+        if (pairs.length > 0) {
+          // 随机选择一对
+          const pair = pairs[Math.floor(Math.random() * pairs.length)];
+
+          // 高亮显示这对
+          gameState.selected = pair[0];
+          updateBoard();
+
+          // 3秒后取消高亮
+          gameState.hintTimeout = setTimeout(() => {
+            gameState.selected = null;
+            updateBoard();
+          }, 3000);
+        } else {
+          alert(
+            currentLang === "en"
+              ? "No connectable pairs left, please shuffle!"
+              : "没有可连接的对了，请重排！"
+          );
+        }
+      }
+
+      // 查找所有可连接的对
+      function findConnectablePairs() {
+        const pairs = [];
+        const checked = new Set();
+
+        for (let i = 0; i < config.rows; i++) {
+          for (let j = 0; j < config.cols; j++) {
+            if (gameState.board[i][j] === 0) continue;
+
+            const key1 = `${i},${j}`;
+            if (checked.has(key1)) continue;
+
+            for (let x = 0; x < config.rows; x++) {
+              for (let y = 0; y < config.cols; y++) {
+                if (
+                  (i !== x || j !== y) &&
+                  gameState.board[x][y] === gameState.board[i][j]
+                ) {
+                  const key2 = `${x},${y}`;
+                  if (
+                    !checked.has(key2) &&
+                    canConnect({x: i, y: j}, {x: x, y: y}, gameState.board)
+                  ) {
+                    pairs.push([
+                      {x: i, y: j},
+                      {x: x, y: y},
+                    ]);
+                    checked.add(key1);
+                    checked.add(key2);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        return pairs;
+      }
+
+      // 重排功能
+      function shuffleBoard() {
+        // 收集所有非空数字
+        let numbers = [];
+        for (let i = 0; i < config.rows; i++) {
+          for (let j = 0; j < config.cols; j++) {
+            if (gameState.board[i][j] !== 0) {
+              numbers.push(gameState.board[i][j]);
+            }
+          }
+        }
+
+        // 随机打乱
+        numbers = shuffleArray(numbers);
+
+        // 重新填充棋盘
+        let index = 0;
+        for (let i = 0; i < config.rows; i++) {
+          for (let j = 0; j < config.cols; j++) {
+            if (gameState.board[i][j] !== 0) {
+              gameState.board[i][j] = numbers[index++];
+            }
+          }
+        }
+
+        // 取消选中
+        gameState.selected = null;
+        updateBoard();
+      }
+
+      // 事件监听
+      hintButton.addEventListener("click", showHint);
+      shuffleButton.addEventListener("click", shuffleBoard);
+      newGameButton.addEventListener("click", initGame);
+      playAgainButton.addEventListener("click", initGame);
+
+      // 初始化语言和游戏
+      updateLanguage();
+      initGame();
+    </script>
+  </body>
+</html>
