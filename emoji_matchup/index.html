@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji Match-Up</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+        .emoji-card {
+            background-color: #3498db;
+            color: white;
+            border-radius: 10px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .emoji-card:hover {
+            background-color: #2980b9;
+        }
+        .emoji-card.selected {
+            background-color: #e74c3c;
+        }
+        .emoji-card.matched {
+            background-color: #2ecc71;
+            cursor: default;
+        }
+        .hint {
+            margin: 20px 0;
+            font-size: 18px;
+            min-height: 50px;
+        }
+        .score {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1a252f;
+        }
+    </style>
+</head>
+<body>
+    <h1>Emoji Match-Up</h1>
+    <div class="score">Matches Found: <span id="score">0</span>/8</div>
+    <div class="hint" id="hint">Find matching pairs of related emojis!</div>
+    <div class="game-container" id="game-container"></div>
+    <button id="reset-btn">New Game</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Emoji pairs with their relationships
+            const emojiPairs = [
+                { emoji1: '🐶', emoji2: '🦴', relation: 'Dog and Bone' },
+                { emoji1: '🐱', emoji2: '🐟', relation: 'Cat and Fish' },
+                { emoji1: '🌞', emoji2: '🌻', relation: 'Sun and Sunflower' },
+                { emoji1: '☕', emoji2: '🍩', relation: 'Coffee and Donut' },
+                { emoji1: '👨‍🚒', emoji2: '🔥', relation: 'Firefighter and Fire' },
+                { emoji1: '👨‍🍳', emoji2: '🍳', relation: 'Chef and Fried Egg' },
+                { emoji1: '👩‍⚕️', emoji2: '💊', relation: 'Doctor and Pill' },
+                { emoji1: '👨‍🌾', emoji2: '🌽', relation: 'Farmer and Corn' }
+            ];
+
+            const gameContainer = document.getElementById('game-container');
+            const hintElement = document.getElementById('hint');
+            const scoreElement = document.getElementById('score');
+            const resetBtn = document.getElementById('reset-btn');
+
+            let cards = [];
+            let selectedCards = [];
+            let matchedPairs = 0;
+            let gameActive = true;
+
+            // Initialize the game
+            function initGame() {
+                gameContainer.innerHTML = '';
+                cards = [];
+                selectedCards = [];
+                matchedPairs = 0;
+                gameActive = true;
+                scoreElement.textContent = '0';
+                hintElement.textContent = 'Find matching pairs of related emojis!';
+
+                // Create a deck with all emoji pairs
+                let emojiDeck = [];
+                emojiPairs.forEach(pair => {
+                    emojiDeck.push({ emoji: pair.emoji1, relation: pair.relation, pairId: emojiPairs.indexOf(pair) });
+                    emojiDeck.push({ emoji: pair.emoji2, relation: pair.relation, pairId: emojiPairs.indexOf(pair) });
+                });
+
+                // Shuffle the deck
+                emojiDeck = shuffleArray(emojiDeck);
+
+                // Create cards
+                emojiDeck.forEach((item, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'emoji-card';
+                    card.dataset.index = index;
+                    card.dataset.pairId = item.pairId;
+                    card.dataset.relation = item.relation;
+                    card.dataset.emoji = item.emoji;
+                    card.addEventListener('click', handleCardClick);
+                    gameContainer.appendChild(card);
+                    cards.push(card);
+                });
+            }
+
+            // Shuffle array function
+            function shuffleArray(array) {
+                const newArray = [...array];
+                for (let i = newArray.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+                }
+                return newArray;
+            }
+
+            // Handle card clicks
+            function handleCardClick() {
+                if (!gameActive || this.classList.contains('matched') || selectedCards.length >= 2) return;
+
+                // Show the emoji
+                this.textContent = this.dataset.emoji;
+                this.classList.add('selected');
+                selectedCards.push(this);
+
+                // Show hint for the first selected card
+                if (selectedCards.length === 1) {
+                    hintElement.textContent = `Find the match for: ${this.dataset.relation}`;
+                }
+
+                // Check for match when two cards are selected
+                if (selectedCards.length === 2) {
+                    const card1 = selectedCards[0];
+                    const card2 = selectedCards[1];
+
+                    if (card1.dataset.pairId === card2.dataset.pairId) {
+                        // Match found
+                        card1.classList.remove('selected');
+                        card2.classList.remove('selected');
+                        card1.classList.add('matched');
+                        card2.classList.add('matched');
+                        selectedCards = [];
+                        matchedPairs++;
+                        scoreElement.textContent = matchedPairs;
+                        hintElement.textContent = `Correct! ${card1.dataset.relation}`;
+
+                        // Check if game is complete
+                        if (matchedPairs === emojiPairs.length) {
+                            hintElement.textContent = 'Congratulations! You found all matches!';
+                            gameActive = false;
+                        }
+                    } else {
+                        // No match
+                        gameActive = false;
+                        hintElement.textContent = 'No match. Try again!';
+                        setTimeout(() => {
+                            card1.textContent = '';
+                            card2.textContent = '';
+                            card1.classList.remove('selected');
+                            card2.classList.remove('selected');
+                            selectedCards = [];
+                            gameActive = true;
+                            hintElement.textContent = 'Find matching pairs of related emojis!';
+                        }, 1000);
+                    }
+                }
+            }
+
+            // Reset game
+            resetBtn.addEventListener('click', initGame);
+
+            // Start the game
+            initGame();
+        });
+    </script>
+</body>
+</html>
