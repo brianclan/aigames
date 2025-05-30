@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Slots - Spin to Win!</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #121212;
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+        }
+        h1 {
+            color: #00ffaa;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .slot-machine {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+        }
+        .reel {
+            width: 100px;
+            height: 100px;
+            background-color: #2a2a2a;
+            border: 2px solid #00ffaa;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 50px;
+            overflow: hidden;
+        }
+        .symbol {
+            transition: transform 0.1s;
+        }
+        button {
+            background-color: #00ffaa;
+            color: #121212;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        button:hover {
+            background-color: #00cc88;
+            transform: scale(1.05);
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        .balance {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        .win-message {
+            height: 30px;
+            color: #00ffaa;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .jackpot {
+            animation: jackpot 0.5s infinite alternate;
+        }
+        @keyframes jackpot {
+            from { color: #00ffaa; }
+            to { color: gold; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CRYPTO SLOTS</h1>
+        <div class="subtitle">Spin to win BTC, ETH, and SOL!</div>
+        
+        <div class="balance">Balance: $<span id="balance">1000</span></div>
+        
+        <div class="win-message" id="win-message"></div>
+        
+        <div class="slot-machine">
+            <div class="reel" id="reel1">?</div>
+            <div class="reel" id="reel2">?</div>
+            <div class="reel" id="reel3">?</div>
+        </div>
+        
+        <button id="spin-btn">SPIN ($100)</button>
+        
+        <div style="margin-top: 30px; color: #666;">
+            <p>Match 3 symbols to win!</p>
+            <p>BTC = 🪙 | ETH = 🔷 | SOL = 🔴</p>
+        </div>
+    </div>
+
+    <script>
+        // Crypto symbols
+        const symbols = [
+            { emoji: "🪙", name: "BTC", multiplier: 5 },
+            { emoji: "🔷", name: "ETH", multiplier: 3 },
+            { emoji: "🔴", name: "SOL", multiplier: 2 },
+            { emoji: "💎", name: "DIAMOND", multiplier: 10 }, // Rare jackpot
+            { emoji: "💸", name: "CASH", multiplier: 0 } // Lose
+        ];
+
+        // Game state
+        let balance = 1000;
+        let spinning = false;
+        const spinCost = 100;
+        const spinBtn = document.getElementById('spin-btn');
+        const winMessage = document.getElementById('win-message');
+        
+        // Initialize reels
+        const reels = [
+            document.getElementById('reel1'),
+            document.getElementById('reel2'),
+            document.getElementById('reel3')
+        ];
+
+        // Spin animation
+        function spin() {
+            if (spinning || balance < spinCost) return;
+            
+            balance -= spinCost;
+            updateBalance();
+            spinning = true;
+            spinBtn.disabled = true;
+            winMessage.textContent = '';
+            
+            // Generate final symbols for each reel
+            const results = [];
+            for (let i = 0; i < 3; i++) {
+                // 10% chance for jackpot symbol
+                const isJackpot = Math.random() < 0.1;
+                results.push(
+                    isJackpot 
+                        ? symbols[3] // Diamond
+                        : symbols[Math.floor(Math.random() * (symbols.length - 1))] // Regular symbols
+                );
+            }
+            
+            // Animation variables
+            const spinDuration = 2000; // 2 seconds
+            const spinStart = Date.now();
+            const framesPerReel = 20; // How many symbols fly by
+            
+            // Animate each reel
+            reels.forEach((reel, index) => {
+                let frame = 0;
+                const animate = () => {
+                    const elapsed = Date.now() - spinStart;
+                    const progress = Math.min(elapsed / spinDuration, 1);
+                    
+                    if (progress < 1) {
+                        // During spin - show random symbols
+                        const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+                        reel.textContent = randomSymbol.emoji;
+                        requestAnimationFrame(animate);
+                    } else {
+                        // Spin complete - show final result
+                        reel.textContent = results[index].emoji;
+                        
+                        // Check if all reels have stopped
+                        if (index === 2) {
+                            spinning = false;
+                            spinBtn.disabled = false;
+                            checkWin(results);
+                        }
+                    }
+                };
+                animate();
+            });
+        }
+        
+        // Check for winning combinations
+        function checkWin(results) {
+            // All symbols match
+            if (results[0].name === results[1].name && results[1].name === results[2].name) {
+                const winAmount = spinCost * results[0].multiplier;
+                balance += winAmount;
+                updateBalance();
+                
+                if (results[0].name === "DIAMOND") {
+                    winMessage.textContent = `JACKPOT! You won $${winAmount}!!!`;
+                    winMessage.classList.add('jackpot');
+                } else {
+                    winMessage.textContent = `You won $${winAmount}!`;
+                    winMessage.classList.remove('jackpot');
+                }
+            } else {
+                winMessage.textContent = "Try again!";
+                winMessage.classList.remove('jackpot');
+            }
+        }
+        
+        // Update balance display
+        function updateBalance() {
+            document.getElementById('balance').textContent = balance;
+            spinBtn.disabled = balance < spinCost;
+        }
+        
+        // Event listeners
+        spinBtn.addEventListener('click', spin);
+        
+        // Initialize
+        updateBalance();
+    </script>
+</body>
+</html>
