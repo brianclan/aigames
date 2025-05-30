@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceX Interstellar Voyage</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            color: white;
+            user-select: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(ellipse at center, #0a0a2a 0%, #000000 100%);
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #uiOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        #missionControl {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: #00fffc;
+            text-shadow: 0 0 10px #00fffc;
+        }
+
+        #fuelDisplay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 200px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #00fffc;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #fuelBar {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(to right, #ff4500, #ff8c00);
+            transition: width 0.3s;
+        }
+
+        #fuelText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 16px;
+        }
+
+        #scoreDisplay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: #00fffc;
+            text-shadow: 0 0 10px #00fffc;
+        }
+
+        #elonMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #00fffc;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s;
+            max-width: 80%;
+            text-shadow: 0 0 10px #00fffc;
+        }
+
+        #startScreen, #gameOverScreen, #missionCompleteScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+
+        #gameOverScreen, #missionCompleteScreen {
+            display: none;
+        }
+
+        .screenTitle {
+            font-size: 48px;
+            color: #00fffc;
+            text-shadow: 0 0 20px #00fffc;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .screenSubtitle {
+            font-size: 24px;
+            color: white;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .actionButton {
+            background: linear-gradient(to right, #ff4500, #ff8c00);
+            border: none;
+            color: white;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-family: 'Orbitron', sans-serif;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
+            pointer-events: auto;
+        }
+
+        .actionButton:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255, 69, 0, 0.8);
+        }
+
+        .starship {
+            position: absolute;
+            width: 60px;
+            height: 100px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100"><path d="M30 0 L60 100 L30 80 L0 100 Z" fill="white"/></svg>') no-repeat;
+            background-size: contain;
+            z-index: 3;
+        }
+
+        .asteroid {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #333, #666);
+            z-index: 2;
+        }
+
+        .planet {
+            position: absolute;
+            border-radius: 50%;
+            z-index: 1;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        .flame {
+            position: absolute;
+            width: 40px;
+            height: 60px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 60"><path d="M20 60 Q30 30 20 0 Q10 30 20 60 Z" fill="orange"/></svg>') no-repeat;
+            background-size: contain;
+            z-index: 2;
+            opacity: 0.8;
+        }
+
+        .explosion {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ff4500 0%, #ff8c00 50%, transparent 70%);
+            z-index: 4;
+            opacity: 0;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @font-face {
+            font-family: 'Orbitron';
+            src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="uiOverlay">
+            <div id="missionControl">MISSION: MARS COLONIZATION</div>
+            <div id="fuelDisplay">
+                <div id="fuelBar"></div>
+                <div id="fuelText">FUEL: 100%</div>
+            </div>
+            <div id="scoreDisplay">SCORE: 0</div>
+            <div id="elonMessage"></div>
+        </div>
+        
+        <div id="startScreen">
+            <h1 class="screenTitle">SPACEX INTERSTELLAR VOYAGE</h1>
+            <p class="screenSubtitle">A visionary mission by Elon Musk to colonize Mars<br>Navigate through asteroid fields and reach the red planet</p>
+            <button class="actionButton" id="startButton">LAUNCH STARSHIP</button>
+        </div>
+        
+        <div id="gameOverScreen">
+            <h1 class="screenTitle">MISSION FAILURE</h1>
+            <p class="screenSubtitle">SpaceX will analyze the failure and try again<br>Total progress: <span id="distanceTraveled">0</span> million km</p>
+            <button class="actionButton" id="restartButton">RETRY MISSION</button>
+        </div>
+        
+        <div id="missionCompleteScreen">
+            <h1 class="screenTitle">MISSION SUCCESS!</h1>
+            <p class="screenSubtitle">Mars colonization initiated<br>Elon Musk would be proud!</p>
+            <button class="actionButton" id="nextMissionButton">NEXT MISSION</button>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const missionControl = document.getElementById('missionControl');
+        const fuelBar = document.getElementById('fuelBar');
+        const fuelText = document.getElementById('fuelText');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const elonMessage = document.getElementById('elonMessage');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const missionCompleteScreen = document.getElementById('missionCompleteScreen');
+        const distanceTraveledDisplay = document.getElementById('distanceTraveled');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const nextMissionButton = document.getElementById('nextMissionButton');
+
+        // Set canvas size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let fuel = 100;
+        let distance = 0;
+        let difficulty = 1;
+        let missionPhase = 1;
+        let starship = null;
+        let asteroids = [];
+        let planets = [];
+        let stars = [];
+        let flames = [];
+        let explosions = [];
+        let lastAsteroidTime = 0;
+        let lastFuelConsumption = 0;
+        let lastDistanceUpdate = 0;
+        let lastElonMessageTime = 0;
+
+        // Elon quotes
+        const elonQuotes = [
+            "The future of humanity is becoming a multi-planet species",
+            "Mars is the next logical step. It's the only planet we know of that could potentially support life",
+            "I think we should be working much harder on sustainable energy",
+            "Failure is an option here. If things are not failing, you are not innovating enough",
+            "When something is important enough, you do it even if the odds are not in your favor",
+            "The first step is to establish that something is possible; then probability will occur",
+            "Persistence is very important. You should not give up unless you are forced to give up",
+            "If you get up in the morning and think the future is going to be better, it is a bright day"
+        ];
+
+        // Mission phases
+        const missionPhases = [
+            { name: "EARTH ASCENT", target: 100, message: "Achieving Earth orbit" },
+            { name: "LUNAR FLYBY", target: 300, message: "Passing Moon orbit" },
+            { name: "DEEP SPACE", target: 600, message: "Entering interplanetary space" },
+            { name: "MARS APPROACH", target: 900, message: "Mars orbit insertion" },
+            { name: "MARS LANDING", target: 1000, message: "Initiating landing sequence" }
+        ];
+
+        // Initialize game
+        function init() {
+            // Create starship
+            starship = {
+                x: canvas.width / 2 - 30,
+                y: canvas.height - 150,
+                width: 60,
+                height: 100,
+                speed: 5,
+                dx: 0,
+                dy: 0
+            };
+
+            // Create background stars
+            createStars(200);
+            
+            // Create initial planets
+            createPlanets();
+            
+            updateUI();
+            draw();
+        }
+
+        // Create background stars
+        function createStars(count) {
+            stars = [];
+            for (let i = 0; i < count; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 3 + 1,
+                    opacity: Math.random() * 0.8 + 0.2
+                });
+            }
+        }
+
+        // Create planets in background
+        function createPlanets() {
+            planets = [];
+            const planetCount = 3 + Math.floor(difficulty / 2);
+            
+            for (let i = 0; i < planetCount; i++) {
+                const size = Math.random() * 100 + 50;
+                planets.push({
+                    x: Math.random() * canvas.width,
+                    y: -size - Math.random() * 500,
+                    size: size,
+                    color: getRandomPlanetColor(),
+                    speed: Math.random() * 2 + 1 + difficulty * 0.5
+                });
+            }
+        }
+
+        // Get random planet color
+        function getRandomPlanetColor() {
+            const colors = [
+                '#4b5320', // Army green
+                '#8b4513', // Saddle brown
+                '#4682b4', // Steel blue
+                '#b8860b', // Dark goldenrod
+                '#556b2f', // Dark olive green
+                '#800020', // Burgundy
+                '#702963', // Byzantium
+                '#007ba7'  // Cerulean
+            ];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Create asteroid
+        function createAsteroid() {
+            const size = Math.random() * 40 + 20;
+            asteroids.push({
+                x: Math.random() * canvas.width,
+                y: -size,
+                size: size,
+                speed: Math.random() * 3 + 2 + difficulty,
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.02
+            });
+        }
+
+        // Create flame effect
+        function createFlame() {
+            flames.push({
+                x: starship.x + 10,
+                y: starship.y + starship.height,
+                width: 40,
+                height: 60,
+                opacity: 0.8
+            });
+        }
+
+        // Create explosion
+        function createExplosion(x, y, size) {
+            explosions.push({
+                x: x,
+                y: y,
+                size: size,
+                opacity: 1,
+                growth: 5
+            });
+        }
+
+        // Show Elon message
+        function showElonMessage() {
+            const now = Date.now();
+            if (now - lastElonMessageTime > 30000) { // Every 30 seconds
+                const quote = elonQuotes[Math.floor(Math.random() * elonQuotes.length)];
+                elonMessage.textContent = `"${quote}" - Elon Musk`;
+                elonMessage.style.opacity = 1;
+                
+                setTimeout(() => {
+                    elonMessage.style.opacity = 0;
+                }, 5000);
+                
+                lastElonMessageTime = now;
+            }
+        }
+
+        // Update mission phase
+        function updateMissionPhase() {
+            const currentPhase = missionPhases[missionPhase - 1];
+            if (distance >= currentPhase.target) {
+                missionControl.textContent = `MISSION: ${currentPhase.name}`;
+                showElonMessage();
+                
+                if (missionPhase < missionPhases.length) {
+                    missionPhase++;
+                } else {
+                    missionComplete();
+                }
+            }
+        }
+
+        // Update UI
+        function updateUI() {
+            fuelBar.style.width = `${fuel}%`;
+            fuelText.textContent = `FUEL: ${Math.round(fuel)}%`;
+            scoreDisplay.textContent = `SCORE: ${score}`;
+            missionControl.textContent = `MISSION: ${missionPhases[missionPhase - 1].name}`;
+        }
+
+        // Draw game elements
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw stars
+            drawStars();
+            
+            // Draw planets
+            drawPlanets();
+            
+            // Draw asteroids
+            drawAsteroids();
+            
+            // Draw flames
+            drawFlames();
+            
+            // Draw explosions
+            drawExplosions();
+            
+            // Draw starship
+            drawStarship();
+            
+            // Draw distance marker
+            drawDistance();
+        }
+
+        // Draw stars
+        function drawStars() {
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                ctx.fill();
+                ctx.closePath();
+                
+                // Move stars (parallax effect)
+                star.y += 0.2;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+        }
+
+        // Draw planets
+        function drawPlanets() {
+            planets.forEach((planet, index) => {
+                ctx.beginPath();
+                ctx.arc(planet.x, planet.y, planet.size, 0, Math.PI * 2);
+                ctx.fillStyle = planet.color;
+                ctx.fill();
+                ctx.closePath();
+                
+                // Move planets
+                planet.y += planet.speed;
+                
+                // Replace planets that go off screen
+                if (planet.y > canvas.height + planet.size) {
+                    planets.splice(index, 1);
+                    planets.push({
+                        x: Math.random() * canvas.width,
+                        y: -planet.size - Math.random() * 500,
+                        size: planet.size,
+                        color: planet.color,
+                        speed: planet.speed
+                    });
+                }
+            });
+        }
+
+        // Draw asteroids
+        function drawAsteroids() {
+            asteroids.forEach((asteroid, index) => {
+                ctx.save();
+                ctx.translate(asteroid.x + asteroid.size/2, asteroid.y + asteroid.size/2);
+                ctx.rotate(asteroid.rotation);
+                
+                ctx.beginPath();
+                ctx.arc(-asteroid.size/2, -asteroid.size/2, asteroid.size, 0, Math.PI * 2);
+                ctx.fillStyle = '#666';
+                ctx.fill();
+                ctx.closePath();
+                
+                // Add asteroid details
+                ctx.beginPath();
+                ctx.arc(-asteroid.size/3, -asteroid.size/4, asteroid.size/4, 0, Math.PI * 2);
+                ctx.fillStyle = '#444';
+                ctx.fill();
+                ctx.closePath();
+                
+                ctx.restore();
+                
+                // Move asteroid
+                asteroid.y += asteroid.speed;
+                asteroid.rotation += asteroid.rotationSpeed;
+                
+                // Check collision with starship
+                if (
+                    asteroid.y + asteroid.size > starship.y &&
+                    asteroid.y < starship.y + starship.height &&
+                    asteroid.x + asteroid.size > starship.x &&
+                    asteroid.x < starship.x + starship.width
+                ) {
+                    // Create explosion
+                    createExplosion(
+                        asteroid.x + asteroid.size/2,
+                        asteroid.y + asteroid.size/2,
+                        asteroid.size * 2
+                    );
+                    
+                    // Reduce fuel
+                    fuel -= 10 + difficulty * 2;
+                    if (fuel <= 0) {
+                        fuel = 0;
+                        gameOver();
+                    }
+                    
+                    // Remove asteroid
+                    asteroids.splice(index, 1);
+                    updateUI();
+                }
+                
+                // Remove asteroids that go off screen
+                if (asteroid.y > canvas.height + asteroid.size) {
+                    asteroids.splice(index, 1);
+                    score += 5 * difficulty;
+                    updateUI();
+                }
+            });
+        }
+
+        // Draw flames
+        function drawFlames() {
+            flames.forEach((flame, index) => {
+                ctx.save();
+                ctx.globalAlpha = flame.opacity;
+                
+                // Draw flame
+                ctx.beginPath();
+                ctx.moveTo(flame.x, flame.y);
+                ctx.lineTo(flame.x + flame.width, flame.y);
+                ctx.lineTo(flame.x + flame.width/2, flame.y + flame.height);
+                ctx.closePath();
+                ctx.fillStyle = 'orange';
+                ctx.fill();
+                
+                // Inner flame
+                ctx.beginPath();
+                ctx.moveTo(flame.x + 5, flame.y + 5);
+                ctx.lineTo(flame.x + flame.width - 5, flame.y + 5);
+                ctx.lineTo(flame.x + flame.width/2, flame.y + flame.height - 10);
+                ctx.closePath();
+                ctx.fillStyle = 'yellow';
+                ctx.fill();
+                
+                ctx.restore();
+                
+                // Update flame position
+                flame.x = starship.x + 10;
+                flame.y = starship.y + starship.height;
+                
+                // Random flicker
+                flame.opacity = 0.6 + Math.random() * 0.4;
+            });
+        }
+
+        // Draw explosions
+        function drawExplosions() {
+            explosions.forEach((explosion, index) => {
+                ctx.save();
+                ctx.globalAlpha = explosion.opacity;
+                
+                // Draw explosion
+                const gradient = ctx.createRadialGradient(
+                    explosion.x, explosion.y, 0,
+                    explosion.x, explosion.y, explosion.size
+                );
+                gradient.addColorStop(0, 'rgba(255, 100, 0, 1)');
+                gradient.addColorStop(0.5, 'rgba(255, 50, 0, 0.5)');
+                gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+                
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, explosion.size, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.closePath();
+                
+                ctx.restore();
+                
+                // Update explosion
+                explosion.size += explosion.growth;
+                explosion.opacity -= 0.02;
+                
+                // Remove faded explosions
+                if (explosion.opacity <= 0) {
+                    explosions.splice(index, 1);
+                }
+            });
+        }
+
+        // Draw starship
+        function drawStarship() {
+            ctx.save();
+            
+            // Draw starship body
+            ctx.beginPath();
+            ctx.moveTo(starship.x, starship.y);
+            ctx.lineTo(starship.x + starship.width, starship.y);
+            ctx.lineTo(starship.x + starship.width/2, starship.y + starship.height);
+            ctx.closePath();
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            
+            // Draw SpaceX logo
+            ctx.fillStyle = 'black';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('SPACEX', starship.x + starship.width/2, starship.y + 20);
+            
+            // Draw window
+            ctx.beginPath();
+            ctx.arc(starship.x + starship.width/2, starship.y + 30, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#00fffc';
+            ctx.fill();
+            ctx.closePath();
+            
+            ctx.restore();
+        }
+
+        // Draw distance marker
+        function drawDistance() {
+            ctx.fillStyle = 'rgba(0, 255, 252, 0.5)';
+            ctx.font = '16px Orbitron';
+            ctx.textAlign = 'left';
+            ctx.fillText(`DISTANCE: ${Math.round(distance)}M km`, 20, canvas.height - 20);
+        }
+
+        // Move starship
+        function moveStarship() {
+            starship.x += starship.dx;
+            starship.y += starship.dy;
+            
+            // Boundary check
+            if (starship.x < 0) starship.x = 0;
+            if (starship.x + starship.width > canvas.width) starship.x = canvas.width - starship.width;
+            if (starship.y < 0) starship.y = 0;
+            if (starship.y + starship.height > canvas.height) starship.y = canvas.height - starship.height;
+            
+            // Create flame when moving
+            if ((starship.dx !== 0 || starship.dy !== 0) && flames.length === 0) {
+                createFlame();
+            } else if (starship.dx === 0 && starship.dy === 0 && flames.length > 0) {
+                flames = [];
+            }
+        }
+
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            distanceTraveledDisplay.textContent = Math.round(distance);
+            gameOverScreen.style.display = 'flex';
+        }
+
+        // Mission complete
+        function missionComplete() {
+            gameRunning = false;
+            missionCompleteScreen.style.display = 'flex';
+        }
+
+        // Next mission
+        function nextMission() {
+            difficulty++;
+            missionPhase = 1;
+            distance = 0;
+            fuel = 100;
+            asteroids = [];
+            createPlanets();
+            missionCompleteScreen.style.display = 'none';
+            gameRunning = true;
+            update();
+        }
+
+        // Game update loop
+        function update() {
+            if (!gameRunning) return;
+            
+            const now = Date.now();
+            
+            // Move starship
+            moveStarship();
+            
+            // Create asteroids periodically
+            if (now - lastAsteroidTime > 1000 / difficulty) {
+                createAsteroid();
+                lastAsteroidTime = now;
+            }
+            
+            // Consume fuel when moving
+            if ((starship.dx !== 0 || starship.dy !== 0) && now - lastFuelConsumption > 100) {
+                fuel -= 0.5;
+                lastFuelConsumption = now;
+                
+                if (fuel <= 0) {
+                    fuel = 0;
+                    gameOver();
+                }
+                updateUI();
+            }
+            
+            // Increase distance
+            if (now - lastDistanceUpdate > 100) {
+                distance += 0.1 * difficulty;
+                lastDistanceUpdate = now;
+                updateMissionPhase();
+            }
+            
+            // Random Elon messages
+            showElonMessage();
+            
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        // Event listeners
+        startButton.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            gameRunning = true;
+            init(); // Initialize game elements
+            update(); // Start game loop
+        });
+
+        restartButton.addEventListener('click', () => {
+            gameRunning = true;
+            difficulty = 1;
+            missionPhase = 1;
+            distance = 0;
+            score = 0;
+            fuel = 100;
+            asteroids = [];
+            createPlanets();
+            gameOverScreen.style.display = 'none';
+            update();
+        });
+
+        nextMissionButton.addEventListener('click', nextMission);
+
+        // Keyboard controls
+        document.addEventListener('keydown', e => {
+            if (!gameRunning) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    starship.dx = -starship.speed;
+                    break;
+                case 'ArrowRight':
+                    starship.dx = starship.speed;
+                    break;
+                case 'ArrowUp':
+                    starship.dy = -starship.speed;
+                    break;
+                case 'ArrowDown':
+                    starship.dy = starship.speed;
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', e => {
+            switch(e.key) {
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                    starship.dx = 0;
+                    break;
+                case 'ArrowUp':
+                case 'ArrowDown':
+                    starship.dy = 0;
+                    break;
+            }
+        });
+
+        // Touch controls for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener('touchstart', e => {
+            if (!gameRunning) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        canvas.addEventListener('touchmove', e => {
+            if (!gameRunning) return;
+            e.preventDefault();
+            
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            
+            starship.dx = (touchX - touchStartX) * 0.1;
+            starship.dy = (touchY - touchStartY) * 0.1;
+            
+            // Limit speed
+            const maxSpeed = starship.speed;
+            const speed = Math.sqrt(starship.dx * starship.dx + starship.dy * starship.dy);
+            if (speed > maxSpeed) {
+                starship.dx = (starship.dx / speed) * maxSpeed;
+                starship.dy = (starship.dy / speed) * maxSpeed;
+            }
+            
+            touchStartX = touchX;
+            touchStartY = touchY;
+        });
+
+        canvas.addEventListener('touchend', () => {
+            starship.dx = 0;
+            starship.dy = 0;
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            if (starship) {
+                starship.y = canvas.height - 150;
+            }
+        });
+
+        // Initialize game on load
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
