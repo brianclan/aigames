@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BombMan</title>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #222;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.game-container {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.game-header {
+    margin-bottom: 20px;
+}
+
+.game-stats {
+    display: flex;
+    justify-content: space-around;
+    margin: 15px 0;
+    font-size: 18px;
+}
+
+#game-board {
+    display: grid;
+    grid-template-columns: repeat(15, 40px);
+    grid-template-rows: repeat(13, 40px);
+    gap: 1px;
+    margin: 0 auto;
+    background-color: #333;
+    border: 4px solid #555;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.cell {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+}
+
+.empty {
+    background-color: #555;
+}
+
+.wall {
+    background-color: #888;
+    background-image: linear-gradient(135deg, #777 25%, #999 25%, #999 50%, #777 50%, #777 75%, #999 75%, #999 100%);
+    background-size: 10px 10px;
+}
+
+.breakable {
+    background-color: #964B00;
+    background-image: linear-gradient(45deg, #8B4513 25%, #A0522D 25%, #A0522D 50%, #8B4513 50%, #8B4513 75%, #A0522D 75%, #A0522D 100%);
+    background-size: 10px 10px;
+}
+
+.player {
+    background-color: #3498db;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    border: 3px solid #2980b9;
+}
+
+.enemy {
+    background-color: #e74c3c;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    border: 3px solid #c0392b;
+    position: relative;
+    z-index: 5;
+}
+
+.bomb {
+    background-color: #000;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    border: 3px solid #333;
+    animation: bomb-pulse 1s infinite;
+}
+
+.enemy-bomb {
+    background-color: #e74c3c;
+    border: 3px solid #c0392b;
+    animation: enemy-bomb-pulse 0.5s infinite;
+    box-shadow: 0 0 10px rgba(255, 0, 0, 0.7);
+}
+
+.explosion {
+    background-color: #f39c12;
+    animation: explosion 0.5s forwards;
+    position: relative;
+    z-index: 10;
+}
+
+.powerup {
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+}
+
+.powerup.extra-bomb {
+    background-color: #9b59b6;
+    border: 2px solid #8e44ad;
+}
+
+.powerup.increased-range {
+    background-color: #2ecc71;
+    border: 2px solid #27ae60;
+}
+
+.powerup.speed {
+    background-color: #f1c40f;
+    border: 2px solid #f39c12;
+}
+
+.controls {
+    margin-top: 20px;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 10px;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: #333;
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    width: 300px;
+}
+
+.controls-info {
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: #ccc;
+}
+
+@keyframes bomb-pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes explosion {
+    0% {
+        opacity: 1;
+        background-color: #f39c12;
+    }
+
+    50% {
+        opacity: 1;
+        background-color: #e74c3c;
+    }
+
+    100% {
+        opacity: 0;
+        background-color: #555;
+    }
+}
+
+@keyframes enemy-death {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.5);
+        opacity: 0.7;
+    }
+
+    100% {
+        transform: scale(0.1);
+        opacity: 0;
+    }
+}
+
+.enemy-death {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+}
+
+@keyframes enemy-bomb-pulse {
+    0% {
+        transform: scale(1);
+        background-color: #e74c3c;
+        box-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
+    }
+
+    50% {
+        transform: scale(1.2);
+        background-color: #ff5722;
+        box-shadow: 0 0 15px rgba(255, 0, 0, 0.9);
+    }
+
+    100% {
+        transform: scale(1);
+        background-color: #e74c3c;
+        box-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
+    }
+}
+
+.enemy.escaping {
+    background-color: #ff5722;
+    animation: enemy-escape 0.5s infinite;
+}
+
+@keyframes enemy-escape {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>BombMan</h1>
+            <div class="game-stats">
+                <div class="lives">Lives: <span id="lives">3</span></div>
+                <div class="score">Score: <span id="score">0</span></div>
+                <div class="bombs">Bombs: <span id="bombs">3</span></div>
+                <div class="wave">Wave: <span id="wave">1</span></div>
+            </div>
+        </div>
+        <div id="game-board"></div>
+        <div class="controls">
+            <div class="controls-info">
+                <p>Arrow keys or WASD to move, Space to place bomb</p>
+            </div>
+            <button id="start-button">Start Game</button>
+            <button id="restart-button" style="display: none;">Restart</button>
+        </div>
+    </div>
+    <div id="game-over" class="modal">
+        <div class="modal-content">
+            <h2>Game Over!</h2>
+            <p>Your final score: <span id="final-score">0</span></p>
+            <button id="play-again">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Game configuration
+    const config = {
+        rows: 13,
+        cols: 15,
+        initialLives: 3,
+        initialBombs: 3,
+        bombTimer: 2000,  // Bomb explosion time (milliseconds)
+        explosionDuration: 500,  // Explosion effect duration
+        initialEnemies: 1,  // Start with only one enemy
+        playerSpeed: 200,   // Player movement speed
+        enemySpeed: 800,    // Enemy movement speed
+        enemyBombChance: 0.15, // Enemy bomb dropping probability increased to 15%
+        bombNearPlayerChance: 0.6, // 60% chance to drop a bomb if the enemy is near player
+        powerUpChance: 0.3,  // Power-up appearance probability (when breaking walls)
+        breakableWallChance: 0.7 // Breakable wall generation probability
+    };
+
+    // Game state
+    const gameState = {
+        board: [],
+        player: { row: 1, col: 1 },
+        enemies: [],
+        bombs: [],
+        explosions: [],
+        powerUps: [],
+        score: 0,
+        lives: config.initialLives,
+        maxBombs: config.initialBombs,
+        availableBombs: config.initialBombs,
+        bombRange: 2,
+        playerMovementSpeed: config.playerSpeed,
+        isGameRunning: false,
+        enemySpawnTimer: null,
+        lastEnemyKillTime: 0,
+        enemiesKilled: 0,
+        enemyMoveTimers: [],
+        currentWave: 1,     // Current enemy wave
+        enemiesInWave: 1,   // Number of enemies in current wave
+        enemiesRemainingInWave: 1 // Remaining enemies in current wave
+    };
+
+    // DOM elements
+    const gameBoard = document.getElementById('game-board');
+    const scoreElement = document.getElementById('score');
+    const livesElement = document.getElementById('lives');
+    const bombsElement = document.getElementById('bombs');
+    const startButton = document.getElementById('start-button');
+    const restartButton = document.getElementById('restart-button');
+    const gameOverModal = document.getElementById('game-over');
+    const finalScoreElement = document.getElementById('final-score');
+    const playAgainButton = document.getElementById('play-again');
+
+    // Keyboard controls
+    const keys = {
+        ArrowUp: false,
+        ArrowDown: false,
+        ArrowLeft: false,
+        ArrowRight: false,
+        w: false,
+        a: false,
+        s: false,
+        d: false,
+        ' ': false  // Space key
+    };
+
+    // Initialize game
+    function initGame() {
+        // Create game board
+        createBoard();
+        // Update statistics
+        updateStats();
+        // Listen for button clicks
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', restartGame);
+        playAgainButton.addEventListener('click', restartGame);
+        // Listen for keyboard events
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+    }
+
+    // Create game board - restore obstacles
+    function createBoard() {
+        gameBoard.innerHTML = '';
+        gameBoard.style.gridTemplateRows = `repeat(${config.rows}, 40px)`;
+        gameBoard.style.gridTemplateColumns = `repeat(${config.cols}, 40px)`;
+
+        // Initialize game board array
+        gameState.board = [];
+
+        for (let row = 0; row < config.rows; row++) {
+            gameState.board[row] = [];
+            for (let col = 0; col < config.cols; col++) {
+                let cellType = 'empty';
+
+                // Boundaries are fixed walls
+                if (row === 0 || col === 0 || row === config.rows - 1 || col === config.cols - 1) {
+                    cellType = 'wall';
+                }
+                // Fixed internal walls (checkerboard pattern)
+                else if (row % 2 === 0 && col % 2 === 0) {
+                    cellType = 'wall';
+                }
+                // Breakable walls and empty areas
+                else if (!(row === 1 && col === 1) && !(row === 1 && col === 2) && !(row === 2 && col === 1)) {
+                    // Keep player area clear, generate breakable walls elsewhere with 70% probability
+                    cellType = Math.random() < config.breakableWallChance ? 'breakable' : 'empty';
+                }
+
+                gameState.board[row][col] = cellType;
+
+                // Create cell DOM element
+                const cell = document.createElement('div');
+                cell.id = `cell-${row}-${col}`;
+                cell.className = `cell ${cellType}`;
+                gameBoard.appendChild(cell);
+            }
+        }
+
+        console.log("Created game board with obstacles");
+    }
+
+    // Start game - updated with new enemy generation logic
+    function startGame() {
+        if (gameState.isGameRunning) return;
+
+        // Clean up all existing enemy elements (ensure no leftovers)
+        document.querySelectorAll('.enemy').forEach(el => el.remove());
+
+        gameState.isGameRunning = true;
+        startButton.style.display = 'none';
+        restartButton.style.display = 'inline-block';
+
+        // Initialize player position
+        gameState.player = { row: 1, col: 1 };
+        renderPlayer();
+
+        // Initialize enemy wave
+        gameState.currentWave = 1;
+        gameState.enemiesInWave = 1;
+        gameState.enemiesRemainingInWave = 1;
+
+        // Generate first wave of enemies
+        spawnEnemyWave();
+
+        // Start player movement handling
+        setInterval(handlePlayerMovement, 100);
+    }
+
+    // Restart game
+    function restartGame() {
+        // Clear all timers
+        gameState.bombs.forEach(bomb => clearTimeout(bomb.timer));
+        gameState.explosions.forEach(exp => clearTimeout(exp.timer));
+        if (gameState.enemySpawnTimer) clearInterval(gameState.enemySpawnTimer);
+
+        // Clear all enemy movement timers
+        if (gameState.enemyMoveTimers) {
+            gameState.enemyMoveTimers.forEach(timer => clearTimeout(timer));
+        }
+        gameState.enemyMoveTimers = [];
+
+        // Clear all enemy elements
+        document.querySelectorAll('.enemy').forEach(el => el.remove());
+        document.querySelectorAll('.enemy-death').forEach(el => el.remove());
+        document.querySelectorAll('.explosion').forEach(el => el.classList.remove('explosion'));
+        document.querySelectorAll('.bomb').forEach(el => el.remove());
+        document.querySelectorAll('.powerup').forEach(el => el.remove());
+
+        // Reset game state
+        gameState.board = [];
+        gameState.player = { row: 1, col: 1 };
+        gameState.enemies = [];
+        gameState.bombs = [];
+        gameState.explosions = [];
+        gameState.powerUps = [];
+        gameState.score = 0;
+        gameState.lives = config.initialLives;
+        gameState.maxBombs = config.initialBombs;
+        gameState.availableBombs = config.initialBombs;
+        gameState.bombRange = 2;
+        gameState.playerMovementSpeed = config.playerSpeed;
+        gameState.isGameRunning = false;
+        gameState.lastEnemyKillTime = 0;
+        gameState.enemiesKilled = 0;
+
+        // Rebuild game board
+        createBoard();
+
+        // Update statistics
+        updateStats();
+
+        // Hide game over modal
+        gameOverModal.style.display = 'none';
+
+        // Restart game
+        startGame();
+    }
+
+    // Handle key down event
+    function handleKeyDown(e) {
+        if (keys.hasOwnProperty(e.key) && gameState.isGameRunning) {
+            keys[e.key] = true;
+            e.preventDefault();
+
+            // Space key places bomb
+            if (e.key === ' ') {
+                placeBomb();
+            }
+        }
+    }
+
+    // Handle key up event
+    function handleKeyUp(e) {
+        if (keys.hasOwnProperty(e.key)) {
+            keys[e.key] = false;
+        }
+    }
+
+    // Check if position is movable
+    function canMoveTo(row, col) {
+        // Check if out of bounds
+        if (row < 0 || row >= config.rows || col < 0 || col >= config.cols) {
+            return false;
+        }
+
+        // Check if it's a wall or breakable wall
+        if (gameState.board[row][col] === 'wall' || gameState.board[row][col] === 'breakable') {
+            return false;
+        }
+
+        // Check if there's a bomb
+        for (const bomb of gameState.bombs) {
+            if (bomb.row === row && bomb.col === col) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Check player-enemy collision - modified to not cause player death
+    function checkPlayerEnemyCollision() {
+        // Player colliding with enemy won't cause death, this function no longer needs to do anything
+        return;
+    }
+
+    // Handle player movement
+    function handlePlayerMovement() {
+        if (!gameState.isGameRunning) return;
+
+        const lastMove = Date.now() - (gameState.lastMove || 0);
+        if (lastMove < gameState.playerMovementSpeed) return;
+
+        let newRow = gameState.player.row;
+        let newCol = gameState.player.col;
+
+        // Move up
+        if ((keys.ArrowUp || keys.w) && newRow > 0) {
+            newRow--;
+        }
+        // Move down
+        else if ((keys.ArrowDown || keys.s) && newRow < config.rows - 1) {
+            newRow++;
+        }
+        // Move left
+        else if ((keys.ArrowLeft || keys.a) && newCol > 0) {
+            newCol--;
+        }
+        // Move right
+        else if ((keys.ArrowRight || keys.d) && newCol < config.cols - 1) {
+            newCol++;
+        }
+        else {
+            return; // No movement
+        }
+
+        // Check if new position is movable
+        if (canMoveTo(newRow, newCol)) {
+            gameState.player.row = newRow;
+            gameState.player.col = newCol;
+            renderPlayer();
+            gameState.lastMove = Date.now();
+
+            // Check for power-ups
+            checkForPowerUp();
+
+            // Check for enemy collision after moving
+            checkPlayerEnemyCollision();
+        }
+    }
+
+    // Render player
+    function renderPlayer() {
+        // Remove old player element
+        const oldPlayerElement = document.querySelector('.player');
+        if (oldPlayerElement) {
+            oldPlayerElement.remove();
+        }
+
+        // Create new player element
+        const { row, col } = gameState.player;
+        const cell = document.getElementById(`cell-${row}-${col}`);
+
+        const playerElement = document.createElement('div');
+        playerElement.className = 'player';
+        cell.appendChild(playerElement);
+
+        // Check if player collides with enemy
+        checkPlayerEnemyCollision();
+    }
+
+    // Place bomb
+    function placeBomb() {
+        if (gameState.availableBombs <= 0) return;
+
+        const { row, col } = gameState.player;
+
+        // Check if there's already a bomb at this position
+        for (const bomb of gameState.bombs) {
+            if (bomb.row === row && bomb.col === col) {
+                return;
+            }
+        }
+
+        // Reduce available bombs
+        gameState.availableBombs--;
+        updateStats();
+
+        // Create bomb
+        const bomb = { row, col, range: gameState.bombRange };
+        gameState.bombs.push(bomb);
+
+        // Render bomb
+        const cell = document.getElementById(`cell-${row}-${col}`);
+        const bombElement = document.createElement('div');
+        bombElement.className = 'bomb';
+        cell.appendChild(bombElement);
+
+        // Set bomb explosion timer
+        bomb.timer = setTimeout(() => {
+            explodeBomb(bomb);
+        }, config.bombTimer);
+    }
+
+    // Bomb explosion - add debug info
+    function explodeBomb(bomb) {
+        console.log(`Bomb exploded at (${bomb.row}, ${bomb.col})`);
+
+        // Remove bomb from array
+        const bombIndex = gameState.bombs.indexOf(bomb);
+        if (bombIndex !== -1) {
+            gameState.bombs.splice(bombIndex, 1);
+            console.log(`Removed bomb from array, remaining bombs: ${gameState.bombs.length}`);
+        }
+
+        // Increase available bombs
+        gameState.availableBombs++;
+        updateStats();
+
+        // Remove bomb element
+        const cell = document.getElementById(`cell-${bomb.row}-${bomb.col}`);
+        const bombElement = cell.querySelector('.bomb');
+        if (bombElement) {
+            console.log(`Removed bomb DOM element`);
+            bombElement.remove();
+        }
+
+        // Create explosion effect
+        createExplosion(bomb.row, bomb.col, bomb.range);
+    }
+
+    // Create explosion effect - added detailed debugging
+    function createExplosion(row, col, range) {
+        console.log(`Creating explosion at center: (${row}, ${col}), range: ${range}`);
+
+        // Center point explosion
+        addExplosion(row, col);
+
+        // Explosion in four directions
+        const directions = [
+            { dr: -1, dc: 0, name: "up" },   // up
+            { dr: 1, dc: 0, name: "down" },  // down
+            { dr: 0, dc: -1, name: "left" }, // left
+            { dr: 0, dc: 1, name: "right" }  // right
+        ];
+
+        directions.forEach(dir => {
+            console.log(`Checking explosion direction: ${dir.name}`);
+            for (let i = 1; i <= range; i++) {
+                const newRow = row + dir.dr * i;
+                const newCol = col + dir.dc * i;
+
+                console.log(`Checking explosion position: (${newRow}, ${newCol})`);
+
+                // Check if out of bounds
+                if (newRow < 0 || newRow >= config.rows || newCol < 0 || newCol >= config.cols) {
+                    console.log(`Position out of bounds, stopping explosion in this direction`);
+                    break;
+                }
+
+                // Check if it's a wall
+                if (gameState.board[newRow][newCol] === 'wall') {
+                    console.log(`Position is a wall, stopping explosion in this direction`);
+                    break;
+                }
+
+                // If it's a breakable wall, destroy it and stop explosion in this direction
+                if (gameState.board[newRow][newCol] === 'breakable') {
+                    console.log(`Position is a breakable wall, destroying it and stopping explosion in this direction`);
+                    destroyBreakable(newRow, newCol);
+                    addExplosion(newRow, newCol);
+                    break;
+                }
+
+                // Add explosion effect
+                console.log(`Adding explosion effect at position (${newRow}, ${newCol})`);
+                addExplosion(newRow, newCol);
+            }
+        });
+
+        // Check if any enemies are in explosion range immediately
+        checkEnemiesInExplosion();
+
+        // Add a delayed check in case the first check wasn't successful
+        setTimeout(() => {
+            console.log("Delayed second check for enemies in explosion range");
+            checkEnemiesInExplosion();
+        }, 100);
+    }
+
+    // New function: check if any enemies are in explosion range - modified to use handleEnemyKilled
+    function checkEnemiesInExplosion() {
+        // Get all explosion cells
+        const explosionCells = document.querySelectorAll('.explosion');
+        const explosionPositions = [];
+
+        // Collect all explosion positions
+        explosionCells.forEach(cell => {
+            const id = cell.id;
+            const match = id.match(/cell-(\d+)-(\d+)/);
+            if (match) {
+                const pos = {
+                    row: parseInt(match[1]),
+                    col: parseInt(match[2])
+                };
+                explosionPositions.push(pos);
+            }
+        });
+
+        // Check if each enemy is in any explosion position
+        for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+            const enemy = gameState.enemies[i];
+
+            for (const pos of explosionPositions) {
+                if (enemy.row === pos.row && enemy.col === pos.col) {
+                    // Create enemy death effect
+                    createEnemyDeathEffect(enemy);
+
+                    // Force remove all enemy elements at this position
+                    const cell = document.getElementById(`cell-${enemy.row}-${enemy.col}`);
+                    if (cell) {
+                        // Clear all enemy elements in the cell
+                        const cellEnemyElements = cell.querySelectorAll('.enemy');
+                        cellEnemyElements.forEach(el => el.remove());
+                    }
+
+                    // Try to remove specific enemy using a more precise selector
+                    const enemyElement = document.querySelector(`.enemy[data-id="${enemy.id}"]`);
+                    if (enemyElement) {
+                        enemyElement.remove();
+                    } else {
+                        // Try to clear all enemy elements
+                        document.querySelectorAll('.enemy').forEach(el => {
+                            if (el.dataset && el.dataset.id === enemy.id) {
+                                el.remove();
+                            }
+                        });
+                    }
+
+                    // Clear enemy's movement timer
+                    if (enemy.moveTimer) {
+                        clearTimeout(enemy.moveTimer);
+                    }
+
+                    // Remove enemy from game state
+                    gameState.enemies.splice(i, 1);
+
+                    // Increase score
+                    gameState.score += 100;
+                    updateStats();
+
+                    // Record enemy kill time
+                    gameState.lastEnemyKillTime = Date.now();
+                    gameState.enemiesKilled++;
+
+                    // Handle enemy killed logic
+                    handleEnemyKilled();
+
+                    break;
+                }
+            }
+        }
+    }
+
+    // Create enemy death effect
+    function createEnemyDeathEffect(enemy) {
+        const cell = document.getElementById(`cell-${enemy.row}-${enemy.col}`);
+        if (!cell) return;
+
+        // Create death effect element
+        const deathEffect = document.createElement('div');
+        deathEffect.className = 'enemy-death';
+        deathEffect.style.width = '30px';
+        deathEffect.style.height = '30px';
+        deathEffect.style.borderRadius = '50%';
+        deathEffect.style.backgroundColor = '#ff0000';
+        deathEffect.style.position = 'absolute';
+        deathEffect.style.zIndex = '100';
+        deathEffect.style.animation = 'enemy-death 0.5s forwards';
+
+        // Add to DOM
+        cell.appendChild(deathEffect);
+
+        // Set animation effect
+        setTimeout(() => {
+            if (deathEffect && deathEffect.parentNode) {
+                deathEffect.parentNode.removeChild(deathEffect);
+            }
+        }, 500);
+    }
+
+    // Add explosion effect - add debug info
+    function addExplosion(row, col) {
+        // Create explosion object
+        const explosion = { row, col };
+        gameState.explosions.push(explosion);
+
+        // Add explosion CSS class
+        const cell = document.getElementById(`cell-${row}-${col}`);
+        if (cell) {
+            cell.classList.add('explosion');
+            console.log(`Added explosion effect to cell (${row}, ${col})`);
+        }
+
+        // Check if explosion hit player
+        if (gameState.player.row === row && gameState.player.col === col) {
+            playerHit();
+        }
+
+        // Check if there's an enemy at this position
+        for (let i = 0; i < gameState.enemies.length; i++) {
+            const enemy = gameState.enemies[i];
+            console.log(`Checking enemy position: (${enemy.row}, ${enemy.col}) vs explosion position: (${row}, ${col})`);
+
+            if (enemy.row === row && enemy.col === col) {
+                console.log(`Found enemy at explosion position! ID: ${enemy.id}`);
+            }
+        }
+
+        // Set explosion effect disappear timer
+        explosion.timer = setTimeout(() => {
+            // Remove explosion effect
+            if (cell) {
+                cell.classList.remove('explosion');
+            }
+
+            // Remove explosion from array
+            const index = gameState.explosions.indexOf(explosion);
+            if (index !== -1) {
+                gameState.explosions.splice(index, 1);
+            }
+        }, config.explosionDuration);
+    }
+
+    // Destroy breakable wall
+    function destroyBreakable(row, col) {
+        // Update game board
+        gameState.board[row][col] = 'empty';
+
+        // Update cell style
+        const cell = document.getElementById(`cell-${row}-${col}`);
+        cell.className = 'cell empty';
+
+        // Increase score
+        gameState.score += 10;
+        updateStats();
+
+        // Chance to spawn power-up
+        if (Math.random() < config.powerUpChance) {
+            spawnPowerUp(row, col);
+        }
+    }
+
+    // Spawn power-up
+    function spawnPowerUp(row, col) {
+        // Randomly select power-up type
+        const types = ['extra-bomb', 'increased-range', 'speed'];
+        const type = types[Math.floor(Math.random() * types.length)];
+
+        // Create power-up object
+        const powerUp = { row, col, type };
+        gameState.powerUps.push(powerUp);
+
+        // Render power-up
+        const cell = document.getElementById(`cell-${row}-${col}`);
+        const powerUpElement = document.createElement('div');
+        powerUpElement.className = `powerup ${type}`;
+        cell.appendChild(powerUpElement);
+    }
+
+    // Handle enemy killed logic
+    function handleEnemyKilled() {
+        // Decrease remaining enemies in current wave
+        gameState.enemiesRemainingInWave--;
+        console.log(`Enemy killed, remaining enemies in current wave: ${gameState.enemiesRemainingInWave}`);
+
+        // If all enemies in current wave are eliminated, proceed to next wave
+        if (gameState.enemiesRemainingInWave <= 0) {
+            gameState.currentWave++;
+            // Next wave has twice as many enemies as current wave
+            gameState.enemiesInWave = Math.min(2 ** (gameState.currentWave - 1), 16);
+
+            console.log(`All enemies eliminated, preparing wave ${gameState.currentWave}, enemy count: ${gameState.enemiesInWave}`);
+
+            // Delay 2 seconds before spawning next wave
+            setTimeout(() => {
+                spawnEnemyWave();
+            }, 2000);
+        }
+    }
+
+    // Player hit logic
+    function playerHit() {
+        gameState.lives--;
+        updateStats();
+
+        if (gameState.lives <= 0) {
+            gameOver();
+        } else {
+            // Player respawn at starting position
+            gameState.player = { row: 1, col: 1 };
+            renderPlayer();
+        }
+    }
+
+    // Game over
+    function gameOver() {
+        gameState.isGameRunning = false;
+
+        // Clear all timers
+        gameState.bombs.forEach(bomb => clearTimeout(bomb.timer));
+        gameState.explosions.forEach(exp => clearTimeout(exp.timer));
+        if (gameState.enemySpawnTimer) clearInterval(gameState.enemySpawnTimer);
+
+        // Show game over modal
+        finalScoreElement.textContent = gameState.score;
+        gameOverModal.style.display = 'flex';
+    }
+
+    // Spawn enemy wave
+    function spawnEnemyWave() {
+        console.log(`Spawning wave ${gameState.currentWave}, enemy count: ${gameState.enemiesInWave}`);
+
+        // Clear existing enemies
+        gameState.enemies.forEach(enemy => {
+            if (enemy.moveTimer) {
+                clearTimeout(enemy.moveTimer);
+            }
+        });
+        gameState.enemies = [];
+        document.querySelectorAll('.enemy').forEach(el => el.remove());
+
+        // Spawn new enemies
+        spawnEnemies(gameState.enemiesInWave);
+
+        // Update remaining enemy count
+        gameState.enemiesRemainingInWave = gameState.enemies.length;
+
+        // Start enemy movement
+        gameState.enemies.forEach(enemy => moveEnemy(enemy));
+    }
+
+    // Check for power-up
+    function checkForPowerUp() {
+        const { row, col } = gameState.player;
+
+        // Find power-up
+        const powerUpIndex = gameState.powerUps.findIndex(p => p.row === row && p.col === col);
+
+        if (powerUpIndex !== -1) {
+            const powerUp = gameState.powerUps[powerUpIndex];
+
+            // Apply power-up effect
+            switch (powerUp.type) {
+                case 'extra-bomb':
+                    gameState.maxBombs++;
+                    gameState.availableBombs++;
+                    break;
+                case 'increased-range':
+                    gameState.bombRange++;
+                    break;
+                case 'speed':
+                    gameState.playerMovementSpeed = Math.max(100, gameState.playerMovementSpeed - 30);
+                    break;
+            }
+
+            // Remove power-up
+            gameState.powerUps.splice(powerUpIndex, 1);
+            const powerUpElement = document.querySelector(`#cell-${row}-${col} .powerup`);
+            if (powerUpElement) {
+                powerUpElement.remove();
+            }
+
+            // Increase score
+            gameState.score += 50;
+            updateStats();
+        }
+    }
+
+    // Update statistics
+    function updateStats() {
+        scoreElement.textContent = gameState.score;
+        livesElement.textContent = gameState.lives;
+        bombsElement.textContent = gameState.availableBombs;
+
+        // Update wave display
+        const waveElement = document.getElementById('wave');
+        if (waveElement) {
+            waveElement.textContent = gameState.currentWave;
+        }
+    }
+
+    // Spawn enemies
+    function spawnEnemies(count) {
+        for (let i = 0; i < count; i++) {
+            // Find available empty position
+            let row, col;
+            let attempts = 0;
+            const maxAttempts = 50;
+            let tooCloseToOtherEnemies = false;
+
+            do {
+                row = Math.floor(Math.random() * (config.rows - 2)) + 1;
+                col = Math.floor(Math.random() * (config.cols - 2)) + 1;
+                attempts++;
+
+                // Avoid spawning near player
+                const playerDistance = Math.abs(row - gameState.player.row) + Math.abs(col - gameState.player.col);
+
+                // Avoid spawning near other enemies
+                tooCloseToOtherEnemies = false;
+                for (const enemy of gameState.enemies) {
+                    const enemyDistance = Math.abs(row - enemy.row) + Math.abs(col - enemy.col);
+                    if (enemyDistance < 4) { // Ensure minimum distance between enemies
+                        tooCloseToOtherEnemies = true;
+                        break;
+                    }
+                }
+
+                if (attempts >= maxAttempts) {
+                    console.log("Could not find suitable position for enemy spawn");
+                    return; // Unable to find suitable position
+                }
+            } while (
+                gameState.board[row][col] !== 'empty' ||
+                (Math.abs(row - gameState.player.row) + Math.abs(col - gameState.player.col) < 7) || // Increase minimum distance to player
+                tooCloseToOtherEnemies || // Avoid enemies too close to each other
+                !canMoveTo(row, col) // Ensure position is movable
+            );
+
+            // Create enemy
+            const enemy = {
+                id: Date.now() + Math.random(),
+                row,
+                col
+            };
+            gameState.enemies.push(enemy);
+
+            // Render enemy
+            renderEnemy(enemy);
+            console.log(`Enemy spawned at (${row}, ${col})`);
+        }
+    }
+
+    // Render enemy - added fleeing state visual effect
+    function renderEnemy(enemy) {
+        // Check if enemy still exists in game
+        const enemyExists = gameState.enemies.some(e => e.id === enemy.id);
+        if (!enemyExists) {
+            return; // Enemy no longer in game, cancel rendering
+        }
+
+        // Remove old enemy element
+        const oldEnemyElement = document.querySelector(`.enemy[data-id="${enemy.id}"]`);
+        if (oldEnemyElement) {
+            oldEnemyElement.remove();
+        }
+
+        // Clear any existing enemy elements with same ID (redundant check)
+        document.querySelectorAll(`.enemy`).forEach(el => {
+            if (el.dataset && el.dataset.id === enemy.id) {
+                el.remove();
+            }
+        });
+
+        // Create new enemy element
+        const cell = document.getElementById(`cell-${enemy.row}-${enemy.col}`);
+        if (!cell) {
+            return;
+        }
+
+        const enemyElement = document.createElement('div');
+        enemyElement.className = 'enemy';
+
+        // If enemy is fleeing, add fleeing style
+        if (enemy.isEscaping) {
+            enemyElement.classList.add('escaping');
+        }
+
+        enemyElement.dataset.id = enemy.id;
+        enemyElement.setAttribute('data-row', enemy.row);
+        enemyElement.setAttribute('data-col', enemy.col);
+        cell.appendChild(enemyElement);
+    }
+
+    // Move enemy - added bomb placing ability and fleeing behavior, increased aggressiveness
+    function moveEnemy(enemy) {
+        if (!gameState.isGameRunning) {
+            return;
+        }
+
+        // Check if enemy still exists in game
+        const enemyIndex = gameState.enemies.findIndex(e => e.id === enemy.id);
+        if (enemyIndex === -1) {
+            return; // Enemy no longer in game, stop moving
+        }
+
+        // If enemy is fleeing, continue fleeing behavior
+        if (enemy.isEscaping && enemy.escapeDirection) {
+            const dir = enemy.escapeDirection;
+            const newRow = enemy.row + dir.dr;
+            const newCol = enemy.col + dir.dc;
+
+            // Check if can continue moving in fleeing direction
+            if (canEnemyMoveTo(newRow, newCol)) {
+                enemy.row = newRow;
+                enemy.col = newCol;
+                renderEnemy(enemy);
+
+                // Continue fleeing for a while
+                enemy.escapeSteps--;
+                if (enemy.escapeSteps <= 0) {
+                    // Stop fleeing
+                    enemy.isEscaping = false;
+                    enemy.escapeDirection = null;
+                }
+            } else {
+                // If cannot continue fleeing in original direction, stop fleeing
+                enemy.isEscaping = false;
+                enemy.escapeDirection = null;
+            }
+        }
+        // If enemy not fleeing, consider dropping a bomb
+        else {
+            // Calculate distance to player
+            const distanceToPlayer = Math.abs(enemy.row - gameState.player.row) +
+                Math.abs(enemy.col - gameState.player.col);
+
+            // Check if player in straight line possible hit
+            const canHitPlayer = playerInBombLine(enemy);
+
+            // If near player (Manhattan distance <= 3) or player in straight line, increase bomb dropping probability
+            let bombChance = config.enemyBombChance;
+            if (distanceToPlayer <= 3) {
+                bombChance = config.bombNearPlayerChance; // Use higher probability when near player
+            }
+            if (canHitPlayer) {
+                bombChance = 0.9; // If player in straight line, 90% probability to drop a bomb
+            }
+
+            // Based on probability decide whether to drop a bomb
+            if (Math.random() < bombChance) {
+                // Get possible fleeing directions
+                const escapeDirections = findEscapeDirections(enemy);
+
+                // Only drop a bomb when there's fleeing path
+                if (escapeDirections.length > 0) {
+                    // Place bomb
+                    enemyPlaceBomb(enemy);
+
+                    // Choose a fleeing direction, prioritize fleeing away from player
+                    let bestDirection = escapeDirections[0];
+                    let maxDistanceIncrease = -1;
+
+                    escapeDirections.forEach(dir => {
+                        const newRow = enemy.row + dir.dr;
+                        const newCol = enemy.col + dir.dc;
+                        const newDistance = Math.abs(newRow - gameState.player.row) +
+                            Math.abs(newCol - gameState.player.col);
+                        const distanceIncrease = newDistance - distanceToPlayer;
+
+                        if (distanceIncrease > maxDistanceIncrease) {
+                            maxDistanceIncrease = distanceIncrease;
+                            bestDirection = dir;
+                        }
+                    });
+
+                    enemy.isEscaping = true;
+                    enemy.escapeDirection = bestDirection;
+                    enemy.escapeSteps = 3; // Flee 3 steps
+
+                    // Immediately start fleeing
+                    const newRow = enemy.row + bestDirection.dr;
+                    const newCol = enemy.col + bestDirection.dc;
+
+                    if (canEnemyMoveTo(newRow, newCol)) {
+                        enemy.row = newRow;
+                        enemy.col = newCol;
+                        renderEnemy(enemy);
+                        enemy.escapeSteps--;
+                    }
+                }
+            } else {
+                // Normal move - Some probability to move towards player
+                const moveTowardsPlayerChance = 0.7; // 70% probability to move towards player
+
+                if (Math.random() < moveTowardsPlayerChance) {
+                    // Calculate move towards player direction
+                    const directions = [];
+                    const possibleMoves = [
+                        { dr: -1, dc: 0, name: "up" },  // Up
+                        { dr: 1, dc: 0, name: "down" },   // Down
+                        { dr: 0, dc: -1, name: "left" },  // Left
+                        { dr: 0, dc: 1, name: "right" }    // Right
+                    ];
+
+                    // Calculate each direction if towards player
+                    possibleMoves.forEach(move => {
+                        const newRow = enemy.row + move.dr;
+                        const newCol = enemy.col + move.dc;
+
+                        if (canEnemyMoveTo(newRow, newCol)) {
+                            const currentDistance = Math.abs(enemy.row - gameState.player.row) +
+                                Math.abs(enemy.col - gameState.player.col);
+                            const newDistance = Math.abs(newRow - gameState.player.row) +
+                                Math.abs(newCol - gameState.player.col);
+
+                            // If this direction makes enemy move towards player, increase priority
+                            if (newDistance < currentDistance) {
+                                // Add multiple directions towards player, increase chance of being selected
+                                directions.push(move);
+                                directions.push(move); // Add twice to increase weight
+                            } else {
+                                // Other directions also have a chance to be selected
+                                directions.push(move);
+                            }
+                        }
+                    });
+
+                    // If there's possible move direction, randomly select one
+                    if (directions.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * directions.length);
+                        const { dr, dc } = directions[randomIndex];
+                        const newRow = enemy.row + dr;
+                        const newCol = enemy.col + dc;
+
+                        enemy.row = newRow;
+                        enemy.col = newCol;
+                        renderEnemy(enemy);
+                    }
+                } else {
+                    // Random move
+                    const directions = [];
+                    const possibleMoves = [
+                        { dr: -1, dc: 0 },  // Up
+                        { dr: 1, dc: 0 },   // Down
+                        { dr: 0, dc: -1 },  // Left
+                        { dr: 0, dc: 1 }    // Right
+                    ];
+
+                    // Check each direction if movable
+                    possibleMoves.forEach(move => {
+                        const newRow = enemy.row + move.dr;
+                        const newCol = enemy.col + move.dc;
+
+                        // Enemy only blocked by wall and breakable wall, can pass through other enemies and bombs
+                        if (canEnemyMoveTo(newRow, newCol)) {
+                            directions.push(move);
+                        }
+                    });
+
+                    // If there's possible move direction, randomly select one
+                    if (directions.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * directions.length);
+                        const { dr, dc } = directions[randomIndex];
+                        const newRow = enemy.row + dr;
+                        const newCol = enemy.col + dc;
+
+                        enemy.row = newRow;
+                        enemy.col = newCol;
+                        renderEnemy(enemy);
+                    }
+                }
+            }
+        }
+
+        // Set next move timer
+        const timer = setTimeout(() => moveEnemy(enemy), config.enemySpeed);
+        enemy.moveTimer = timer; // Save in enemy object
+
+        // Save timer reference for cleanup
+        if (!gameState.enemyMoveTimers) {
+            gameState.enemyMoveTimers = [];
+        }
+        gameState.enemyMoveTimers.push(timer);
+    }
+
+    // Check if player in enemy's bomb line
+    function playerInBombLine(enemy) {
+        const { row: playerRow, col: playerCol } = gameState.player;
+        const { row: enemyRow, col: enemyCol } = enemy;
+
+        // Check if in the same row
+        if (playerRow === enemyRow) {
+            // Determine distance between player and enemy
+            const distance = Math.abs(playerCol - enemyCol);
+            if (distance <= 2) { // In bomb explosion range
+                // Check if there's a wall in between
+                const startCol = Math.min(playerCol, enemyCol);
+                const endCol = Math.max(playerCol, enemyCol);
+
+                let pathClear = true;
+                for (let col = startCol + 1; col < endCol; col++) {
+                    if (gameState.board[playerRow][col] === 'wall' || gameState.board[playerRow][col] === 'breakable') {
+                        pathClear = false;
+                        break;
+                    }
+                }
+
+                return pathClear;
+            }
+        }
+
+        // Check if in the same column
+        if (playerCol === enemyCol) {
+            // Determine distance between player and enemy
+            const distance = Math.abs(playerRow - enemyRow);
+            if (distance <= 2) { // In bomb explosion range
+                // Check if there's a wall in between
+                const startRow = Math.min(playerRow, enemyRow);
+                const endRow = Math.max(playerRow, enemyRow);
+
+                let pathClear = true;
+                for (let row = startRow + 1; row < endRow; row++) {
+                    if (gameState.board[row][playerCol] === 'wall' || gameState.board[row][playerCol] === 'breakable') {
+                        pathClear = false;
+                        break;
+                    }
+                }
+
+                return pathClear;
+            }
+        }
+
+        return false;
+    }
+
+    // Find enemy fleeing direction
+    function findEscapeDirections(enemy) {
+        const possibleMoves = [
+            { dr: -1, dc: 0, name: "up" },  // Up
+            { dr: 1, dc: 0, name: "down" },   // Down
+            { dr: 0, dc: -1, name: "left" },  // Left
+            { dr: 0, dc: 1, name: "right" }    // Right
+        ];
+
+        const validDirections = [];
+
+        // Check each direction if it's a valid fleeing path
+        possibleMoves.forEach(move => {
+            let canEscape = true;
+
+            // Check if can walk at least 3 steps in this direction
+            for (let steps = 1; steps <= 3; steps++) {
+                const newRow = enemy.row + move.dr * steps;
+                const newCol = enemy.col + move.dc * steps;
+
+                if (!canEnemyMoveTo(newRow, newCol)) {
+                    canEscape = false;
+                    break;
+                }
+            }
+
+            if (canEscape) {
+                validDirections.push(move);
+            }
+        });
+
+        return validDirections;
+    }
+
+    // Enemy place bomb
+    function enemyPlaceBomb(enemy) {
+        // Check if position already has a bomb
+        for (const bomb of gameState.bombs) {
+            if (bomb.row === enemy.row && bomb.col === enemy.col) {
+                return;
+            }
+        }
+
+        console.log(`Enemy ${enemy.id} placed bomb at (${enemy.row}, ${enemy.col}) and is preparing to flee`);
+
+        // Create bomb
+        const bomb = {
+            row: enemy.row,
+            col: enemy.col,
+            range: 2, // Increase enemy bomb explosion range to 2 cells
+            isEnemyBomb: true
+        };
+        gameState.bombs.push(bomb);
+
+        // Render bomb
+        const cell = document.getElementById(`cell-${enemy.row}-${enemy.col}`);
+        const bombElement = document.createElement('div');
+        bombElement.className = 'bomb enemy-bomb';
+        cell.appendChild(bombElement);
+
+        // Set bomb explosion timer
+        bomb.timer = setTimeout(() => {
+            explodeBomb(bomb);
+        }, config.bombTimer);
+    }
+
+    // Check if enemy can move to specified position
+    function canEnemyMoveTo(row, col) {
+        // Check if out of bounds
+        if (row < 0 || row >= config.rows || col < 0 || col >= config.cols) {
+            return false;
+        }
+
+        // Enemy only blocked by wall and breakable wall
+        if (gameState.board[row][col] === 'wall' || gameState.board[row][col] === 'breakable') {
+            return false;
+        }
+
+        return true;
+    }
+
+    // Initialize game
+    initGame();
+});
+    </script>
+</body>
+</html> 

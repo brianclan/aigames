@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catch the Thief - Voice Typing Game</title>
+    <link rel="stylesheet" href="./styles.css">
+  <script type="module" crossorigin>(function(){const b=document.createElement("link").relList;if(b&&b.supports&&b.supports("modulepreload"))return;for(const s of document.querySelectorAll('link[rel="modulepreload"]'))I(s);new MutationObserver(s=>{for(const a of s)if(a.type==="childList")for(const x of a.addedNodes)x.tagName==="LINK"&&x.rel==="modulepreload"&&I(x)}).observe(document,{childList:!0,subtree:!0});function K(s){const a={};return s.integrity&&(a.integrity=s.integrity),s.referrerPolicy&&(a.referrerPolicy=s.referrerPolicy),s.crossOrigin==="use-credentials"?a.credentials="include":s.crossOrigin==="anonymous"?a.credentials="omit":a.credentials="same-origin",a}function I(s){if(s.ep)return;s.ep=!0;const a=K(s);fetch(s.href,a)}})();document.addEventListener("DOMContentLoaded",()=>{const v=document.getElementById("start-btn"),b=document.getElementById("restart-btn"),K=document.getElementById("help-btn"),I=document.getElementById("target-text"),s=document.getElementById("typed-text"),a=document.getElementById("accuracy"),x=document.getElementById("time"),B=document.getElementById("thief"),U=document.getElementById("police"),j=document.getElementById("game-result"),F=document.getElementById("result-message"),ce=document.getElementById("result-stats"),h=document.getElementById("mic-status"),$=document.getElementById("help-modal"),se=document.querySelector(".close");let u=null,A=null,S=!1,p=!1,V,Y,z=0,k=0,g=0;const _=750,q=15;let R=0,y=0,W=0;const J=["The quick brown fox jumps over the lazy dog. This sentence contains every letter in the English alphabet.","Speech recognition technology allows computers to understand human voice. It has improved significantly in recent years.","Learning to type quickly and accurately is an important skill in today's digital world. Practice makes perfect.","The internet has revolutionized how we communicate, work, and access information in the modern age.","Artificial intelligence and machine learning are transforming many industries and creating new opportunities."];let G,T,P,d=[];function Q(){return window.SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition||window.mozSpeechRecognition||window.msSpeechRecognition,window.SpeechRecognition?(console.log("浏览器支持语音识别"),!0):(console.warn("浏览器不支持语音识别功能"),alert("您的浏览器不支持语音识别功能，将使用键盘输入模式"),M(),!1)}function M(){S=!0,h&&(h.textContent="使用键盘输入",h.style.color="#e67e22"),document.addEventListener("keydown",le);const e=document.createElement("div");e.className="speech-help",e.textContent="请使用键盘输入英文文本 (语音识别不可用)",e.style.color="#e67e22";const n=document.querySelector(".typing-area");n&&!document.querySelector(".speech-help")&&n.appendChild(e)}let E="";function le(e){p&&(e.ctrlKey||e.altKey||e.metaKey||(e.key==="Backspace"?E=E.slice(0,-1):e.key==="Enter"?E="":e.key.length===1&&(E+=e.key),D(E)))}function ie(){return navigator.mediaDevices.getUserMedia({audio:!0}).then(e=>(console.log("获取麦克风权限成功"),A=e,ae(e),e)).catch(e=>{throw console.error("获取麦克风权限失败:",e),alert("无法获取麦克风权限，将使用键盘输入模式"),M(),e})}function ae(e){try{G=new(window.AudioContext||window.webkitAudioContext);const n=G.createMediaStreamSource(e);T=G.createAnalyser(),T.fftSize=32,n.connect(T),P=new Uint8Array(T.frequencyBinCount),X(),console.log("音频分析器设置完成")}catch(n){console.error("设置音频分析器失败:",n)}}function X(){if(!T||!p)return;T.getByteFrequencyData(P);const n=P.reduce((o,c)=>o+c,0)/P.length,t=Math.min(100,Math.max(0,n*100/255)),r=document.querySelector(".volume-bar");r&&(r.style.width=`${t}%`,t>70?r.style.backgroundColor="#e74c3c":t>30?r.style.backgroundColor="#2ecc71":r.style.backgroundColor="#3498db"),requestAnimationFrame(X)}function Z(){me(),Q()&&(S||ie().then(()=>{const e=document.createElement("div");e.className="speech-help",e.textContent="请对着麦克风说出英文文本",e.style.color="#2ecc71";const n=document.querySelector(".typing-area");n&&!document.querySelector(".speech-help")&&n.appendChild(e),ee()}).catch(()=>{}))}function ee(){if(!S)try{u=new window.SpeechRecognition,u.lang="en-US",u.interimResults=!0,u.maxAlternatives=3,u.onresult=ue,u.onerror=fe,u.onend=pe,h&&(h.textContent="Microphone active",h.classList.add("active")),u.start(),console.log("开始语音识别")}catch(e){console.error("启动语音识别失败:",e),M()}}function ue(e){if(!p)return;const n=e.results;if(n.length>0){const t=n[n.length-1];if(t&&t.length>0){const r=t[0].transcript,o=t[0].confidence;console.log(`识别文本: "${r}", 置信度: ${o}`);let c=r,f=o;if(o<.8&&t.length>1)for(let l=1;l<t.length;l++)console.log(`备选识别 #${l}: "${t[l].transcript}", 置信度: ${t[l].confidence}`),t[l].confidence>f&&(c=t[l].transcript,f=t[l].confidence);de(c)}}}function de(e){const r=I.textContent.toLowerCase().split(/\s+/),c=e.toLowerCase().trim().split(/\s+/);if(console.log("原始输入:",e),console.log("输入单词:",c),console.log("目标单词:",r),console.log("已完成单词:",d),d.length===0){D(e);return}const f=d.length;if(f>=r.length)return;const l=r[f];for(let i=0;i<c.length;i++){const w=c.slice(i).join(" ");if(w.startsWith(l.substring(0,2))){let m="";for(let C=0;C<f;C++)m+=r[C]+" ";m+=w,console.log("构建的输入:",m),D(m);return}}D(e)}function fe(e){console.error("语音识别错误:",e.error,e.message||""),e.error==="audio-capture"?(console.warn("音频捕获错误 - 切换到键盘模式"),M()):e.error==="not-allowed"?(console.warn("麦克风权限被拒绝 - 切换到键盘模式"),M()):e.error==="network"?(console.warn("网络错误 - 尝试重新启动语音识别"),N()):e.error==="no-speech"?console.log("未检测到语音 - 继续监听"):(console.warn("其他语音识别错误:",e.error),N())}function pe(){console.log("语音识别会话结束"),p&&!S&&setTimeout(()=>{p&&!S&&N()},300)}function N(){if(!(S||!p)){if(u)try{u.stop()}catch(e){console.error("停止语音识别失败:",e)}setTimeout(()=>{p&&!S&&ee()},500)}}function ge(){if(u){try{u.stop()}catch(e){console.error("停止语音识别失败:",e)}u=null}A&&(A.getTracks().forEach(n=>n.stop()),A=null),h&&(h.textContent="Microphone inactive",h.classList.remove("active")),console.log("语音识别资源已清理")}function me(){p=!0,V=Date.now(),z=0,k=0,g=0,y=Math.floor(_*.5),W=0,E="",B.style.left=`${y}px`,U.style.left="0px",console.log("小偷初始位置:",y,"px"),d=[];const e=Math.floor(Math.random()*J.length),n=J[e];I.textContent=n,s.innerHTML="",ne(0),x.textContent="0",v.disabled=!0,j.style.display="none";const t=document.querySelector(".speech-help");t&&t.remove(),setTimeout(()=>{B.style.left=`${y}px`,console.log("确认小偷位置:",B.style.left),Y=setInterval(we,100)},50)}function D(e){const n=I.textContent,t=e.toLowerCase().trim(),r=n.toLowerCase(),o=t.split(/\s+/),c=r.split(/\s+/);console.log("原始输入:",e),console.log("输入单词:",o),console.log("目标单词:",c),he(o,c);let f=ye(c,d,o);s.innerHTML=f;const l=document.createElement("p");l.classList.add("user-input"),l.textContent=`You said: "${e}"`;const i=s.querySelector(".user-input");i&&s.removeChild(i),s.appendChild(l);let w=0,m=0;d.forEach(L=>{L<c.length&&(w+=c[L].length,m+=c[L].length)});const C=d.length;if(C<c.length&&o.length>C){const L=c[C],re=o[C];for(let O=0;O<Math.min(re.length,L.length);O++)m++,re[O].toLowerCase()===L[O].toLowerCase()&&w++}z=w,k=m;let H=0;k>0&&(H=z/k*100,d.length>c.length/2&&(H=Math.min(100,H+10))),ne(H),console.log("已完成单词索引:",d),console.log("正确字符数:",z,"总字符数:",k,"准确率:",g),[...o]}function he(e,n){let t=0;for(;t<e.length&&t<n.length;){const r=te(e[t]),o=te(n[t]),c=r.length>2&&o.startsWith(r)||r.startsWith(o);if(r===o||c)d.includes(t)||d.push(t),t++;else break}d.sort((r,o)=>r-o)}function te(e){return e.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"")}function ye(e,n,t){let r="";for(let o=0;o<e.length;o++)if(n.includes(o))r+=`<span class="completed-word">${e[o]}</span> `;else if(o===n.length)if(o<t.length){const c=e[o],f=t[o];let l="";for(let i=0;i<c.length;i++)if(i<f.length){const w=f[i].toLowerCase(),m=c[i].toLowerCase();w===m?l+=`<span class="correct">${c[i]}</span>`:l+=`<span class="incorrect">${c[i]}</span>`}else i===f.length?l+=`<span class="current">${c[i]}</span>`:l+=c[i];r+=`<span class="current-word">${l}</span> `}else r+=`<span class="current-word">${e[o]}</span> `;else r+=`${e[o]} `;return r}function ne(e){g=Math.round(e),a.textContent=g,g<=0?R=0:g<50?R=g/50*q:g<=100&&(R=q*(1+(g-50)/40))}function we(){if(!p)return;const e=Math.floor((Date.now()-V)/1e3);x.textContent=e,y+=q/10,B.style.left=`${y}px`,W+=R/10,U.style.left=`${W}px`,y>=_?oe(!1):W>=y&&oe(!0),e>30&&p&&(q=15+(e-30)*.2)}function oe(e){p=!1,clearInterval(Y),ge(),v.disabled=!1,j.style.display="block",e?F.textContent="Congratulations! The police caught the thief!":F.textContent="The thief escaped! Try again!";const n=parseInt(x.textContent);ce.textContent=`Game Time: ${n}s | Accuracy: ${g}%`}v.addEventListener("click",Z),b.addEventListener("click",Z),K.addEventListener("click",()=>{$.style.display="block"}),se.addEventListener("click",()=>{$.style.display="none"}),window.addEventListener("click",e=>{e.target===$&&($.style.display="none")}),Q()});</script>
+  <style rel="stylesheet" crossorigin>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;background-color:#f5f5f5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}.game-container{width:100%;max-width:800px;background-color:#fff;border-radius:10px;box-shadow:0 0 15px #0000001a;overflow:hidden}.game-header{background-color:#3498db;color:#fff;padding:15px 20px;text-align:center}.stats{display:flex;justify-content:space-around;margin-top:10px;font-size:18px}.game-scene{height:200px;background-color:#ecf0f1;position:relative;border-bottom:2px solid #bdc3c7;overflow:hidden}.character{position:absolute;bottom:20px;display:flex;flex-direction:column;align-items:center;transition:left .5s linear}.character-icon{font-size:40px}.character-label{font-size:14px;margin-top:5px}.typing-area{padding:20px}.text-display{background-color:#f9f9f9;padding:15px;border-radius:5px;margin-bottom:20px;min-height:150px;border:1px solid #ddd;position:relative}.display-header{display:flex;justify-content:space-between;margin-bottom:10px;font-weight:700;color:#3498db;border-bottom:1px solid #eee;padding-bottom:5px}#mic-status{font-weight:700;padding:5px 10px;border-radius:4px;transition:all .3s ease}#mic-status.active{background-color:#2ecc71;color:#fff}.speech-help{background-color:#2ecc711a;border:1px solid #2ecc71;border-radius:5px;padding:8px;margin-top:15px;font-weight:700;animation:pulse 2s infinite}@keyframes pulse{0%{box-shadow:0 0 #2ecc7166}70%{box-shadow:0 0 0 10px #2ecc7100}to{box-shadow:0 0 #2ecc7100}}#typed-text{min-height:50px;background-color:#ffffffe6;border-radius:5px;padding:10px;font-size:16px;margin-top:5px}.user-input{color:#3498db;font-style:italic;margin-top:10px;border-top:1px dashed #ccc;padding-top:5px}#target-text{font-size:18px;color:#2c3e50;line-height:1.6;margin-bottom:10px}#typed-text{font-size:18px;color:#2c3e50;line-height:1.6}.input-area{display:flex;justify-content:center;gap:20px}button{padding:10px 20px;border:none;border-radius:5px;cursor:pointer;font-size:16px;transition:background-color .3s}#start-btn{background-color:#2ecc71;color:#fff}#start-btn:hover{background-color:#27ae60}#mic-btn{background-color:#e74c3c;color:#fff}#mic-btn.listening{background-color:#c0392b}#mic-btn:disabled{background-color:#95a5a6;cursor:not-allowed}.game-result{padding:20px;text-align:center;display:none}#result-message{font-size:24px;margin-bottom:10px;color:#2c3e50}#result-stats{font-size:18px;margin-bottom:20px;color:#7f8c8d}#restart-btn{background-color:#3498db;color:#fff}#restart-btn:hover{background-color:#2980b9}.correct{color:#27ae60}.incorrect{color:#e74c3c;text-decoration:underline wavy #e74c3c}.current{background-color:#f1c40f}#help-btn{background-color:#3498db;color:#fff}#help-btn:hover{background-color:#2980b9}.modal{display:none;position:fixed;z-index:10;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:#00000080}.modal-content{background-color:#fefefe;margin:10% auto;padding:20px;border-radius:10px;box-shadow:0 5px 15px #0000004d;width:80%;max-width:700px;max-height:80vh;overflow-y:auto}.close{color:#aaa;float:right;font-size:28px;font-weight:700;cursor:pointer}.close:hover,.close:focus{color:#333;text-decoration:none}.modal h2{color:#2c3e50;margin-bottom:20px}.modal h3{color:#3498db;margin-top:20px;margin-bottom:10px}.modal p,.modal li{margin-bottom:10px;line-height:1.5}.modal ol,.modal ul{padding-left:20px;margin-bottom:15px}.mic-status-container{display:flex;align-items:center;gap:10px}.volume-meter{width:50px;height:10px;background-color:#eee;border-radius:5px;overflow:hidden}.volume-bar{height:100%;width:0%;background-color:#2ecc71;transition:width .1s ease}.completed-word{color:#27ae60;font-weight:700;background-color:#2ecc711a;border-radius:3px;padding:2px 3px}.current-word{border-bottom:2px solid #3498db;padding-bottom:2px;position:relative}.current-word:before{content:"▶";position:absolute;left:-15px;top:0;color:#e74c3c;font-size:12px;animation:pulse-arrow 1s infinite}@keyframes pulse-arrow{0%,to{opacity:.5;transform:translate(0)}50%{opacity:1;transform:translate(3px)}}</style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>Catch the Thief - Voice Typing Game</h1>
+            <div class="stats">
+                <div>Accuracy: <span id="accuracy">0</span>%</div>
+                <div>Time: <span id="time">0</span>s</div>
+            </div>
+        </div>
+        
+        <div class="game-scene">
+            <div id="thief" class="character thief">
+                <div class="character-icon">🦹</div>
+                <div class="character-label">Thief</div>
+            </div>
+            <div id="police" class="character police">
+                <div class="character-icon">👮</div>
+                <div class="character-label">Police</div>
+            </div>
+        </div>
+        
+        <div class="typing-area">
+            <div class="text-display">
+                <div class="display-header">
+                    <span>Target Text:</span>
+                </div>
+                <p id="target-text"></p>
+            </div>
+            <div class="text-display">
+                <div class="display-header">
+                    <span>Recognized Speech:</span>
+                    <div class="mic-status-container">
+                        <span id="mic-status">Microphone inactive</span>
+                        <div id="volume-meter" class="volume-meter">
+                            <div class="volume-bar"></div>
+                        </div>
+                    </div>
+                </div>
+                <p id="typed-text"></p>
+            </div>
+            <div class="input-area">
+                <button id="start-btn">Start Game</button>
+                <button id="help-btn">Help</button>
+            </div>
+        </div>
+        
+        <div id="game-result" class="game-result">
+            <h2 id="result-message"></h2>
+            <p id="result-stats"></p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+    </div>
+    
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Help Information</h2>
+            <h3>Microphone Troubleshooting:</h3>
+            <ol>
+                <li>Make sure you're using the latest Chrome or Chromium-based Edge browser</li>
+                <li>Check if your browser has microphone access permission:
+                    <ul>
+                        <li>Look for the microphone icon in the address bar</li>
+                        <li>Click on it to confirm permission settings</li>
+                    </ul>
+                </li>
+                <li>Check if your microphone is enabled and working properly in system settings</li>
+                <li>Try refreshing the page and granting permission again</li>
+                <li>If using headphones or an external microphone, ensure it's properly connected</li>
+                <li>Make sure you speak clearly and at a normal volume</li>
+                <li>Try speaking in a quiet environment</li>
+            </ol>
+            
+            <h3>Game Instructions:</h3>
+            <p>1. After the game starts, the thief will move at a constant speed to the right</p>
+            <p>2. Speak aloud the English text displayed on the screen</p>
+            <p>3. The higher your voice input accuracy, the faster the police will move</p>
+            <p>4. You win when the police catches the thief</p>
+            <p>5. If the thief escapes off the screen, you lose</p>
+            <p>6. If voice recognition doesn't work, you can use keyboard input as a fallback</p>
+        </div>
+    </div>
+    
+</body>
+</html> 

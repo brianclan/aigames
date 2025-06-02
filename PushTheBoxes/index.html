@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push The Boxes(Hard)</title>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.container {
+    max-width: 600px;
+    background-color: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.game-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+/* Level jump styles */
+.level-jump {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+}
+
+.level-jump span {
+    font-size: 16px;
+}
+
+.level-jump input {
+    width: 70px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.level-jump button {
+    padding: 5px 12px;
+    font-size: 14px;
+}
+
+.controls {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+#game-container {
+    display: flex;
+    justify-content: center;
+    margin: 15px 0;
+    position: relative;
+}
+
+#game-canvas {
+    border: 2px solid #333;
+    background-color: #e0e0e0;
+}
+
+.instructions {
+    text-align: center;
+    margin-top: 15px;
+    color: #666;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Win message box styles */
+.message-box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.message-box.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.message-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+    max-width: 80%;
+}
+
+.message-content h2 {
+    color: #4CAF50;
+    margin-bottom: 15px;
+}
+
+.message-content p {
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.message-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.message-buttons button {
+    min-width: 100px;
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Push The Boxes(Hard)</h1>
+        <div class="game-info">
+            <div>Level: <span id="level-display">1</span> / <span id="total-levels">20</span></div>
+            <div>Steps: <span id="steps">0</span></div>
+        </div>
+        <div class="controls">
+            <button id="restart">Restart</button>
+            <button id="undo">Undo</button>
+            <button id="prev-level">Previous</button>
+            <button id="next-level">Next</button>
+        </div>
+        <div class="level-jump">
+            <span>Jump to level: </span>
+            <input type="number" id="level-input" min="1" max="20" value="1">
+            <button id="level-go">Go</button>
+        </div>
+        <div id="game-container">
+            <canvas id="game-canvas" width="400" height="400"></canvas>
+            
+            <!-- Win message box -->
+            <div id="win-message" class="message-box">
+                <div class="message-content">
+                    <h2>Level Complete!</h2>
+                    <p>You completed level <span id="completed-level">1</span></p>
+                    <p>in <span id="used-steps">0</span> steps</p>
+                    <div class="message-buttons">
+                        <button id="next-level-btn">Next Level</button>
+                        <button id="replay-btn">Play Again</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="instructions">
+            <p>Use arrow keys or WASD to move</p>
+            <p>Push all boxes onto the target spots</p>
+            <p>Press Z or click "Undo" to undo your last move</p>
+        </div>
+    </div>
+
+    <script>
+// All game levels
+// Total: 3332 levels
+const levels = [
+    // Level 1
+    `##########
+######## #
+#######  #
+#######$ #
+#######  #
+######. .#
+###### $.#
+#####  #$#
+#####. $@#
+##########`,
+
+    // Level 2
+    `##########
+##########
+## #######
+#.   #####
+#. $######
+##  . ####
+#   $#####
+##$$.#####
+#      @ #
+##########`,
+
+    // Level 3
+    `##########
+########@#
+########$#
+##### #  #
+#####  . #
+##### $. #
+######.  #
+######$$.#
+######   #
+##########`,
+
+    // Level 4
+    `##########
+##########
+##@#######
+##$#######
+##  ######
+# .$######
+#   # ..##
+# $ $   .#
+#        #
+##########`,
+
+    // Level 5
+    `##########
+#@ . #####
+# $$ #####
+## .######
+#  $ #####
+#.  ######
+#  $ #####
+# #.######
+#     ####
+##########`,
+
+    // Level 6
+    `##########
+####  . ##
+#### $  ##
+######@###
+##  ## ###
+## .   ###
+#   #$.###
+# $.# $ ##
+#       ##
+##########`,
+
+    // Level 7
+    `##########
+##########
+#      ###
+# $ .@####
+# $#  ####
+##  ######
+##. ######
+# $.$ ####
+#    . ###
+##########`,
+
+    // Level 8
+    `##########
+# @.     #
+#  $ # $.#
+# $####$ #
+#. ####  #
+# ######.#
+# ########
+##########
+##########
+##########`,
+
+    // Level 9
+    `##########
+##########
+##########
+######.###
+#       @#
+# $..$ $ #
+# $##### #
+#  .# #  #
+#        #
+##########`,
+
+    // Level 10
+    `##########
+#####    #
+##### $ ##
+###### .##
+#######  #
+#   .  . #
+# $   # .#
+# $$ #####
+### @#####
+##########`,
+
+    // Level 11
+    `##########
+#     ####
+# $   ####
+#.  ######
+#   ######
+##  #  ###
+#  $@$  ##
+# . # .$ #
+######  .#
+##########`,
+
+    // Level 12
+    `##########
+#  .    .#
+#  # $$$ #
+######. ##
+####@$ . #
+#####    #
+####### ##
+##########
+##########
+##########`,
+
+    // Level 13
+    `##########
+#.       #
+#       .#
+# $ # ## #
+#  #  # .#
+## #  ## #
+#####$ . #
+##@$   $ #
+#####  # #
+##########`,
+
+    // Level 14
+    `##########
+#  #######
+# ########
+#  #    ##
+#  $$.. ##
+#.$     ##
+#@.#######
+# $ ######
+#  #######
+##########`,
+
+    // Level 15
+    `##########
+#. ## @###
+# $ $ .###
+# .  $ ###
+#  #######
+# #####  #
+# .####  #
+# $# ##  #
+#        #
+##########`,
+
+    // Level 16
+    `##########
+##### .@ #
+#### $ $ #
+#### ..$ #
+#######$.#
+#######  #
+######## #
+##########
+##########
+##########`,
+
+    // Level 17
+    `##########
+##########
+#### #####
+### .  @##
+###.$$ ###
+##  ##  ##
+##. ##. ##
+# $    $ #
+#     #  #
+##########`,
+
+    // Level 18
+    `##########
+########@#
+######$ ##
+###### ###
+#####   ##
+####    ##
+###  #.###
+### $ .###
+### $.####
+##########`,
+
+    // Level 19
+    `##########
+##########
+##########
+#@  ######
+#$$$ .####
+#.  #.####
+# $ ######
+### ######
+##########
+##########`,
+
+    // Level 20
+    `##########
+##########
+##########
+##########
+####   ###
+##..$  ###
+# @$$.####
+########.#
+##########
+##########`
+];
+    </script>
+    <script>
+// Game constants
+const TILE_SIZE = 40;
+const WALL = '#';
+const PLAYER = '@';
+const BOX = '$';
+const GOAL = '.';
+const BOX_ON_GOAL = '*';
+const PLAYER_ON_GOAL = '+';
+const FLOOR = ' ';
+
+// Game state
+let currentLevel = 0;
+let steps = 0;
+let map = [];
+let playerX = 0;
+let playerY = 0;
+let playerOnGoal = false;
+let boxCount = 0;
+let goalCount = 0;
+
+// History for undo feature
+let history = [];
+const MAX_HISTORY = 100; // Maximum history records
+
+// Get DOM elements
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const levelDisplay = document.getElementById('level-display');
+const totalLevelsDisplay = document.getElementById('total-levels');
+const stepsDisplay = document.getElementById('steps');
+const restartBtn = document.getElementById('restart');
+const undoBtn = document.getElementById('undo');
+const prevLevelBtn = document.getElementById('prev-level');
+const nextLevelBtn = document.getElementById('next-level');
+const winMessage = document.getElementById('win-message');
+const completedLevelDisplay = document.getElementById('completed-level');
+const usedStepsDisplay = document.getElementById('used-steps');
+const nextLevelBtn2 = document.getElementById('next-level-btn');
+const replayBtn = document.getElementById('replay-btn');
+const levelInput = document.getElementById('level-input');
+const levelGoBtn = document.getElementById('level-go');
+
+// Colors for game elements
+const images = {
+    wall: '#8B4513',       // Brown wall
+    floor: '#F5F5DC',      // Beige floor
+    player: '#0000FF',     // Blue player
+    box: '#87CEEB',        // Light blue box
+    goal: '#FF0000',       // Red goal
+    boxOnGoal: '#00FF00',  // Green box on goal
+    playerOnGoal: '#800080' // Purple player on goal
+};
+
+// Initialize game
+function initGame() {
+    // Update total levels display
+    totalLevelsDisplay.textContent = levels.length;
+
+    // Set initial level
+    loadLevel(currentLevel);
+    updateDisplay();
+    renderGame();
+    hideWinMessage();
+}
+
+// Save current state
+function saveState() {
+    // Copy current map
+    const mapCopy = map.map(row => [...row]);
+
+    // Create state object
+    const state = {
+        map: mapCopy,
+        playerX: playerX,
+        playerY: playerY,
+        playerOnGoal: playerOnGoal,
+        steps: steps
+    };
+
+    // Add to history
+    history.push(state);
+
+    // Limit history size
+    if (history.length > MAX_HISTORY) {
+        history.shift();
+    }
+}
+
+// Undo last move
+function undo() {
+    if (history.length === 0) {
+        return false;
+    }
+
+    // Get previous state
+    const prevState = history.pop();
+
+    // Restore state
+    map = prevState.map;
+    playerX = prevState.playerX;
+    playerY = prevState.playerY;
+    playerOnGoal = prevState.playerOnGoal;
+    steps = prevState.steps;
+
+    // Update display
+    updateDisplay();
+    renderGame();
+
+    return true;
+}
+
+// Load level
+function loadLevel(levelIndex) {
+    if (levelIndex < 0) {
+        levelIndex = 0;
+    } else if (levelIndex >= levels.length) {
+        levelIndex = levels.length - 1;
+    }
+
+    currentLevel = levelIndex;
+    steps = 0;
+    boxCount = 0;
+    goalCount = 0;
+    history = []; // Clear history
+
+    const levelData = levels[currentLevel];
+    const rows = levelData.split('\n');
+    map = [];
+
+    for (let y = 0; y < rows.length; y++) {
+        const row = rows[y];
+        map[y] = [];
+
+        for (let x = 0; x < row.length; x++) {
+            const cell = row[x];
+            map[y][x] = cell;
+
+            // Set player position
+            if (cell === PLAYER) {
+                playerX = x;
+                playerY = y;
+                playerOnGoal = false;
+            } else if (cell === PLAYER_ON_GOAL) {
+                playerX = x;
+                playerY = y;
+                playerOnGoal = true;
+            }
+
+            // Calculate the number of boxes and goals
+            if (cell === BOX || cell === BOX_ON_GOAL) {
+                boxCount++;
+            }
+            if (cell === GOAL || cell === BOX_ON_GOAL || cell === PLAYER_ON_GOAL) {
+                goalCount++;
+            }
+        }
+    }
+
+    // Adjust canvas size
+    canvas.width = map[0].length * TILE_SIZE;
+    canvas.height = map.length * TILE_SIZE;
+
+    // Update level input field
+    levelInput.value = currentLevel + 1;
+}
+
+// Update display
+function updateDisplay() {
+    levelDisplay.textContent = (currentLevel + 1);
+    stepsDisplay.textContent = steps;
+}
+
+// Show winning message
+function showWinMessage() {
+    completedLevelDisplay.textContent = (currentLevel + 1);
+    usedStepsDisplay.textContent = steps;
+    winMessage.classList.add('show');
+}
+
+// Hide winning message
+function hideWinMessage() {
+    winMessage.classList.remove('show');
+}
+
+// Jump to specific level
+function jumpToLevel(levelNum) {
+    const levelIndex = parseInt(levelNum) - 1;
+    if (levelIndex >= 0 && levelIndex < levels.length) {
+        loadLevel(levelIndex);
+        updateDisplay();
+        renderGame();
+        hideWinMessage();
+    }
+}
+
+// Render game
+function renderGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < map.length; y++) {
+        for (let x = 0; x < map[y].length; x++) {
+            const cell = map[y][x];
+            const posX = x * TILE_SIZE;
+            const posY = y * TILE_SIZE;
+
+            // Draw floor
+            drawFloor(posX, posY);
+
+            // Draw other elements
+            switch (cell) {
+                case WALL:
+                    drawWall(posX, posY);
+                    break;
+                case PLAYER:
+                    drawPlayer(posX, posY, false);
+                    break;
+                case BOX:
+                    drawBox(posX, posY, false);
+                    break;
+                case GOAL:
+                    drawGoal(posX, posY);
+                    break;
+                case BOX_ON_GOAL:
+                    drawBox(posX, posY, true);
+                    break;
+                case PLAYER_ON_GOAL:
+                    drawGoal(posX, posY);
+                    drawPlayer(posX, posY, true);
+                    break;
+            }
+        }
+    }
+}
+
+// Draw floor
+function drawFloor(x, y) {
+    // Basic floor color
+    ctx.fillStyle = images.floor;
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+    // Add floor texture
+    ctx.strokeStyle = '#E5E5C5';
+    ctx.lineWidth = 0.5;
+
+    // Draw floor grid
+    ctx.beginPath();
+    // Horizontal lines
+    ctx.moveTo(x, y + TILE_SIZE / 2);
+    ctx.lineTo(x + TILE_SIZE, y + TILE_SIZE / 2);
+    // Vertical lines
+    ctx.moveTo(x + TILE_SIZE / 2, y);
+    ctx.lineTo(x + TILE_SIZE / 2, y + TILE_SIZE);
+    ctx.stroke();
+}
+
+// Draw wall
+function drawWall(x, y) {
+    // Base color
+    ctx.fillStyle = images.wall;
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+    // Add wall texture
+    const brickWidth = TILE_SIZE / 3;
+    const brickHeight = TILE_SIZE / 3;
+    const mortar = 2;
+
+    // Darker color for shadow
+    ctx.fillStyle = '#7a3b0c';
+
+    // Draw brick pattern
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            // Offset every other row for brick pattern
+            const offsetX = j % 2 === 0 ? 0 : brickWidth / 2;
+            
+            // Draw individual bricks with mortar spacing
+            ctx.fillRect(
+                x + offsetX + i * brickWidth + mortar, 
+                y + j * brickHeight + mortar, 
+                brickWidth - mortar * 2, 
+                brickHeight - mortar * 2
+            );
+        }
+    }
+
+    // Add highlight
+    ctx.strokeStyle = '#9a5823';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+}
+
+// Draw player
+function drawPlayer(x, y, onGoal) {
+    const centerX = x + TILE_SIZE / 2;
+    const centerY = y + TILE_SIZE / 2;
+    const radius = TILE_SIZE / 2 - 4;
+
+    // Player circle
+    ctx.fillStyle = onGoal ? images.playerOnGoal : images.player;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Add face details
+    ctx.fillStyle = 'white';
+    
+    // Eyes
+    const eyeSize = radius / 4;
+    ctx.beginPath();
+    ctx.arc(centerX - radius/3, centerY - radius/5, eyeSize, 0, Math.PI * 2);
+    ctx.arc(centerX + radius/3, centerY - radius/5, eyeSize, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Smile
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY + radius/5, radius/2, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+}
+
+// Draw box
+function drawBox(x, y, onGoal) {
+    // Base box
+    ctx.fillStyle = onGoal ? images.boxOnGoal : images.box;
+    ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+
+    // Box details
+    if (onGoal) {
+        // Box on goal has special styling
+        ctx.strokeStyle = '#005500';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+        
+        // Add a checkmark or star to indicate completion
+        ctx.fillStyle = '#FFFFFF';
+        const centerX = x + TILE_SIZE / 2;
+        const centerY = y + TILE_SIZE / 2;
+        
+        // Draw a star
+        drawStar(centerX, centerY, 5, TILE_SIZE / 5, TILE_SIZE / 10);
+    } else {
+        // Regular box with wood texture
+        ctx.strokeStyle = '#4682B4';
+        ctx.lineWidth = 1;
+        
+        // Wood grain lines
+        for (let i = 1; i < 5; i++) {
+            ctx.beginPath();
+            ctx.moveTo(x + 4, y + i * (TILE_SIZE / 5));
+            ctx.lineTo(x + TILE_SIZE - 4, y + i * (TILE_SIZE / 5));
+            ctx.stroke();
+        }
+        
+        // Box outline
+        ctx.strokeStyle = '#4682B4';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+    }
+}
+
+// Draw a star shape
+function drawStar(cx, cy, spikes, outerRadius, innerRadius) {
+    let rot = Math.PI / 2 * 3;
+    let x = cx;
+    let y = cy;
+    let step = Math.PI / spikes;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - outerRadius);
+    for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius;
+        y = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+    }
+    ctx.lineTo(cx, cy - outerRadius);
+    ctx.closePath();
+    ctx.fill();
+}
+
+// Draw goal
+function drawGoal(x, y) {
+    const centerX = x + TILE_SIZE / 2;
+    const centerY = y + TILE_SIZE / 2;
+    const radius = TILE_SIZE / 3;
+
+    // Draw goal circle
+    ctx.fillStyle = images.goal;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Add inner circle for target effect
+    ctx.fillStyle = '#FF5555';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius / 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.fillStyle = '#FF9999';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius / 3, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Move player
+function movePlayer(dx, dy) {
+    // Calculate new position
+    const newX = playerX + dx;
+    const newY = playerY + dy;
+
+    // Check if the new position is valid
+    if (newX < 0 || newX >= map[0].length || newY < 0 || newY >= map.length) {
+        return false;
+    }
+
+    // Save current state before move
+    saveState();
+
+    // Check if the new position is a wall
+    if (map[newY][newX] === WALL) {
+        return false;
+    }
+
+    // Check if the new position has a box
+    if (map[newY][newX] === BOX || map[newY][newX] === BOX_ON_GOAL) {
+        // Calculate the new position of the box
+        const newBoxX = newX + dx;
+        const newBoxY = newY + dy;
+
+        // Check if the new box position is valid
+        if (newBoxX < 0 || newBoxX >= map[0].length || newBoxY < 0 || newBoxY >= map.length) {
+            return false;
+        }
+
+        // Check if the new box position is a wall or another box
+        if (map[newBoxY][newBoxX] === WALL || map[newBoxY][newBoxX] === BOX || map[newBoxY][newBoxX] === BOX_ON_GOAL) {
+            return false;
+        }
+
+        // Move the box
+        if (map[newBoxY][newBoxX] === GOAL) {
+            map[newBoxY][newBoxX] = BOX_ON_GOAL;
+        } else {
+            map[newBoxY][newBoxX] = BOX;
+        }
+    }
+
+    // Update the player's position on the map
+    if (playerOnGoal) {
+        map[playerY][playerX] = GOAL;
+    } else {
+        map[playerY][playerX] = FLOOR;
+    }
+
+    // Check if the new position is a goal
+    playerOnGoal = (map[newY][newX] === GOAL || map[newY][newX] === BOX_ON_GOAL);
+
+    // Update the map with the player's new position
+    map[newY][newX] = playerOnGoal ? PLAYER_ON_GOAL : PLAYER;
+
+    // Update player coordinates
+    playerX = newX;
+    playerY = newY;
+
+    // Increment steps
+    steps++;
+    updateDisplay();
+
+    // Check if the level is complete
+    if (checkWin()) {
+        showWinMessage();
+    }
+
+    return true;
+}
+
+// Check if the level is complete
+function checkWin() {
+    // Count boxes on goals
+    let boxesOnGoal = 0;
+    for (let y = 0; y < map.length; y++) {
+        for (let x = 0; x < map[y].length; x++) {
+            if (map[y][x] === BOX_ON_GOAL) {
+                boxesOnGoal++;
+            }
+        }
+    }
+    
+    // If all boxes are on goals, the level is complete
+    return boxesOnGoal === boxCount && boxesOnGoal === goalCount;
+}
+
+// Event listeners
+document.addEventListener('keydown', (e) => {
+    // Don't process input if win message is shown
+    if (winMessage.classList.contains('show')) {
+        return;
+    }
+
+    let moved = false;
+
+    // Arrow keys and WASD
+    switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+            moved = movePlayer(0, -1);
+            break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+            moved = movePlayer(0, 1);
+            break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+            moved = movePlayer(-1, 0);
+            break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+            moved = movePlayer(1, 0);
+            break;
+        case 'z':
+        case 'Z':
+            undo();
+            break;
+    }
+
+    if (moved) {
+        renderGame();
+    }
+});
+
+// Button event listeners
+restartBtn.addEventListener('click', () => {
+    loadLevel(currentLevel);
+    updateDisplay();
+    renderGame();
+    hideWinMessage();
+});
+
+undoBtn.addEventListener('click', undo);
+
+prevLevelBtn.addEventListener('click', () => {
+    loadLevel(currentLevel - 1);
+    updateDisplay();
+    renderGame();
+    hideWinMessage();
+});
+
+nextLevelBtn.addEventListener('click', () => {
+    loadLevel(currentLevel + 1);
+    updateDisplay();
+    renderGame();
+    hideWinMessage();
+});
+
+nextLevelBtn2.addEventListener('click', () => {
+    loadLevel(currentLevel + 1);
+    updateDisplay();
+    renderGame();
+    hideWinMessage();
+});
+
+replayBtn.addEventListener('click', () => {
+    loadLevel(currentLevel);
+    updateDisplay();
+    renderGame();
+    hideWinMessage();
+});
+
+levelGoBtn.addEventListener('click', () => {
+    jumpToLevel(levelInput.value);
+});
+
+// Initialize the game when the page loads
+window.addEventListener('load', initGame);
+    </script>
+</body>
+</html> 

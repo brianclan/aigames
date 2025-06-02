@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Snake Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 700px;
+            width: 100%;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-right: 20px;
+        }
+
+        .score-container,
+        .level-container {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .game-container {
+            position: relative;
+            margin: 0 auto;
+            width: 600px;
+            height: 400px;
+        }
+
+        #game-canvas {
+            background-color: #ddd;
+            display: block;
+            border: 2px solid #333;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #word-info-overlay {
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 80%;
+            max-width: 500px;
+        }
+
+        #current-word {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        #word-definition {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.5;
+            font-size: 18px;
+        }
+
+        #countdown {
+            font-size: 48px;
+            font-weight: bold;
+            color: #FF5722;
+            margin: 10px 0;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #continue-btn {
+            background-color: #FF5722;
+            margin-top: 10px;
+        }
+
+        #continue-btn:hover {
+            background-color: #E64A19;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="game-header">
+            <h1>Word Snake Game</h1>
+            <div class="score-container">
+                <span>Score: </span>
+                <span id="score">0</span>
+            </div>
+            <div class="level-container">
+                <span>Level: </span>
+                <span id="level">1</span>
+            </div>
+        </div>
+        
+        <div class="game-container">
+            <canvas id="game-canvas" width="600" height="400"></canvas>
+            
+            <!-- 游戏内显示的单词信息和倒计时 -->
+            <div id="overlay" class="hidden">
+                <div id="word-info-overlay">
+                    <h2 id="current-word"></h2>
+                    <p id="word-definition"></p>
+                </div>
+                <div id="countdown" class="hidden"></div>
+                <button id="continue-btn">Skip Voice & Countdown</button>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="start-btn">Start Game</button>
+            <button id="pause-btn">Pause</button>
+        </div>
+    </div>
+
+    <script>
+        // 常用英语单词及其释义，扩充至3000词中的一部分
+        const wordsData = [
+            // 2字母单词
+            { word: "at", definition: "Used to indicate location or time" },
+            { word: "in", definition: "Located inside or within" },
+            { word: "on", definition: "Positioned above and supported by" },
+            { word: "to", definition: "Indicating direction or purpose" },
+            { word: "of", definition: "Expressing the relationship between a part and a whole" },
+            { word: "be", definition: "To exist or live" },
+            { word: "is", definition: "Third person singular of 'be'" },
+            { word: "it", definition: "Used to refer to a thing previously mentioned" },
+            { word: "as", definition: "To the same degree or amount" },
+            { word: "he", definition: "Used to refer to a male person" },
+            
+            // 3字母单词
+            { word: "and", definition: "Used to connect words or groups of words" },
+            { word: "the", definition: "Definite article used to refer to specific things" },
+            { word: "but", definition: "Used to introduce a statement that contrasts with the previous" },
+            { word: "for", definition: "Used to indicate purpose or recipient" },
+            { word: "not", definition: "Used to form a negative statement" },
+            { word: "you", definition: "Used to refer to the person being addressed" },
+            { word: "she", definition: "Used to refer to a female person previously mentioned" },
+            { word: "can", definition: "To be able to; have the ability to" },
+            { word: "who", definition: "Used to introduce a clause giving further information about a person" },
+            { word: "get", definition: "Come to have or hold; receive" },
+            
+            // 4字母单词
+            { word: "that", definition: "Used to identify a specific person or thing observed or pointed out" },
+            { word: "this", definition: "Used to identify a specific person or thing close at hand" },
+            { word: "with", definition: "Accompanied by or in the company of" },
+            { word: "from", definition: "Indicating the starting point of a physical movement or action" },
+            { word: "they", definition: "Used to refer to two or more people or things previously mentioned" },
+            { word: "have", definition: "Possess, own, or hold" },
+            { word: "been", definition: "Past participle of 'be'" },
+            { word: "when", definition: "At or during the time that" },
+            { word: "will", definition: "Expressing the future tense" },
+            { word: "more", definition: "A greater or additional amount or degree" },
+            
+            // 5字母单词
+            { word: "about", definition: "On the subject of; concerning" },
+            { word: "there", definition: "In, at, or to that place or position" },
+            { word: "which", definition: "Used referring to something previously mentioned" },
+            { word: "their", definition: "Belonging to or associated with people or things previously mentioned" },
+            { word: "would", definition: "Past tense of 'will', used for hypothetical situations" },
+            { word: "these", definition: "The plural form of 'this'" },
+            { word: "other", definition: "Used to refer to a person or thing that is different" },
+            { word: "could", definition: "Past tense of 'can'" },
+            { word: "where", definition: "In or to what place or position" },
+            { word: "after", definition: "In the time following an event" },
+            
+            // 6字母单词
+            { word: "before", definition: "During the period of time preceding a particular event" },
+            { word: "people", definition: "Human beings in general or considered collectively" },
+            { word: "should", definition: "Used to indicate obligation, duty, or correctness" },
+            { word: "though", definition: "Despite the fact that; although" },
+            { word: "because", definition: "For the reason that; since" },
+            { word: "between", definition: "At, into, or across the space separating two objects or regions" },
+            { word: "through", definition: "Moving in one side and out of the other side of" },
+            { word: "during", definition: "Throughout the course or duration of" },
+            { word: "second", definition: "Coming after the first in time or order" },
+            { word: "number", definition: "An arithmetical value representing a particular quantity" },
+            
+            // 7字母单词及以上
+            { word: "another", definition: "An additional one; one more" },
+            { word: "without", definition: "In the absence of; lacking" },
+            { word: "against", definition: "In opposition to; contrary to" },
+            { word: "present", definition: "In a particular place; existing or occurring now" },
+            { word: "example", definition: "A thing characteristic of its kind or illustrating a general rule" },
+            { word: "general", definition: "Affecting or concerning all or most people, places, or things" },
+            { word: "million", definition: "The number 1,000,000" },
+            { word: "thought", definition: "An idea or opinion produced by thinking" },
+            { word: "problem", definition: "A matter or situation regarded as unwelcome or harmful" },
+            { word: "although", definition: "In spite of the fact that; even though" },
+            { word: "possible", definition: "Able to be done; within the power or capacity of someone" },
+            { word: "question", definition: "A sentence worded or expressed so as to elicit information" },
+            { word: "national", definition: "Relating to or characteristic of a nation" },
+            { word: "different", definition: "Not the same as another or each other; unlike" },
+            { word: "consider", definition: "Think carefully about something, typically before making a decision" },
+            { word: "increase", definition: "Become or make greater in size, amount, intensity, or degree" },
+            { word: "interest", definition: "The feeling of wanting to know or learn about something" },
+            { word: "together", definition: "With or in proximity to another person or people" },
+            { word: "position", definition: "A place where someone or something is located or has been put" },
+            { word: "important", definition: "Of great significance or value; likely to have a profound effect" }
+        ];
+
+        // 按照单词长度进行排序
+        const sortedWords = [...wordsData].sort((a, b) => a.word.length - b.word.length || a.word.localeCompare(b.word));
+    </script>
+
+    <script>
+        // 获取DOM元素
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startButton = document.getElementById('start-btn');
+        const pauseButton = document.getElementById('pause-btn');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const overlayElement = document.getElementById('overlay');
+        const currentWordElement = document.getElementById('current-word');
+        const wordDefinitionElement = document.getElementById('word-definition');
+        const countdownElement = document.getElementById('countdown');
+        const continueButton = document.getElementById('continue-btn');
+
+        // 游戏参数
+        const gridSize = 20; // 网格大小
+        const initialSnakeLength = 3; // 初始蛇的长度
+        const initialSpeed = 150; // 初始速度（毫秒）
+        const speedIncrement = 5; // 每关卡速度增加
+        let gameSpeed = initialSpeed; // 当前游戏速度
+        let gameInterval; // 游戏循环间隔
+        let isPaused = false;
+        let isGameOver = false;
+        let currentLevelIndex = 0;
+        let score = 0;
+
+        // 游戏对象
+        let snake = [];
+        let wordLetters = []; // 存储当前单词的字母方块
+        let currentWord = ""; // 当前单词
+        let currentWordDefinition = ""; // 当前单词释义
+        let letterIndex = 0; // 当前需要吃掉的字母索引
+        let direction = 'right';
+        let nextDirection = 'right';
+
+        // 初始化游戏
+        function initGame() {
+            // 初始化蛇
+            resetSnake();
+
+            // 重置游戏状态
+            score = 0;
+            scoreElement.textContent = score;
+            currentLevelIndex = 0;
+            levelElement.textContent = currentLevelIndex + 1;
+            gameSpeed = initialSpeed;
+            isPaused = false;
+            isGameOver = false;
+
+            // 隐藏覆盖层
+            overlayElement.classList.add('hidden');
+
+            // 生成单词字母
+            generateWordLetters();
+
+            // 清除任何现有的游戏循环
+            if (gameInterval) {
+                clearInterval(gameInterval);
+            }
+
+            // 绘制初始状态
+            draw();
+        }
+
+        // 重置蛇的长度和位置
+        function resetSnake() {
+            snake = [];
+            for (let i = initialSnakeLength - 1; i >= 0; i--) {
+                snake.push({ x: i, y: 0 });
+            }
+
+            // 初始化方向
+            direction = 'right';
+            nextDirection = 'right';
+        }
+
+        // 生成单词字母
+        function generateWordLetters() {
+            // 获取当前关卡的单词
+            const wordData = sortedWords[currentLevelIndex % sortedWords.length];
+            currentWord = wordData.word;
+            currentWordDefinition = wordData.definition;
+
+            // 重置字母索引
+            letterIndex = 0;
+
+            // 清空字母数组
+            wordLetters = [];
+
+            // 生成每个字母的位置
+            const letters = currentWord.split('');
+
+            // 为每个字母生成随机位置
+            for (let i = 0; i < letters.length; i++) {
+                let validPosition = false;
+                let letterX, letterY;
+
+                // 尝试为每个字母找到一个有效位置
+                while (!validPosition) {
+                    letterX = Math.floor(Math.random() * (canvas.width / gridSize - 1));
+                    letterY = Math.floor(Math.random() * (canvas.height / gridSize - 1));
+
+                    // 检查是否与蛇重叠
+                    let snakeCollision = false;
+                    for (let j = 0; j < snake.length; j++) {
+                        if (snake[j].x === letterX && snake[j].y === letterY) {
+                            snakeCollision = true;
+                            break;
+                        }
+                    }
+
+                    // 检查是否与已放置的字母重叠
+                    let letterCollision = false;
+                    for (let j = 0; j < wordLetters.length; j++) {
+                        if (wordLetters[j].x === letterX && wordLetters[j].y === letterY) {
+                            letterCollision = true;
+                            break;
+                        }
+                    }
+
+                    // 如果没有碰撞，则位置有效
+                    validPosition = !snakeCollision && !letterCollision;
+                }
+
+                // 添加字母到数组
+                wordLetters.push({
+                    x: letterX,
+                    y: letterY,
+                    letter: letters[i],
+                    index: i // 保存字母在单词中的原始索引，用于显示顺序
+                });
+            }
+        }
+
+        // 移动蛇
+        function moveSnake() {
+            // 更新方向
+            direction = nextDirection;
+
+            // 根据方向计算新的头部位置
+            const head = { ...snake[0] };
+
+            switch (direction) {
+                case 'up':
+                    head.y -= 1;
+                    break;
+                case 'down':
+                    head.y += 1;
+                    break;
+                case 'left':
+                    head.x -= 1;
+                    break;
+                case 'right':
+                    head.x += 1;
+                    break;
+            }
+
+            // 检查是否撞到墙或自己
+            if (
+                head.x < 0 ||
+                head.x >= canvas.width / gridSize ||
+                head.y < 0 ||
+                head.y >= canvas.height / gridSize ||
+                isCollision(head)
+            ) {
+                gameOver();
+                return;
+            }
+
+            // 将新头部添加到蛇数组
+            snake.unshift(head);
+
+            // 检查是否吃到字母
+            let ate = false;
+            let ateCorrectLetter = false;
+
+            // 遍历所有字母，查找是否吃到了字母
+            for (let i = 0; i < wordLetters.length; i++) {
+                if (head.x === wordLetters[i].x && head.y === wordLetters[i].y) {
+                    ate = true;
+                    
+                    // 检查是否是当前需要吃的字母（正确顺序）
+                    if (wordLetters[i].index === letterIndex) {
+                        ateCorrectLetter = true;
+                        letterIndex++;
+                        
+                        // 检查是否吃完了所有字母
+                        if (letterIndex >= currentWord.length) {
+                            // 增加分数和关卡
+                            score += currentWord.length * 10;
+                            scoreElement.textContent = score;
+
+                            currentLevelIndex++;
+                            levelElement.textContent = currentLevelIndex + 1;
+
+                            // 增加速度
+                            gameSpeed = Math.max(50, initialSpeed - (currentLevelIndex * speedIncrement));
+
+                            // 显示单词信息
+                            showWordInfo();
+                        }
+                    } else {
+                        // 吃到了错误顺序的字母，重置字母索引
+                        letterIndex = 0;
+                        
+                        // 显示错误提示（可选）
+                        showErrorMessage();
+                    }
+                    break;
+                }
+            }
+
+            if (!ate) {
+                // 如果没有吃到字母，移除尾部
+                snake.pop();
+            } else if (!ateCorrectLetter) {
+                // 如果吃到了错误的字母，不增加长度
+                snake.pop();
+            }
+        }
+
+        // 检查碰撞
+        function isCollision(position) {
+            // 检查是否与蛇身体碰撞
+            for (let i = 1; i < snake.length; i++) {
+                if (position.x === snake[i].x && position.y === snake[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 绘制游戏
+        function draw() {
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制蛇
+            ctx.fillStyle = '#4CAF50';
+            for (let i = 0; i < snake.length; i++) {
+                ctx.fillRect(
+                    snake[i].x * gridSize,
+                    snake[i].y * gridSize,
+                    gridSize,
+                    gridSize
+                );
+
+                // 添加边框使蛇身体分段更明显
+                ctx.strokeStyle = '#45a049';
+                ctx.strokeRect(
+                    snake[i].x * gridSize,
+                    snake[i].y * gridSize,
+                    gridSize,
+                    gridSize
+                );
+            }
+
+            // 绘制单词字母
+            for (let i = 0; i < wordLetters.length; i++) {
+                // 如果已经吃掉了该字母，则跳过
+                if (wordLetters[i].index < letterIndex) continue;
+
+                // 所有未吃的字母都使用相同颜色，不再区分当前需要吃的字母
+                ctx.fillStyle = '#9E9E9E';
+
+                ctx.fillRect(
+                    wordLetters[i].x * gridSize,
+                    wordLetters[i].y * gridSize,
+                    gridSize,
+                    gridSize
+                );
+
+                // 绘制字母
+                ctx.fillStyle = 'white';
+                ctx.font = `${gridSize * 0.7}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(
+                    wordLetters[i].letter,
+                    wordLetters[i].x * gridSize + gridSize / 2,
+                    wordLetters[i].y * gridSize + gridSize / 2
+                );
+
+                // 不再绘制序号
+            }
+        }
+
+        // 游戏循环
+        function gameLoop() {
+            if (!isPaused && !isGameOver) {
+                moveSnake();
+                draw();
+            }
+        }
+
+        // 显示单词信息并播放语音
+        function showWordInfo() {
+            // 暂停游戏
+            isPaused = true;
+
+            // 显示单词信息在游戏覆盖层上
+            currentWordElement.textContent = currentWord;
+            wordDefinitionElement.textContent = currentWordDefinition;
+            overlayElement.classList.remove('hidden');
+            countdownElement.classList.add('hidden');
+
+            // 清除现有游戏循环
+            clearInterval(gameInterval);
+
+            // 使用语音合成朗读单词和释义
+            speakWordAndDefinition();
+        }
+
+        // 语音合成朗读单词和释义
+        function speakWordAndDefinition() {
+            // 检查浏览器是否支持语音合成
+            if ('speechSynthesis' in window) {
+                // 停止任何正在进行的朗读
+                window.speechSynthesis.cancel();
+
+                // 创建语音合成实例
+                const wordUtterance = new SpeechSynthesisUtterance(currentWord);
+                const definitionUtterance = new SpeechSynthesisUtterance(currentWordDefinition);
+
+                // 设置语音参数
+                wordUtterance.rate = 0.9; // 语速稍慢
+                wordUtterance.pitch = 1;  // 音调正常
+                wordUtterance.lang = 'en-US'; // 英语
+
+                definitionUtterance.rate = 0.9;
+                definitionUtterance.pitch = 1;
+                definitionUtterance.lang = 'en-US';
+
+                // 先朗读单词
+                window.speechSynthesis.speak(wordUtterance);
+
+                // 单词朗读完后朗读释义
+                wordUtterance.onend = function () {
+                    window.speechSynthesis.speak(definitionUtterance);
+
+                    // 释义朗读完后开始倒计时
+                    definitionUtterance.onend = function () {
+                        startCountdown();
+                    };
+                };
+            } else {
+                // 如果浏览器不支持语音合成，直接开始倒计时
+                startCountdown();
+            }
+        }
+
+        // 开始倒计时
+        function startCountdown() {
+            countdownElement.classList.remove('hidden');
+
+            let count = 3;
+            countdownElement.textContent = count.toString();
+
+            const countdownInterval = setInterval(function () {
+                count--;
+
+                if (count > 0) {
+                    countdownElement.textContent = count.toString();
+                } else {
+                    // 倒计时结束
+                    clearInterval(countdownInterval);
+                    countdownElement.classList.add('hidden');
+
+                    // 继续游戏
+                    continueGame();
+                }
+            }, 1000);
+        }
+
+        // 继续游戏
+        function continueGame() {
+            // 隐藏覆盖层
+            overlayElement.classList.add('hidden');
+
+            // 重置蛇的长度 - 实现用户要求的功能
+            resetSnake();
+
+            // 生成新单词字母
+            generateWordLetters();
+
+            // 继续游戏
+            isPaused = false;
+
+            // 重新启动游戏循环，使用新的游戏速度
+            gameInterval = setInterval(gameLoop, gameSpeed);
+        }
+
+        // 游戏结束
+        function gameOver() {
+            isGameOver = true;
+            clearInterval(gameInterval);
+            alert(`Game Over! Your score is: ${score}`);
+            startButton.disabled = false;
+            pauseButton.disabled = false;
+        }
+
+        // 事件监听器
+        startButton.addEventListener('click', function () {
+            initGame();
+            gameInterval = setInterval(gameLoop, gameSpeed);
+            startButton.disabled = true;
+            pauseButton.disabled = false;
+        });
+
+        pauseButton.addEventListener('click', function () {
+            isPaused = !isPaused;
+            pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+        });
+
+        continueButton.addEventListener('click', function () {
+            // 停止语音合成和任何正在进行的倒计时
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+
+            // 立即继续游戏
+            countdownElement.classList.add('hidden');
+            continueGame();
+        });
+
+        // 键盘控制
+        document.addEventListener('keydown', function (event) {
+            const key = event.key;
+
+            // 阻止方向键滚动页面
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(key)) {
+                event.preventDefault();
+            }
+
+            // 如果处于单词展示状态，空格键可以跳过展示
+            if (key === ' ' && !overlayElement.classList.contains('hidden')) {
+                // 停止语音合成
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                }
+                
+                // 隐藏倒计时
+                countdownElement.classList.add('hidden');
+                
+                // 立即继续游戏
+                continueGame();
+                return;
+            }
+
+            // 如果游戏结束，空格键不做任何处理
+            if (isGameOver && key === ' ') return;
+
+            // 如果游戏正在进行，空格键暂停/继续游戏
+            if (key === ' ' && !isGameOver && overlayElement.classList.contains('hidden')) {
+                isPaused = !isPaused;
+                pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+                return;
+            }
+
+            // 设置下一个方向，防止180度转弯（蛇不能直接向反方向移动）
+            switch (key) {
+                case 'ArrowUp':
+                    if (direction !== 'down') nextDirection = 'up';
+                    break;
+                case 'ArrowDown':
+                    if (direction !== 'up') nextDirection = 'down';
+                    break;
+                case 'ArrowLeft':
+                    if (direction !== 'right') nextDirection = 'left';
+                    break;
+                case 'ArrowRight':
+                    if (direction !== 'left') nextDirection = 'right';
+                    break;
+            }
+        });
+
+        // 显示错误消息
+        function showErrorMessage() {
+            // 创建临时错误消息元素
+            const errorMsg = document.createElement('div');
+            errorMsg.textContent = 'Wrong Order! Try Again';
+            errorMsg.style.position = 'absolute';
+            errorMsg.style.top = '10px';
+            errorMsg.style.left = '50%';
+            errorMsg.style.transform = 'translateX(-50%)';
+            errorMsg.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+            errorMsg.style.color = 'white';
+            errorMsg.style.padding = '10px 15px';
+            errorMsg.style.borderRadius = '5px';
+            errorMsg.style.zIndex = '10';
+            errorMsg.style.fontWeight = 'bold';
+            
+            // 添加到游戏容器
+            document.querySelector('.game-container').appendChild(errorMsg);
+            
+            // 2秒后移除
+            setTimeout(() => {
+                errorMsg.remove();
+            }, 2000);
+        }
+    </script>
+</body>
+</html> 
