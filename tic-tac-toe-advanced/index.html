@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enhanced Tic-Tac-Toe 4x4</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f0f0f0;
+        padding: 20px;
+        color: #333;
+      }
+      h1 {
+        color: #333;
+        margin-bottom: 10px;
+      }
+      .game-options {
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        width: 100%;
+        max-width: 600px;
+      }
+      .game-options button {
+        margin: 0 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .game-options button:hover {
+        background-color: #45a049;
+      }
+      .board {
+        display: grid;
+        grid-template-columns: repeat(4, 80px);
+        grid-template-rows: repeat(4, 80px);
+        gap: 5px;
+        background-color: #333;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        margin-top: 20px;
+      }
+      .cell {
+        width: 80px;
+        height: 80px;
+        background-color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 36px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.3s;
+      }
+      .cell:hover {
+        background-color: #f0f0f0;
+      }
+      .cell.x {
+        color: #e74c3c;
+      }
+      .cell.o {
+        color: #3498db;
+      }
+      .cell.flipped {
+        animation: flip 0.5s;
+      }
+      .cell.highlight {
+        background-color: #fffacd;
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+      }
+      @keyframes flip {
+        0% {
+          transform: rotateY(0deg);
+        }
+        50% {
+          transform: rotateY(90deg);
+        }
+        100% {
+          transform: rotateY(0deg);
+        }
+      }
+      .status {
+        margin-top: 20px;
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+      }
+      .reset-button {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .reset-button:hover {
+        background-color: #2980b9;
+      }
+      .hidden {
+        display: none;
+      }
+      .rules {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        max-width: 600px;
+        text-align: left;
+        line-height: 1.6;
+      }
+      .rules h3 {
+        text-align: center;
+        margin-bottom: 15px;
+      }
+      .rules ul {
+        padding-left: 20px;
+      }
+      .rules li {
+        margin-bottom: 8px;
+      }
+      .rules .example {
+        background-color: #f9f9f9;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+      .rules .example-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 30px);
+        grid-template-rows: repeat(1, 30px);
+        gap: 2px;
+        background-color: #333;
+        border-radius: 4px;
+        margin: 10px auto;
+        width: fit-content;
+      }
+      .rules .example-cell {
+        width: 30px;
+        height: 30px;
+        background-color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 16px;
+        font-weight: bold;
+      }
+      .rules .example-cell.x {
+        color: #e74c3c;
+      }
+      .rules .example-cell.o {
+        color: #3498db;
+      }
+      .toggle-rules {
+        margin-top: 10px;
+        color: #3498db;
+        text-decoration: underline;
+        cursor: pointer;
+        text-align: center;
+      }
+      /* Tutorial mode styles */
+      .tutorial-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .tutorial-content {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+      }
+      .tutorial-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .tutorial-header h2 {
+        margin: 0;
+        color: #333;
+      }
+      .tutorial-close {
+        cursor: pointer;
+        font-size: 24px;
+        color: #777;
+      }
+      .tutorial-step {
+        margin-bottom: 30px;
+      }
+      .tutorial-step h3 {
+        color: #3498db;
+        margin-bottom: 10px;
+      }
+      .tutorial-board {
+        display: grid;
+        grid-template-columns: repeat(4, 60px);
+        grid-template-rows: repeat(4, 60px);
+        gap: 5px;
+        background-color: #333;
+        border-radius: 8px;
+        overflow: hidden;
+        margin: 20px auto;
+      }
+      .tutorial-cell {
+        width: 60px;
+        height: 60px;
+        background-color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 28px;
+        font-weight: bold;
+      }
+      .tutorial-cell.x {
+        color: #e74c3c;
+      }
+      .tutorial-cell.o {
+        color: #3498db;
+      }
+      .tutorial-cell.highlight {
+        background-color: #fffacd;
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+      }
+      .tutorial-cell.flipped {
+        animation: flip 0.5s;
+      }
+      .tutorial-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+      }
+      .tutorial-btn {
+        padding: 10px 20px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+      }
+      .tutorial-btn:hover {
+        background-color: #2980b9;
+      }
+      .tutorial-btn.disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .tutorial-progress {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+      }
+      .tutorial-dot {
+        width: 12px;
+        height: 12px;
+        background-color: #ccc;
+        border-radius: 50%;
+        margin: 0 5px;
+      }
+      .tutorial-dot.active {
+        background-color: #3498db;
+      }
+      .tutorial-start-btn {
+        display: block;
+        margin: 20px auto;
+        padding: 12px 24px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+      }
+      .tutorial-start-btn:hover {
+        background-color: #45a049;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Enhanced Tic-Tac-Toe 4x4</h1>
+
+    <div class="rules hidden" id="rules">
+      <h3>Game Rules</h3>
+      <p>
+        This is an enhanced version of Tic-Tac-Toe played on a 4x4 board with
+        special flipping rules.
+      </p>
+
+      <h4>Basic Rules:</h4>
+      <ul>
+        <li>The game is played on a 4x4 grid.</li>
+        <li>
+          Players take turns placing their symbol (X or O) on any empty cell.
+        </li>
+        <li>
+          The first player to get 4 of their symbols in a row (horizontally,
+          vertically, or diagonally) wins.
+        </li>
+        <li>If the board fills up with no winner, the game is a draw.</li>
+      </ul>
+
+      <h4>Special Flipping Rule:</h4>
+      <p>
+        When you place your symbol, it can flip your opponent's symbols under
+        certain conditions:
+      </p>
+      <ul>
+        <li>
+          If your newly placed symbol creates a "sandwich" with another of your
+          symbols, with your opponent's symbol(s) in between, those opponent
+          symbols will flip to your symbol.
+        </li>
+        <li>
+          This can happen in any direction: horizontally, vertically, or
+          diagonally.
+        </li>
+        <li>Multiple flip combinations can occur in a single move.</li>
+      </ul>
+
+      <div class="example">
+        <p>
+          <strong>Example:</strong> If Player X places their symbol as shown
+          below:
+        </p>
+        <div class="example-grid">
+          <div class="example-cell x">X</div>
+          <div class="example-cell o">O</div>
+          <div class="example-cell">→</div>
+          <div class="example-cell x">X</div>
+        </div>
+        <p>
+          The O will flip to X because it's now "sandwiched" between two X's:
+        </p>
+        <div class="example-grid">
+          <div class="example-cell x">X</div>
+          <div class="example-cell x">X</div>
+          <div class="example-cell">→</div>
+          <div class="example-cell x">X</div>
+        </div>
+      </div>
+
+      <p>
+        This flipping mechanism adds strategic depth to the traditional
+        Tic-Tac-Toe game.
+      </p>
+
+      <div class="toggle-rules" id="showRules">Show Rules</div>
+      <button class="tutorial-start-btn" id="startTutorial">
+        Interactive Tutorial
+      </button>
+    </div>
+
+    <div class="game-options" id="gameOptions">
+      <h2>Who goes first?</h2>
+      <button id="playerFirst">Player First</button>
+      <button id="computerFirst">Computer First</button>
+    </div>
+
+    <div class="board hidden" id="board">
+      <div class="cell" data-index="0"></div>
+      <div class="cell" data-index="1"></div>
+      <div class="cell" data-index="2"></div>
+      <div class="cell" data-index="3"></div>
+      <div class="cell" data-index="4"></div>
+      <div class="cell" data-index="5"></div>
+      <div class="cell" data-index="6"></div>
+      <div class="cell" data-index="7"></div>
+      <div class="cell" data-index="8"></div>
+      <div class="cell" data-index="9"></div>
+      <div class="cell" data-index="10"></div>
+      <div class="cell" data-index="11"></div>
+      <div class="cell" data-index="12"></div>
+      <div class="cell" data-index="13"></div>
+      <div class="cell" data-index="14"></div>
+      <div class="cell" data-index="15"></div>
+    </div>
+
+    <div class="status hidden" id="status"></div>
+    <button class="reset-button hidden" id="resetButton">Restart Game</button>
+
+    <!-- Tutorial Container -->
+    <div class="tutorial-container hidden" id="tutorialContainer">
+      <div class="tutorial-content">
+        <div class="tutorial-header">
+          <h2>Interactive Tutorial</h2>
+          <div class="tutorial-close" id="closeTutorial">×</div>
+        </div>
+
+        <!-- Step 1: Introduction -->
+        <div class="tutorial-step" id="tutorialStep1">
+          <h3>Welcome to Enhanced Tic-Tac-Toe!</h3>
+          <p>
+            This tutorial will guide you through the game's rules and mechanics
+            using interactive examples.
+          </p>
+          <p>You'll learn how to play and develop strategies to win.</p>
+        </div>
+
+        <!-- Step 2: Basic Board -->
+        <div class="tutorial-step hidden" id="tutorialStep2">
+          <h3>The Game Board</h3>
+          <p>Enhanced Tic-Tac-Toe is played on a 4×4 grid:</p>
+          <div class="tutorial-board" id="tutorialBoard1">
+            <!-- Empty 4x4 board cells will be generated by JavaScript -->
+          </div>
+          <p>
+            Players take turns placing their symbols (X or O) on any empty cell.
+          </p>
+        </div>
+
+        <!-- Step 3: Winning Condition -->
+        <div class="tutorial-step hidden" id="tutorialStep3">
+          <h3>How to Win</h3>
+          <p>
+            The goal is to get 4 of your symbols in a row - horizontally,
+            vertically, or diagonally:
+          </p>
+          <div class="tutorial-board" id="tutorialBoard2">
+            <!-- Board with winning example will be generated by JavaScript -->
+          </div>
+          <p>
+            In this example, X wins by having 4 symbols in a row horizontally.
+          </p>
+        </div>
+
+        <!-- Step 4: Flipping Mechanism Intro -->
+        <div class="tutorial-step hidden" id="tutorialStep4">
+          <h3>Special Flipping Rule</h3>
+          <p>
+            What makes this game unique is the ability to flip your opponent's
+            pieces:
+          </p>
+          <p>
+            When you place your symbol and create a "sandwich" with another of
+            your symbols, with your opponent's symbol(s) in between, those
+            opponent symbols will flip to your symbol.
+          </p>
+        </div>
+
+        <!-- Step 5: Horizontal Flip Example -->
+        <div class="tutorial-step hidden" id="tutorialStep5">
+          <h3>Horizontal Flipping</h3>
+          <p>Let's see how horizontal flipping works:</p>
+          <div class="tutorial-board" id="tutorialBoard3">
+            <!-- Board with horizontal flip example will be generated by JavaScript -->
+          </div>
+          <p>
+            When X is placed on the right, it sandwiches the O between two X's
+            horizontally, causing O to flip to X.
+          </p>
+        </div>
+
+        <!-- Step 6: Vertical Flip Example -->
+        <div class="tutorial-step hidden" id="tutorialStep6">
+          <h3>Vertical Flipping</h3>
+          <p>Flipping also works vertically:</p>
+          <div class="tutorial-board" id="tutorialBoard4">
+            <!-- Board with vertical flip example will be generated by JavaScript -->
+          </div>
+          <p>
+            When O is placed at the bottom, it sandwiches the X between two O's
+            vertically, causing X to flip to O.
+          </p>
+        </div>
+
+        <!-- Step 7: Diagonal Flip Example -->
+        <div class="tutorial-step hidden" id="tutorialStep7">
+          <h3>Diagonal Flipping</h3>
+          <p>And diagonally too:</p>
+          <div class="tutorial-board" id="tutorialBoard5">
+            <!-- Board with diagonal flip example will be generated by JavaScript -->
+          </div>
+          <p>
+            When X is placed in the bottom-right, it sandwiches the O between
+            two X's diagonally, causing O to flip to X.
+          </p>
+        </div>
+
+        <!-- Step 8: Multiple Flips -->
+        <div class="tutorial-step hidden" id="tutorialStep8">
+          <h3>Multiple Flips</h3>
+          <p>A single move can flip multiple pieces in different directions:</p>
+          <div class="tutorial-board" id="tutorialBoard6">
+            <!-- Board with multiple flip example will be generated by JavaScript -->
+          </div>
+          <p>This powerful move flips three O's to X's in one turn!</p>
+        </div>
+
+        <!-- Step 9: Strategy Tips -->
+        <div class="tutorial-step hidden" id="tutorialStep9">
+          <h3>Strategic Tips</h3>
+          <ul>
+            <li>
+              Corner positions are valuable - they can't be flipped from two
+              sides
+            </li>
+            <li>
+              Think ahead about how your moves might set up future flipping
+              opportunities
+            </li>
+            <li>
+              Sometimes placing a piece that doesn't flip anything immediately
+              can be strategic
+            </li>
+            <li>
+              Remember that you can place pieces anywhere, not just where
+              they'll cause flips
+            </li>
+          </ul>
+        </div>
+
+        <!-- Step 10: Ready to Play -->
+        <div class="tutorial-step hidden" id="tutorialStep10">
+          <h3>You're Ready to Play!</h3>
+          <p>Now you understand how Enhanced Tic-Tac-Toe works!</p>
+          <p>Choose whether you want to go first or let the computer start.</p>
+          <p>Good luck and have fun!</p>
+        </div>
+
+        <!-- Tutorial Navigation -->
+        <div class="tutorial-navigation">
+          <button class="tutorial-btn disabled" id="prevButton">
+            Previous
+          </button>
+          <button class="tutorial-btn" id="nextButton">Next</button>
+        </div>
+
+        <!-- Tutorial Progress Dots -->
+        <div class="tutorial-progress" id="tutorialProgress">
+          <!-- Progress dots will be generated by JavaScript -->
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // 立即检查localStorage，并设置教程容器的状态
+        if (localStorage.getItem("tutorialClosed") === "true") {
+          const tutorialContainer =
+            document.getElementById("tutorialContainer");
+          if (tutorialContainer) {
+            tutorialContainer.classList.add("hidden");
+            tutorialContainer.style.display = "none";
+            tutorialContainer.style.visibility = "hidden";
+            tutorialContainer.style.opacity = "0";
+            tutorialContainer.style.position = "absolute";
+            tutorialContainer.style.left = "-9999px";
+            tutorialContainer.style.zIndex = "-1000";
+            console.log("Tutorial hidden on page load based on localStorage");
+          }
+        }
+
+        const board = document.getElementById("board");
+        const cells = document.querySelectorAll(".cell");
+        const status = document.getElementById("status");
+        const resetButton = document.getElementById("resetButton");
+        const gameOptions = document.getElementById("gameOptions");
+        const playerFirstButton = document.getElementById("playerFirst");
+        const computerFirstButton = document.getElementById("computerFirst");
+        const rules = document.getElementById("rules");
+        const showRules = document.getElementById("showRules");
+        const hideRules = document.createElement("div");
+        hideRules.id = "hideRules";
+        hideRules.className = "toggle-rules hidden";
+        hideRules.textContent = "Hide Rules";
+        rules.appendChild(hideRules);
+
+        // Tutorial elements
+        const startTutorialButton = document.getElementById("startTutorial");
+        const tutorialContainer = document.getElementById("tutorialContainer");
+        const closeTutorial = document.getElementById("closeTutorial");
+        const prevButton = document.getElementById("prevButton");
+        const nextButton = document.getElementById("nextButton");
+        const tutorialProgress = document.getElementById("tutorialProgress");
+
+        // All tutorial steps
+        const tutorialSteps = document.querySelectorAll(".tutorial-step");
+        let currentTutorialStep = 0;
+
+        // Create tutorial boards
+        createTutorialBoards();
+
+        // Create progress dots
+        createProgressDots();
+
+        // Rules toggle
+        hideRules.addEventListener("click", () => {
+          rules.classList.add("hidden");
+          hideRules.classList.add("hidden");
+          showRules.classList.remove("hidden");
+        });
+
+        showRules.addEventListener("click", () => {
+          rules.classList.remove("hidden");
+          hideRules.classList.remove("hidden");
+          showRules.classList.add("hidden");
+        });
+
+        // Tutorial event listeners
+        startTutorialButton.addEventListener("click", function () {
+          localStorage.removeItem("tutorialClosed");
+          tutorialContainer.classList.remove("hidden");
+          tutorialContainer.style.display = "flex";
+          currentTutorialStep = 0;
+          showTutorialStep(currentTutorialStep);
+          updateTutorialNavigation();
+          setTimeout(function () {
+            emergencyExitBtn.style.display = "block";
+          }, 1000);
+        });
+
+        closeTutorial.addEventListener("click", function () {
+          localStorage.setItem("tutorialClosed", "true");
+          tutorialContainer.classList.add("hidden");
+          tutorialContainer.style.display = "none";
+          emergencyExitBtn.style.display = "none";
+        });
+
+        prevButton.addEventListener("click", goToPreviousStep);
+
+        // Directly add event listener to the next button
+        nextButton.addEventListener("click", function () {
+          console.log("Next button clicked directly");
+          if (currentTutorialStep < tutorialSteps.length - 1) {
+            currentTutorialStep++;
+            showTutorialStep(currentTutorialStep);
+            updateTutorialNavigation();
+          } else {
+            // This is the Finish button case
+            console.log("Finish button action triggered - final close");
+            localStorage.setItem("tutorialClosed", "true");
+
+            // Apply all hiding methods
+            tutorialContainer.classList.add("hidden");
+            tutorialContainer.style.display = "none";
+            tutorialContainer.style.visibility = "hidden";
+            tutorialContainer.style.opacity = "0";
+            tutorialContainer.style.position = "absolute";
+            tutorialContainer.style.left = "-9999px";
+            tutorialContainer.style.zIndex = "-1000";
+
+            // Hide emergency button
+            emergencyExitBtn.style.display = "none";
+
+            console.log("Tutorial permanently closed");
+          }
+        });
+
+        // Add an emergency exit button to tutorial
+        const emergencyExitBtn = document.createElement("button");
+        emergencyExitBtn.textContent = "紧急退出教程";
+        emergencyExitBtn.style.position = "fixed";
+        emergencyExitBtn.style.top = "10px";
+        emergencyExitBtn.style.right = "10px";
+        emergencyExitBtn.style.zIndex = "2000";
+        emergencyExitBtn.style.background = "red";
+        emergencyExitBtn.style.color = "white";
+        emergencyExitBtn.style.padding = "10px";
+        emergencyExitBtn.style.border = "none";
+        emergencyExitBtn.style.borderRadius = "5px";
+        emergencyExitBtn.style.cursor = "pointer";
+        emergencyExitBtn.style.display = "none"; // Initially hidden
+
+        emergencyExitBtn.addEventListener("click", function () {
+          localStorage.setItem("tutorialClosed", "true");
+          window.location.reload(); // Force page reload
+        });
+
+        document.body.appendChild(emergencyExitBtn);
+
+        // Game state
+        let gameActive = false;
+        let currentPlayer = "X"; // X is player, O is computer
+        let gameState = [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+        ];
+        let playerSymbol = "X";
+        let computerSymbol = "O";
+
+        // Board dimensions
+        const BOARD_SIZE = 4;
+
+        // Winning combinations for 4x4 board
+        const winningConditions = [
+          // Rows
+          [0, 1, 2, 3],
+          [4, 5, 6, 7],
+          [8, 9, 10, 11],
+          [12, 13, 14, 15],
+          // Columns
+          [0, 4, 8, 12],
+          [1, 5, 9, 13],
+          [2, 6, 10, 14],
+          [3, 7, 11, 15],
+          // Diagonals
+          [0, 5, 10, 15],
+          [3, 6, 9, 12],
+        ];
+
+        // Directions for flipping: horizontal, vertical, and diagonal
+        const directions = [
+          [-1, 0],
+          [1, 0], // horizontal
+          [0, -1],
+          [0, 1], // vertical
+          [-1, -1],
+          [1, 1], // diagonal \
+          [-1, 1],
+          [1, -1], // diagonal /
+        ];
+
+        // Tutorial functions - REMOVE UNUSED FUNCTIONS
+        function goToPreviousStep() {
+          if (currentTutorialStep > 0) {
+            currentTutorialStep--;
+            showTutorialStep(currentTutorialStep);
+            updateTutorialNavigation();
+          }
+        }
+
+        function showTutorialStep(stepIndex) {
+          // Hide all steps
+          tutorialSteps.forEach((step) => step.classList.add("hidden"));
+
+          // Show current step
+          tutorialSteps[stepIndex].classList.remove("hidden");
+
+          // Update progress dots
+          document.querySelectorAll(".tutorial-dot").forEach((dot, index) => {
+            if (index === stepIndex) {
+              dot.classList.add("active");
+            } else {
+              dot.classList.remove("active");
+            }
+          });
+        }
+
+        function updateTutorialNavigation() {
+          // Update previous button state
+          if (currentTutorialStep === 0) {
+            prevButton.classList.add("disabled");
+          } else {
+            prevButton.classList.remove("disabled");
+          }
+
+          // Update next button text and state
+          if (currentTutorialStep === tutorialSteps.length - 1) {
+            nextButton.textContent = "Finish";
+          } else {
+            nextButton.textContent = "Next";
+          }
+        }
+
+        function createProgressDots() {
+          // Create a dot for each tutorial step
+          tutorialSteps.forEach((_, index) => {
+            const dot = document.createElement("div");
+            dot.classList.add("tutorial-dot");
+            if (index === 0) {
+              dot.classList.add("active");
+            }
+
+            // Add click event to jump to step
+            dot.addEventListener("click", () => {
+              currentTutorialStep = index;
+              showTutorialStep(currentTutorialStep);
+              updateTutorialNavigation();
+            });
+
+            tutorialProgress.appendChild(dot);
+          });
+        }
+
+        function createTutorialBoards() {
+          // Create empty board for step 2
+          createTutorialBoard("tutorialBoard1", []);
+
+          // Create winning example for step 3
+          const winningBoard = Array(16).fill("");
+          winningBoard[4] = "X";
+          winningBoard[5] = "X";
+          winningBoard[6] = "X";
+          winningBoard[7] = "X";
+          createTutorialBoard("tutorialBoard2", winningBoard, [4, 5, 6, 7]);
+
+          // Create horizontal flip example for step 5
+          const horizontalBoard = Array(16).fill("");
+          horizontalBoard[5] = "X";
+          horizontalBoard[6] = "O";
+          horizontalBoard[7] = ""; // This will be where X is placed
+          createTutorialBoard("tutorialBoard3", horizontalBoard, [], 7, "X", [
+            6,
+          ]);
+
+          // Create vertical flip example for step 6
+          const verticalBoard = Array(16).fill("");
+          verticalBoard[1] = "O";
+          verticalBoard[5] = "X";
+          verticalBoard[9] = ""; // This will be where O is placed
+          createTutorialBoard("tutorialBoard4", verticalBoard, [], 9, "O", [5]);
+
+          // Create diagonal flip example for step 7
+          const diagonalBoard = Array(16).fill("");
+          diagonalBoard[0] = "X";
+          diagonalBoard[5] = "O";
+          diagonalBoard[10] = ""; // This will be where X is placed
+          createTutorialBoard("tutorialBoard5", diagonalBoard, [], 10, "X", [
+            5,
+          ]);
+
+          // Create multiple flip example for step 8
+          const multipleBoard = Array(16).fill("");
+          multipleBoard[5] = "X";
+          multipleBoard[6] = "O";
+          multipleBoard[7] = "X";
+          multipleBoard[9] = "O";
+          multipleBoard[11] = "O";
+          multipleBoard[10] = ""; // This will be where X is placed
+          createTutorialBoard(
+            "tutorialBoard6",
+            multipleBoard,
+            [],
+            10,
+            "X",
+            [6, 9, 11]
+          );
+        }
+
+        function createTutorialBoard(
+          boardId,
+          initialState,
+          highlightIndices = [],
+          placeIndex = -1,
+          placeSymbol = "",
+          flipIndices = []
+        ) {
+          const boardElement = document.getElementById(boardId);
+          boardElement.innerHTML = "";
+
+          // Create a 4x4 grid
+          for (let i = 0; i < 16; i++) {
+            const cell = document.createElement("div");
+            cell.classList.add("tutorial-cell");
+            cell.setAttribute("data-index", i);
+
+            // Set initial state
+            if (initialState[i]) {
+              cell.textContent = initialState[i];
+              cell.classList.add(initialState[i].toLowerCase());
+            }
+
+            // Add highlight if needed
+            if (highlightIndices.includes(i)) {
+              cell.classList.add("highlight");
+            }
+
+            // Highlight the cell where a piece will be placed
+            if (i === placeIndex) {
+              cell.classList.add("highlight");
+
+              // Add animation to show placing and flipping
+              setTimeout(() => {
+                cell.textContent = placeSymbol;
+                cell.classList.add(placeSymbol.toLowerCase());
+
+                // Flip pieces
+                setTimeout(() => {
+                  flipIndices.forEach((flipIndex) => {
+                    const flipCell = boardElement.querySelector(
+                      `[data-index="${flipIndex}"]`
+                    );
+                    flipCell.textContent = placeSymbol;
+                    flipCell.classList.remove("x", "o");
+                    flipCell.classList.add(
+                      placeSymbol.toLowerCase(),
+                      "flipped"
+                    );
+                  });
+                }, 500);
+              }, 1000);
+            }
+
+            boardElement.appendChild(cell);
+          }
+        }
+
+        // Start game with player first
+        playerFirstButton.addEventListener("click", () => {
+          startGame(true);
+        });
+
+        // Start game with computer first
+        computerFirstButton.addEventListener("click", () => {
+          startGame(false);
+        });
+
+        // Start the game
+        function startGame(playerFirst) {
+          gameActive = true;
+          // Initialize empty board
+          gameState = [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+          ];
+
+          cells.forEach((cell) => {
+            cell.textContent = "";
+            cell.classList.remove("x", "o", "flipped");
+          });
+
+          // Show board and hide options
+          board.classList.remove("hidden");
+          status.classList.remove("hidden");
+          resetButton.classList.remove("hidden");
+          gameOptions.classList.add("hidden");
+
+          if (playerFirst) {
+            currentPlayer = "X";
+            playerSymbol = "X";
+            computerSymbol = "O";
+            status.textContent = "Your turn (X)";
+          } else {
+            currentPlayer = "O";
+            playerSymbol = "O";
+            computerSymbol = "X";
+            status.textContent = "Computer thinking... (X)";
+            setTimeout(computerMove, 500); // Delay for better UX
+          }
+        }
+
+        // Convert 1D index to 2D coordinates
+        function indexToCoords(index) {
+          return {
+            row: Math.floor(index / BOARD_SIZE),
+            col: index % BOARD_SIZE,
+          };
+        }
+
+        // Convert 2D coordinates to 1D index
+        function coordsToIndex(row, col) {
+          return row * BOARD_SIZE + col;
+        }
+
+        // Check if coordinates are valid (within board)
+        function isValidCoord(row, col) {
+          return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
+        }
+
+        // Find cells to flip when placing a piece
+        function findCellsToFlip(index, symbol) {
+          const coords = indexToCoords(index);
+          const opponentSymbol = symbol === "X" ? "O" : "X";
+          const cellsToFlip = [];
+
+          // Check all directions
+          for (const [dx, dy] of directions) {
+            let row = coords.row + dx;
+            let col = coords.col + dy;
+            const flippableCells = [];
+
+            // Continue in this direction as long as we find opponent pieces
+            while (isValidCoord(row, col)) {
+              const currentIndex = coordsToIndex(row, col);
+              const currentCell = gameState[currentIndex];
+
+              if (currentCell === opponentSymbol) {
+                flippableCells.push(currentIndex);
+                row += dx;
+                col += dy;
+              } else if (currentCell === symbol) {
+                // Found our own piece, can flip all pieces in between
+                cellsToFlip.push(...flippableCells);
+                break;
+              } else {
+                // Empty cell, can't flip
+                break;
+              }
+            }
+          }
+
+          return cellsToFlip;
+        }
+
+        // Flip cells and update UI
+        function flipCells(cellsToFlip, symbol) {
+          cellsToFlip.forEach((index) => {
+            gameState[index] = symbol;
+            cells[index].textContent = symbol;
+            cells[index].classList.remove("x", "o");
+            cells[index].classList.add(symbol.toLowerCase(), "flipped");
+          });
+        }
+
+        // Handle cell click
+        function handleCellClick(clickedCellEvent) {
+          const clickedCell = clickedCellEvent.target;
+          const clickedCellIndex = parseInt(
+            clickedCell.getAttribute("data-index")
+          );
+
+          // Ignore click if cell is already filled or game is not active
+          if (
+            gameState[clickedCellIndex] !== "" ||
+            !gameActive ||
+            currentPlayer !== playerSymbol
+          ) {
+            return;
+          }
+
+          // Update game state and UI
+          gameState[clickedCellIndex] = playerSymbol;
+          clickedCell.textContent = playerSymbol;
+          clickedCell.classList.add(playerSymbol.toLowerCase());
+
+          // Check if this move can flip any pieces and flip them
+          const cellsToFlip = findCellsToFlip(clickedCellIndex, playerSymbol);
+          if (cellsToFlip.length > 0) {
+            flipCells(cellsToFlip, playerSymbol);
+          }
+
+          // Check for win or draw
+          if (checkWin(playerSymbol)) {
+            status.textContent = "Congratulations! You won!";
+            gameActive = false;
+            return;
+          }
+
+          if (isDraw()) {
+            status.textContent = "Game ended in a draw!";
+            gameActive = false;
+            return;
+          }
+
+          // Switch to computer's turn
+          currentPlayer = computerSymbol;
+          status.textContent = "Computer thinking...";
+
+          // Computer makes a move after a short delay
+          setTimeout(computerMove, 500);
+        }
+
+        // Computer move with strategic thinking
+        function computerMove() {
+          if (!gameActive) return;
+
+          let index = findBestMove();
+          gameState[index] = computerSymbol;
+          cells[index].textContent = computerSymbol;
+          cells[index].classList.add(computerSymbol.toLowerCase());
+
+          // Check if this move can flip any pieces and flip them
+          const cellsToFlip = findCellsToFlip(index, computerSymbol);
+          if (cellsToFlip.length > 0) {
+            flipCells(cellsToFlip, computerSymbol);
+          }
+
+          // Check for win or draw
+          if (checkWin(computerSymbol)) {
+            status.textContent = "Computer won!";
+            gameActive = false;
+            return;
+          }
+
+          if (isDraw()) {
+            status.textContent = "Game ended in a draw!";
+            gameActive = false;
+            return;
+          }
+
+          // Switch back to player's turn
+          currentPlayer = playerSymbol;
+          status.textContent = `Your turn (${playerSymbol})`;
+        }
+
+        // Find best move using minimax algorithm with alpha-beta pruning and depth limitation
+        function findBestMove() {
+          // Get all empty cells
+          const emptyCells = [];
+          for (let i = 0; i < 16; i++) {
+            if (gameState[i] === "") {
+              emptyCells.push(i);
+            }
+          }
+
+          // If only one empty cell, take it
+          if (emptyCells.length === 1) {
+            return emptyCells[0];
+          }
+
+          // For 4x4 board, we limit the depth of minimax to make it faster
+          const maxDepth = 3;
+
+          let bestScore = -Infinity;
+          let bestMove = emptyCells[0]; // Default to first empty cell
+
+          // Try each available cell
+          for (const move of emptyCells) {
+            // Make the move
+            gameState[move] = computerSymbol;
+
+            // Find cells that would be flipped
+            const cellsToFlip = findCellsToFlip(move, computerSymbol);
+
+            // Flip cells temporarily
+            for (const flipIndex of cellsToFlip) {
+              gameState[flipIndex] = computerSymbol;
+            }
+
+            // Evaluate this move
+            let score = minimax(
+              gameState,
+              0,
+              false,
+              -Infinity,
+              Infinity,
+              maxDepth
+            );
+
+            // Undo the move
+            gameState[move] = "";
+            for (const flipIndex of cellsToFlip) {
+              gameState[flipIndex] = playerSymbol;
+            }
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestMove = move;
+            }
+          }
+
+          return bestMove;
+        }
+
+        // Minimax algorithm with alpha-beta pruning and depth limitation
+        function minimax(board, depth, isMaximizing, alpha, beta, maxDepth) {
+          // Check for terminal states or max depth reached
+          if (checkWinForState(board, computerSymbol)) return 100 - depth;
+          if (checkWinForState(board, playerSymbol)) return depth - 100;
+          if (isDrawForState(board) || depth >= maxDepth)
+            return evaluateBoard(board);
+
+          // Get all empty cells
+          const emptyCells = [];
+          for (let i = 0; i < 16; i++) {
+            if (board[i] === "") {
+              emptyCells.push(i);
+            }
+          }
+
+          if (isMaximizing) {
+            let bestScore = -Infinity;
+
+            // If no empty cells, it's a draw
+            if (emptyCells.length === 0) {
+              return 0;
+            }
+
+            for (const move of emptyCells) {
+              // Make the move
+              const boardCopy = [...board];
+              boardCopy[move] = computerSymbol;
+
+              // Find cells that would be flipped
+              const cellsToFlip = findCellsToFlipForState(
+                boardCopy,
+                move,
+                computerSymbol
+              );
+
+              // Flip cells
+              for (const flipIndex of cellsToFlip) {
+                boardCopy[flipIndex] = computerSymbol;
+              }
+
+              // Recursive call
+              let score = minimax(
+                boardCopy,
+                depth + 1,
+                false,
+                alpha,
+                beta,
+                maxDepth
+              );
+              bestScore = Math.max(score, bestScore);
+              alpha = Math.max(alpha, bestScore);
+              if (beta <= alpha) break; // Alpha-beta pruning
+            }
+            return bestScore;
+          } else {
+            let bestScore = Infinity;
+
+            // If no empty cells, it's a draw
+            if (emptyCells.length === 0) {
+              return 0;
+            }
+
+            for (const move of emptyCells) {
+              // Make the move
+              const boardCopy = [...board];
+              boardCopy[move] = playerSymbol;
+
+              // Find cells that would be flipped
+              const cellsToFlip = findCellsToFlipForState(
+                boardCopy,
+                move,
+                playerSymbol
+              );
+
+              // Flip cells
+              for (const flipIndex of cellsToFlip) {
+                boardCopy[flipIndex] = playerSymbol;
+              }
+
+              // Recursive call
+              let score = minimax(
+                boardCopy,
+                depth + 1,
+                true,
+                alpha,
+                beta,
+                maxDepth
+              );
+              bestScore = Math.min(score, bestScore);
+              beta = Math.min(beta, bestScore);
+              if (beta <= alpha) break; // Alpha-beta pruning
+            }
+            return bestScore;
+          }
+        }
+
+        // Find cells to flip for a given board state
+        function findCellsToFlipForState(board, index, symbol) {
+          const coords = indexToCoords(index);
+          const opponentSymbol = symbol === "X" ? "O" : "X";
+          const cellsToFlip = [];
+
+          // Check all directions
+          for (const [dx, dy] of directions) {
+            let row = coords.row + dx;
+            let col = coords.col + dy;
+            const flippableCells = [];
+
+            // Continue in this direction as long as we find opponent pieces
+            while (isValidCoord(row, col)) {
+              const currentIndex = coordsToIndex(row, col);
+              const currentCell = board[currentIndex];
+
+              if (currentCell === opponentSymbol) {
+                flippableCells.push(currentIndex);
+                row += dx;
+                col += dy;
+              } else if (currentCell === symbol) {
+                // Found our own piece, can flip all pieces in between
+                cellsToFlip.push(...flippableCells);
+                break;
+              } else {
+                // Empty cell, can't flip
+                break;
+              }
+            }
+          }
+
+          return cellsToFlip;
+        }
+
+        // Simple board evaluation function
+        function evaluateBoard(board) {
+          // Count pieces
+          let computerPieces = 0;
+          let playerPieces = 0;
+
+          for (let i = 0; i < 16; i++) {
+            if (board[i] === computerSymbol) {
+              computerPieces++;
+              // Bonus for corners
+              if (i === 0 || i === 3 || i === 12 || i === 15) {
+                computerPieces += 2;
+              }
+            } else if (board[i] === playerSymbol) {
+              playerPieces++;
+              // Bonus for corners
+              if (i === 0 || i === 3 || i === 12 || i === 15) {
+                playerPieces += 2;
+              }
+            }
+          }
+
+          return computerPieces - playerPieces;
+        }
+
+        // Check if a player has won
+        function checkWin(player) {
+          return winningConditions.some((condition) => {
+            return condition.every((index) => {
+              return gameState[index] === player;
+            });
+          });
+        }
+
+        // Check if a player has won for a given board state
+        function checkWinForState(board, player) {
+          return winningConditions.some((condition) => {
+            return condition.every((index) => {
+              return board[index] === player;
+            });
+          });
+        }
+
+        // Check if the game is a draw
+        function isDraw() {
+          return !gameState.includes("");
+        }
+
+        // Check if the game is a draw for a given board state
+        function isDrawForState(board) {
+          return !board.includes("");
+        }
+
+        // Reset the game
+        resetButton.addEventListener("click", () => {
+          board.classList.add("hidden");
+          status.classList.add("hidden");
+          resetButton.classList.add("hidden");
+          gameOptions.classList.remove("hidden");
+          gameActive = false;
+        });
+
+        // Add event listeners to cells
+        cells.forEach((cell) => {
+          cell.addEventListener("click", handleCellClick);
+        });
+      });
+    </script>
+  </body>
+</html>

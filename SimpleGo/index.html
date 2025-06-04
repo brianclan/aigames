@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4x4 Go Game</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #f5f5f5;
+        margin: 0;
+        padding: 20px;
+      }
+      h1 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+      .game-container {
+        background-color: #e6c88e;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+      .board {
+        position: relative;
+        background-color: #e6c88e;
+        width: 240px;
+        height: 240px;
+        border: 2px solid #333;
+      }
+      .intersection {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+        cursor: pointer;
+      }
+
+      /* 水平线 */
+      .h-line {
+        position: absolute;
+        width: 100%;
+        height: 2px;
+        background-color: black;
+        z-index: 0;
+      }
+
+      /* 垂直线 */
+      .v-line {
+        position: absolute;
+        width: 2px;
+        height: 100%;
+        background-color: black;
+        z-index: 0;
+      }
+
+      .stone {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      .black {
+        background-color: black;
+      }
+      .white {
+        background-color: white;
+      }
+      .controls {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+      }
+      button {
+        padding: 10px 15px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      .status {
+        margin-top: 15px;
+        font-size: 18px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>4x4 Go Game</h1>
+    <div class="game-container">
+      <div class="board" id="board"></div>
+      <div class="status" id="status">Your turn (Black)</div>
+      <div class="controls">
+        <button id="pass-button">Pass</button>
+        <button id="reset-button">New Game</button>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const boardSize = 4;
+        const board = document.getElementById("board");
+        const statusDisplay = document.getElementById("status");
+        const passButton = document.getElementById("pass-button");
+        const resetButton = document.getElementById("reset-button");
+
+        // Game state
+        let gameBoard = Array(boardSize)
+          .fill()
+          .map(() => Array(boardSize).fill(null));
+        let currentPlayer = "black";
+        let passCount = 0;
+        let gameOver = false;
+        // 保存最后一次吃子的位置（用于打劫规则）
+        let lastCapture = null;
+
+        // Create the board
+        function createBoard() {
+          board.innerHTML = "";
+          const cellSize = 240 / (boardSize - 1);
+
+          // 创建水平线
+          for (let i = 0; i < boardSize; i++) {
+            const hLine = document.createElement("div");
+            hLine.classList.add("h-line");
+            hLine.style.top = i * cellSize + "px";
+            board.appendChild(hLine);
+          }
+
+          // 创建垂直线
+          for (let i = 0; i < boardSize; i++) {
+            const vLine = document.createElement("div");
+            vLine.classList.add("v-line");
+            vLine.style.left = i * cellSize + "px";
+            board.appendChild(vLine);
+          }
+
+          // 创建交叉点
+          for (let y = 0; y < boardSize; y++) {
+            for (let x = 0; x < boardSize; x++) {
+              const intersection = document.createElement("div");
+              intersection.classList.add("intersection");
+              intersection.style.left = x * cellSize + "px";
+              intersection.style.top = y * cellSize + "px";
+              intersection.dataset.x = x;
+              intersection.dataset.y = y;
+              intersection.addEventListener("click", handleIntersectionClick);
+              board.appendChild(intersection);
+            }
+          }
+        }
+
+        // Handle click on intersection
+        function handleIntersectionClick(event) {
+          if (gameOver || currentPlayer !== "black") return;
+
+          const x = parseInt(event.currentTarget.dataset.x);
+          const y = parseInt(event.currentTarget.dataset.y);
+
+          if (isValidMove(x, y, currentPlayer)) {
+            makeMove(x, y, currentPlayer);
+            passCount = 0;
+            currentPlayer = "white";
+            updateStatus();
+
+            // Computer's turn
+            setTimeout(computerMove, 500);
+          }
+        }
+
+        // Computer makes a move
+        function computerMove() {
+          if (gameOver) return;
+
+          // 改进的AI：优先考虑能够威胁玩家棋子的位置
+          const bestMove = findBestMove();
+
+          if (bestMove) {
+            makeMove(bestMove.x, bestMove.y, "white");
+            passCount = 0;
+          } else {
+            // 如果没有找到好的位置，就跳过
+            passCount++;
+            checkGameEnd();
+          }
+
+          currentPlayer = "black";
+          updateStatus();
+        }
+
+        // 寻找最佳落子位置
+        function findBestMove() {
+          // 1. 首先尝试找到可以直接吃掉黑棋的位置
+          for (let y = 0; y < boardSize; y++) {
+            for (let x = 0; x < boardSize; x++) {
+              if (gameBoard[y][x] !== null) continue;
+
+              // 检查是否违反打劫规则
+              if (
+                lastCapture &&
+                lastCapture.x === x &&
+                lastCapture.y === y &&
+                lastCapture.player === "black"
+              ) {
+                continue;
+              }
+
+              // 临时落子
+              gameBoard[y][x] = "white";
+
+              // 检查是否可以吃掉黑棋
+              let canCapture = false;
+              let captureCoords = [];
+              for (let ny = 0; ny < boardSize; ny++) {
+                for (let nx = 0; nx < boardSize; nx++) {
+                  if (gameBoard[ny][nx] === "black") {
+                    const group = findGroup(nx, ny);
+                    if (group.liberties.size === 0) {
+                      canCapture = true;
+                      group.stones.forEach((stone) =>
+                        captureCoords.push(stone)
+                      );
+                    }
+                  }
+                }
+              }
+
+              // 撤销临时落子
+              gameBoard[y][x] = null;
+
+              // 如果只吃一个子且形成打劫，记录该位置
+              if (
+                canCapture &&
+                captureCoords.length === 1 &&
+                isValidMove(x, y, "white")
+              ) {
+                return {x, y};
+              }
+            }
+          }
+
+          // 2. 尝试找到可以减少黑棋气的位置
+          let bestScore = -1;
+          let bestMoves = [];
+
+          for (let y = 0; y < boardSize; y++) {
+            for (let x = 0; x < boardSize; x++) {
+              // 检查是否违反打劫规则
+              if (
+                lastCapture &&
+                lastCapture.x === x &&
+                lastCapture.y === y &&
+                lastCapture.player === "black"
+              ) {
+                continue;
+              }
+
+              if (!isValidMove(x, y, "white")) continue;
+
+              // 计算这一步会减少多少黑棋的气
+              let score = evaluateMove(x, y);
+
+              if (score > bestScore) {
+                bestScore = score;
+                bestMoves = [{x, y}];
+              } else if (score === bestScore && score > 0) {
+                bestMoves.push({x, y});
+              }
+            }
+          }
+
+          // 3. 如果有好的进攻位置，随机选一个
+          if (bestMoves.length > 0) {
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+          }
+
+          // 4. 如果没有特别好的位置，随机选择一个有效位置
+          let validMoves = [];
+          for (let y = 0; y < boardSize; y++) {
+            for (let x = 0; x < boardSize; x++) {
+              // 检查是否违反打劫规则
+              if (
+                lastCapture &&
+                lastCapture.x === x &&
+                lastCapture.y === y &&
+                lastCapture.player === "black"
+              ) {
+                continue;
+              }
+
+              if (isValidMove(x, y, "white")) {
+                validMoves.push({x, y});
+              }
+            }
+          }
+
+          if (validMoves.length > 0) {
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+          }
+
+          return null;
+        }
+
+        // 评估一步棋的价值（主要看能减少多少黑棋的气）
+        function evaluateMove(x, y) {
+          // 记录原始黑棋气数
+          let originalLiberties = 0;
+          let blackGroups = [];
+
+          for (let ny = 0; ny < boardSize; ny++) {
+            for (let nx = 0; nx < boardSize; nx++) {
+              if (gameBoard[ny][nx] === "black") {
+                const group = findGroup(nx, ny);
+                if (
+                  !blackGroups.some((g) =>
+                    g.stones.some((s) => s.x === nx && s.y === ny)
+                  )
+                ) {
+                  blackGroups.push(group);
+                  originalLiberties += group.liberties.size;
+                }
+              }
+            }
+          }
+
+          // 临时落子
+          gameBoard[y][x] = "white";
+
+          // 计算落子后黑棋气数
+          let newLiberties = 0;
+          blackGroups = [];
+
+          for (let ny = 0; ny < boardSize; ny++) {
+            for (let nx = 0; nx < boardSize; nx++) {
+              if (gameBoard[ny][nx] === "black") {
+                const group = findGroup(nx, ny);
+                if (
+                  !blackGroups.some((g) =>
+                    g.stones.some((s) => s.x === nx && s.y === ny)
+                  )
+                ) {
+                  blackGroups.push(group);
+                  newLiberties += group.liberties.size;
+                }
+              }
+            }
+          }
+
+          // 撤销临时落子
+          gameBoard[y][x] = null;
+
+          // 返回减少的气数
+          return originalLiberties - newLiberties;
+        }
+
+        // Check if a move is valid
+        function isValidMove(x, y, player) {
+          // Already occupied
+          if (gameBoard[y][x] !== null) {
+            return false;
+          }
+
+          // 检查打劫规则
+          if (
+            lastCapture &&
+            lastCapture.x === x &&
+            lastCapture.y === y &&
+            lastCapture.player !== player
+          ) {
+            return false;
+          }
+
+          // Temporarily place stone to check for captures and suicide
+          gameBoard[y][x] = player;
+
+          // Check for captures
+          let captureFound = false;
+          const opponent = player === "black" ? "white" : "black";
+
+          // Check if this move captures any opponent groups
+          for (let ny = 0; ny < boardSize; ny++) {
+            for (let nx = 0; nx < boardSize; nx++) {
+              if (gameBoard[ny][nx] === opponent) {
+                const group = findGroup(nx, ny);
+                if (group.liberties.size === 0) {
+                  captureFound = true;
+                }
+              }
+            }
+          }
+
+          // Check for suicide (unless a capture was made)
+          if (!captureFound) {
+            const group = findGroup(x, y);
+            if (group.liberties.size === 0) {
+              gameBoard[y][x] = null; // Undo move
+              return false;
+            }
+          }
+
+          gameBoard[y][x] = null; // Undo move
+          return true;
+        }
+
+        // Make a move
+        function makeMove(x, y, player) {
+          gameBoard[y][x] = player;
+
+          // 重置上一次打劫标记
+          let newKoPoint = null;
+
+          // Check for captures
+          const opponent = player === "black" ? "white" : "black";
+          let capturedStones = [];
+
+          for (let ny = 0; ny < boardSize; ny++) {
+            for (let nx = 0; nx < boardSize; nx++) {
+              if (gameBoard[ny][nx] === opponent) {
+                const group = findGroup(nx, ny);
+                if (group.liberties.size === 0) {
+                  // Remove captured stones
+                  group.stones.forEach((stone) => {
+                    gameBoard[stone.y][stone.x] = null;
+                    capturedStones.push({x: stone.x, y: stone.y});
+                  });
+                }
+              }
+            }
+          }
+
+          // 检查是否形成打劫
+          if (capturedStones.length === 1) {
+            // 检查这个落子是否只有一口气
+            const group = findGroup(x, y);
+            if (group.liberties.size === 1) {
+              // 记录打劫点
+              newKoPoint = {
+                x: capturedStones[0].x,
+                y: capturedStones[0].y,
+                player: player,
+              };
+            }
+          }
+
+          // 更新打劫标记
+          lastCapture = newKoPoint;
+
+          renderBoard();
+        }
+
+        // Find a connected group of stones and its liberties
+        function findGroup(x, y) {
+          const color = gameBoard[y][x];
+          if (color === null) return {stones: [], liberties: new Set()};
+
+          const visited = new Set();
+          const stones = [];
+          const liberties = new Set();
+
+          function visit(x, y) {
+            const key = `${x},${y}`;
+            if (visited.has(key)) return;
+            visited.add(key);
+
+            if (x < 0 || x >= boardSize || y < 0 || y >= boardSize) return;
+
+            if (gameBoard[y][x] === null) {
+              liberties.add(key);
+              return;
+            }
+
+            if (gameBoard[y][x] === color) {
+              stones.push({x, y});
+              visit(x - 1, y);
+              visit(x + 1, y);
+              visit(x, y - 1);
+              visit(x, y + 1);
+            }
+          }
+
+          visit(x, y);
+          return {stones, liberties};
+        }
+
+        // Pass turn
+        function passTurn() {
+          if (gameOver) return;
+
+          passCount++;
+          currentPlayer = currentPlayer === "black" ? "white" : "black";
+
+          // 重置打劫标记
+          lastCapture = null;
+
+          checkGameEnd();
+          updateStatus();
+
+          if (!gameOver && currentPlayer === "white") {
+            setTimeout(computerMove, 500);
+          }
+        }
+
+        // Check if the game has ended
+        function checkGameEnd() {
+          if (passCount >= 2) {
+            gameOver = true;
+            const scores = calculateScore();
+            if (scores.black > scores.white) {
+              statusDisplay.textContent = `Game over! Black wins ${scores.black} - ${scores.white}`;
+            } else if (scores.white > scores.black) {
+              statusDisplay.textContent = `Game over! White wins ${scores.white} - ${scores.black}`;
+            } else {
+              statusDisplay.textContent = `Game over! It's a tie ${scores.black} - ${scores.white}`;
+            }
+          }
+        }
+
+        // Calculate the score
+        function calculateScore() {
+          let blackCount = 0;
+          let whiteCount = 0;
+
+          for (let y = 0; y < boardSize; y++) {
+            for (let x = 0; x < boardSize; x++) {
+              if (gameBoard[y][x] === "black") {
+                blackCount++;
+              } else if (gameBoard[y][x] === "white") {
+                whiteCount++;
+              }
+            }
+          }
+
+          return {black: blackCount, white: whiteCount};
+        }
+
+        // Update the status display
+        function updateStatus() {
+          if (!gameOver) {
+            statusDisplay.textContent = `${
+              currentPlayer === "black" ? "Your" : "Computer's"
+            } turn (${
+              currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)
+            })`;
+          }
+        }
+
+        // Render the board based on the game state
+        function renderBoard() {
+          // 清除所有棋子
+          const existingStones = Array.from(board.querySelectorAll(".stone"));
+          existingStones.forEach((stone) => stone.remove());
+
+          // 添加棋子
+          const cellSize = 240 / (boardSize - 1);
+          for (let y = 0; y < boardSize; y++) {
+            for (let x = 0; x < boardSize; x++) {
+              if (gameBoard[y][x]) {
+                const stone = document.createElement("div");
+                stone.classList.add("stone", gameBoard[y][x]);
+                stone.style.left = x * cellSize + "px";
+                stone.style.top = y * cellSize + "px";
+                board.appendChild(stone);
+              }
+            }
+          }
+        }
+
+        // Reset the game
+        function resetGame() {
+          gameBoard = Array(boardSize)
+            .fill()
+            .map(() => Array(boardSize).fill(null));
+          currentPlayer = "black";
+          passCount = 0;
+          gameOver = false;
+          lastCapture = null;
+          renderBoard();
+          updateStatus();
+        }
+
+        // Event listeners
+        passButton.addEventListener("click", passTurn);
+        resetButton.addEventListener("click", resetGame);
+
+        // Initialize the game
+        createBoard();
+        updateStatus();
+      });
+    </script>
+  </body>
+</html>
