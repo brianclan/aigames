@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Students Crossing the Road</title>
+    <script type="module" crossorigin>
+(function(){const l=document.createElement("link").relList;if(l&&l.supports&&l.supports("modulepreload"))return;for(const t of document.querySelectorAll('link[rel="modulepreload"]'))n(t);new MutationObserver(t=>{for(const i of t)if(i.type==="childList")for(const r of i.addedNodes)r.tagName==="LINK"&&r.rel==="modulepreload"&&n(r)}).observe(document,{childList:!0,subtree:!0});function e(t){const i={};return t.integrity&&(i.integrity=t.integrity),t.referrerPolicy&&(i.referrerPolicy=t.referrerPolicy),t.crossOrigin==="use-credentials"?i.credentials="include":t.crossOrigin==="anonymous"?i.credentials="omit":i.credentials="same-origin",i}function n(t){if(t.ep)return;t.ep=!0;const i=e(t);fetch(t.href,i)}})();const w=document.getElementById("waiting-area"),h=document.getElementById("lane1"),v=document.getElementById("lane2"),I=document.getElementById("start-btn"),d=document.getElementById("cross-btn"),P=document.getElementById("score"),O=document.getElementById("fails"),T=document.getElementById("game-over"),N=document.getElementById("final-score"),F=document.getElementById("final-fails"),G=document.getElementById("restart-btn"),B=document.querySelector(".safe-area"),L=document.querySelector(".game-container");let c=!1,y=0,u=0,p=0,s=[],f=[],m=null,b=1,a=!1;function H(){return window.innerWidth<=800||"ontouchstart"in window||navigator.maxTouchPoints>0||navigator.msMaxTouchPoints>0}function R(){console.log("Game initialized"),a=H(),console.log(`Is mobile device: ${a}`),I.addEventListener("click",M),d.addEventListener("click",z),G.addEventListener("click",q),a&&(document.addEventListener("touchstart",function(o){o.target.tagName!=="BUTTON"&&o.preventDefault()},{passive:!1}),L.addEventListener("dblclick",W),document.addEventListener("contextmenu",function(o){o.preventDefault()},!1)),window.addEventListener("resize",C),C()}function W(){document.fullscreenElement?document.exitFullscreen&&document.exitFullscreen():document.documentElement.requestFullscreen().catch(o=>{console.log(`Fullscreen request failed: ${o.message}`)})}function C(){if(window.innerWidth<=600&&s.length>0){const l=s.filter(e=>e.position==="waiting");if(l.length>0){const e=x(l.length);l.forEach((n,t)=>{n.element.style.top=`${e[t]}px`})}}}function M(){console.log("Game started"),c=!0,y=0,u=0,p=0,b=1,S(),I.disabled=!0,d.disabled=!1,$(),D()}function q(){w.innerHTML="",h.innerHTML="",v.innerHTML="",B.innerHTML="",f.forEach(o=>clearInterval(o)),f=[],m&&clearTimeout(m),s=[],T.classList.add("hidden"),M()}const A=300;function x(o){const l=w.clientHeight,e=a?32:40,n=l*.1,t=l-2*n;if(o===1)return[n+t/2-e/2];const i=[],r=t/(o-1);for(let E=0;E<o;E++)i.push(n+E*r);return i}function $(){if(!c)return;const o=Math.floor(Math.random()*4)+1;console.log(`Spawning ${o} students`);const l=x(o);for(let n=0;n<o;n++){const t=document.createElement("div");t.className="student",t.id=`student-${p}`,a?t.style.left=`${L.clientWidth/2-15}px`:t.style.left=`${A}px`,t.style.top=`${l[n]}px`,w.appendChild(t),s.push({id:`student-${p}`,position:"waiting",element:t,verticalPosition:l[n]}),p++}s.length>0&&s.some(n=>n.position==="waiting")&&(d.disabled=!1);const e=2e3+Math.random()*5e3;m=setTimeout($,e)}function D(){console.log("Starting traffic"),g(h,"lane1"),g(v,"lane2");const o=setInterval(()=>{c&&(console.log("Spawning car in lane 1"),g(h,"lane1"))},a?3500:3e3),l=setInterval(()=>{c&&(console.log("Spawning car in lane 2"),g(v,"lane2"))},a?4500:4e3);f.push(o,l);const e=setInterval(()=>{if(!c){clearInterval(e);return}b+=.1,console.log(`Game speed increased to ${b}`)},3e4);f.push(e)}function g(o,l){console.log(`Spawning car in ${l}`);const e=document.createElement("div");e.className="car",e.style.left="-80px",o.appendChild(e);let n;l==="lane1"?(n=(2+Math.random()*2)*(a?.8:1),e.style.backgroundColor="#f44336"):(n=(3+Math.random()*3)*(a?.8:1),e.style.backgroundColor="#2196F3"),console.log(`Car created with speed ${n}`);const t=L.clientWidth;let i=-80;const r=setInterval(()=>{if(!c){clearInterval(r),e.remove();return}i+=n,e.style.left=`${i}px`,k(e,l),i>t&&(console.log("Car removed (out of screen)"),e.remove(),clearInterval(r))},20)}function k(o,l){const e=o.getBoundingClientRect();s.forEach(n=>{if(n.position===l){const t=n.element,i=t.getBoundingClientRect();e.left<i.right&&e.right>i.left&&e.top<i.bottom&&e.bottom>i.top&&(console.log("Collision detected!"),t.classList.add("crash"),n.position="crashed",a&&navigator.vibrate&&navigator.vibrate(200),u++,S(),setTimeout(()=>{t.remove(),s=s.filter(r=>r.id!==n.id),u>=5&&U()},1e3))}})}function z(){const o=s.filter(e=>e.position==="waiting");if(o.length===0)return;console.log(`${o.length} students crossing the road`),d.disabled=!0;const l=a?400:500;o.forEach(e=>{const n=e.element.style.left,t=e.element.style.top;e.position="lane2",v.appendChild(e.element),e.element.style.left=n,e.element.style.top=t,setTimeout(()=>{e.position!=="crashed"&&(e.position="lane1",h.appendChild(e.element),e.element.style.left=n,e.element.style.top=t,setTimeout(()=>{e.position!=="crashed"&&(e.position="safe",B.appendChild(e.element),e.element.style.left=n,e.element.style.top=t,y++,S(),console.log("Student safely crossed"),a&&navigator.vibrate&&navigator.vibrate([50,50,50]),setTimeout(()=>{e.element.remove(),s=s.filter(i=>i.id!==e.id)},1e3))},l))},l)}),setTimeout(()=>{const e=s.some(n=>n.position==="waiting");d.disabled=!e},1e3)}function S(){P.textContent=y,O.textContent=u}function U(){console.log("Game over"),c=!1,f.forEach(o=>clearInterval(o)),f=[],m&&clearTimeout(m),a&&navigator.vibrate&&navigator.vibrate([100,100,100,100,300]),N.textContent=y,F.textContent=u,T.classList.remove("hidden"),I.disabled=!1,d.disabled=!0}window.addEventListener("load",R);
+
+</script>
+    <style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background-color:#f0f0f0;touch-action:manipulation}.game-container{width:600px;height:550px;border:2px solid #333;border-radius:10px;overflow:hidden;position:relative;background-color:#fff;max-width:100%;max-height:90vh}.score-container{display:flex;justify-content:space-between;padding:10px 20px;background-color:#333;color:#fff;font-size:16px}.game-area{display:flex;flex-direction:column;height:450px;max-height:calc(90vh - 100px)}.waiting-area,.safe-area{position:relative}.waiting-area{height:150px;background-color:#97c281;border-top:2px dashed #333}.safe-area{height:100px;background-color:#97c281;border-bottom:2px dashed #333}.road{height:200px;background-color:#777;display:flex;flex-direction:column;position:relative}.lane{height:100px;border:1px solid white;position:relative;overflow:visible}.lane:first-child{border-bottom:5px dashed white}.control-panel{display:flex;justify-content:space-around;padding:10px;background-color:#ddd}button{padding:8px 16px;font-size:16px;cursor:pointer;background-color:#4caf50;color:#fff;border:none;border-radius:4px;min-height:44px;min-width:44px;touch-action:manipulation}button:disabled{background-color:#ccc;cursor:not-allowed}button:hover:not(:disabled){background-color:#45a049}.student{width:30px;height:40px;position:absolute;background-color:#ff9800;border-radius:50% 50% 0 0;z-index:10;transition:top .5s linear}.student:before{content:"";width:20px;height:20px;background-color:#ffcc80;border-radius:50%;position:absolute;top:-10px;left:5px}@keyframes walking{0%{transform:translateY(0)}25%{transform:translateY(-2px)}50%{transform:translateY(0)}75%{transform:translateY(2px)}to{transform:translateY(0)}}#lane1 .student,#lane2 .student{animation:walking .3s infinite}.car{position:absolute;height:30px;width:60px;background-color:#f44336;border-radius:5px;z-index:5;top:35px}.car:before{content:"";position:absolute;width:10px;height:5px;background-color:#ffeb3b;right:0;top:5px;border-radius:2px}.car:after{content:"";position:absolute;width:10px;height:5px;background-color:#ffeb3b;right:0;bottom:5px;border-radius:2px}.hidden{display:none}.game-over{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background-color:#ffffffe6;padding:20px;border-radius:10px;text-align:center;box-shadow:0 0 10px #00000080;z-index:100;width:80%;max-width:400px}.game-over h2{margin-bottom:15px;color:#333}.game-over p{margin-bottom:10px}.crash{animation:shake .5s;background-color:red!important}@keyframes shake{0%{transform:translate(0)}25%{transform:translate(-5px) rotate(-5deg)}50%{transform:translate(5px) rotate(5deg)}75%{transform:translate(-5px) rotate(-5deg)}to{transform:translate(0)}}@media (max-width: 600px){.game-container{width:100%;height:100vh;border-radius:0;border:none}.game-area{height:calc(100vh - 100px)}.waiting-area{height:25vh}.road{height:50vh}.lane,.safe-area{height:25vh}.score-container{padding:10px;font-size:14px}.control-panel{padding:5px}button{padding:10px 20px;font-size:18px}.student{width:24px;height:32px}.student:before{width:16px;height:16px;top:-8px;left:4px}.car{height:24px;width:48px}}
+
+</style>
+  </head>
+  <body>
+    <div class="game-container">
+      <div class="score-container">
+        <span>Safe Crossings: <span id="score">0</span></span>
+        <span>Accidents: <span id="fails">0</span></span>
+      </div>
+
+      <div class="game-area">
+        <div class="safe-area">
+          <!-- Safe area, the destination for crossing -->
+        </div>
+
+        <div class="road">
+          <div class="lane" id="lane1"></div>
+          <div class="lane" id="lane2"></div>
+        </div>
+
+        <div class="waiting-area" id="waiting-area">
+          <!-- Waiting area, where students will appear -->
+        </div>
+      </div>
+
+      <div class="control-panel">
+        <button id="start-btn">Start Game</button>
+        <button id="cross-btn" disabled>Cross Road</button>
+      </div>
+    </div>
+
+    <div class="game-over hidden" id="game-over">
+      <h2>Game Over</h2>
+      <p>You helped <span id="final-score">0</span> students cross safely</p>
+      <p><span id="final-fails">0</span> students had accidents</p>
+      <button id="restart-btn">Play Again</button>
+    </div>
+
+  </body>
+</html>
