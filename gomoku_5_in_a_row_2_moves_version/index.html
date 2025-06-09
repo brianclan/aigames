@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Move Gomoku</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f5dc;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        #game-info {
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        #board-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        #board {
+            background-color: #dcb35c;
+            border: 2px solid #8b4513;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        #controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #move-counter {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        #instructions {
+            max-width: 500px;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Double Move Gomoku</h1>
+    <div id="game-info">Your turn (Black)</div>
+    <div id="move-counter">Moves left this turn: 2</div>
+    <div id="board-container">
+        <canvas id="board"></canvas>
+    </div>
+    <div id="controls">
+        <button id="undo-btn">Undo Move</button>
+        <button id="restart-btn">Restart Game</button>
+    </div>
+    <div id="instructions">
+        <h3>How to Play:</h3>
+        <p>1. Each player places TWO stones per turn (alternating colors)</p>
+        <p>2. First to get 5 stones in a row (horizontally, vertically or diagonally) wins</p>
+        <p>3. You play as Black, the AI is White</p>
+        <p>4. Click on the board to place your stones</p>
+    </div>
+
+    <script>
+        // Game constants
+        const BOARD_SIZE = 15;
+        const CELL_SIZE = 30;
+        const STONE_RADIUS = 13;
+        const BOARD_PADDING = 20;
+        
+        // Game variables
+        let board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+        let currentPlayer = 1; // 1 for black (player), 2 for white (AI)
+        let movesThisTurn = 0;
+        let gameOver = false;
+        let moveHistory = [];
+        
+        // DOM elements
+        const canvas = document.getElementById('board');
+        const ctx = canvas.getContext('2d');
+        const gameInfo = document.getElementById('game-info');
+        const moveCounter = document.getElementById('move-counter');
+        const undoBtn = document.getElementById('undo-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        
+        // Initialize board
+        function initBoard() {
+            canvas.width = BOARD_SIZE * CELL_SIZE + BOARD_PADDING * 2;
+            canvas.height = BOARD_SIZE * CELL_SIZE + BOARD_PADDING * 2;
+            
+            drawBoard();
+        }
+        
+        // Draw the empty board
+        function drawBoard() {
+            // Draw background
+            ctx.fillStyle = '#dcb35c';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                // Horizontal lines
+                ctx.beginPath();
+                ctx.moveTo(BOARD_PADDING, BOARD_PADDING + i * CELL_SIZE);
+                ctx.lineTo(BOARD_PADDING + (BOARD_SIZE - 1) * CELL_SIZE, BOARD_PADDING + i * CELL_SIZE);
+                ctx.stroke();
+                
+                // Vertical lines
+                ctx.beginPath();
+                ctx.moveTo(BOARD_PADDING + i * CELL_SIZE, BOARD_PADDING);
+                ctx.lineTo(BOARD_PADDING + i * CELL_SIZE, BOARD_PADDING + (BOARD_SIZE - 1) * CELL_SIZE);
+                ctx.stroke();
+            }
+            
+            // Draw stones
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (board[y][x] !== 0) {
+                        drawStone(x, y, board[y][x]);
+                    }
+                }
+            }
+        }
+        
+        // Draw a stone at position (x, y)
+        function drawStone(x, y, player) {
+            const centerX = BOARD_PADDING + x * CELL_SIZE;
+            const centerY = BOARD_PADDING + y * CELL_SIZE;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, STONE_RADIUS, 0, Math.PI * 2);
+            
+            if (player === 1) {
+                // Black stone
+                ctx.fillStyle = '#000';
+                ctx.fill();
+            } else {
+                // White stone
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+        
+        // Handle click on board
+        function handleClick(event) {
+            if (gameOver || currentPlayer !== 1) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((event.clientX - rect.left - BOARD_PADDING + CELL_SIZE / 2) / CELL_SIZE);
+            const y = Math.floor((event.clientY - rect.top - BOARD_PADDING + CELL_SIZE / 2) / CELL_SIZE);
+            
+            // Check if move is valid
+            if (x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE && board[y][x] === 0) {
+                // Make move
+                board[y][x] = currentPlayer;
+                moveHistory.push({x, y, player: currentPlayer});
+                drawStone(x, y, currentPlayer);
+                movesThisTurn++;
+                moveCounter.textContent = `Moves left this turn: ${2 - movesThisTurn}`;
+                
+                // Check for win after each move
+                if (checkWin(x, y, currentPlayer)) {
+                    gameOver = true;
+                    gameInfo.textContent = currentPlayer === 1 ? "You win!" : "AI wins!";
+                    return;
+                }
+                
+                // Check if turn is complete
+                if (movesThisTurn >= 2) {
+                    movesThisTurn = 0;
+                    currentPlayer = 3 - currentPlayer; // Switch player (1->2 or 2->1)
+                    gameInfo.textContent = currentPlayer === 1 ? "Your turn (Black)" : "AI thinking...";
+                    moveCounter.textContent = "Moves left this turn: 2";
+                    
+                    // AI move
+                    if (currentPlayer === 2 && !gameOver) {
+                        setTimeout(aiMove, 500);
+                    }
+                }
+            }
+        }
+        
+        // AI makes its moves
+        function aiMove() {
+            if (gameOver) return;
+            
+            let movesMade = 0;
+            
+            // First move - try to find winning move or block player
+            let bestMove = findBestMove();
+            if (bestMove) {
+                makeAIMove(bestMove.x, bestMove.y);
+                movesMade++;
+            }
+            
+            // Second move - if first move was made, find another good move
+            if (movesMade === 1 && movesThisTurn < 2) {
+                bestMove = findBestMove();
+                if (bestMove) {
+                    makeAIMove(bestMove.x, bestMove.y);
+                    movesMade++;
+                }
+            }
+            
+            // If no strategic moves, make random moves
+            while (movesMade < 2 && movesThisTurn < 2) {
+                const emptyCells = [];
+                for (let y = 0; y < BOARD_SIZE; y++) {
+                    for (let x = 0; x < BOARD_SIZE; x++) {
+                        if (board[y][x] === 0) {
+                            emptyCells.push({x, y});
+                        }
+                    }
+                }
+                
+                if (emptyCells.length > 0) {
+                    const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                    makeAIMove(randomCell.x, randomCell.y);
+                    movesMade++;
+                } else {
+                    break; // board is full
+                }
+            }
+            
+            // After AI moves, switch back to player
+            if (movesThisTurn >= 2) {
+                movesThisTurn = 0;
+                currentPlayer = 3 - currentPlayer;
+                gameInfo.textContent = currentPlayer === 1 ? "Your turn (Black)" : "AI thinking...";
+                moveCounter.textContent = "Moves left this turn: 2";
+            }
+        }
+        
+        // AI makes a move at (x, y)
+        function makeAIMove(x, y) {
+            board[y][x] = currentPlayer;
+            moveHistory.push({x, y, player: currentPlayer});
+            drawStone(x, y, currentPlayer);
+            movesThisTurn++;
+            moveCounter.textContent = `Moves left this turn: ${2 - movesThisTurn}`;
+            
+            if (checkWin(x, y, currentPlayer)) {
+                gameOver = true;
+                gameInfo.textContent = currentPlayer === 1 ? "You win!" : "AI wins!";
+            }
+        }
+        
+        // Find the best move for AI
+        function findBestMove() {
+            // First check if AI can win immediately
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (board[y][x] === 0) {
+                        board[y][x] = 2;
+                        if (checkWin(x, y, 2)) {
+                            board[y][x] = 0; // undo test move
+                            return {x, y};
+                        }
+                        board[y][x] = 0;
+                    }
+                }
+            }
+            
+            // Check if player is about to win and block
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (board[y][x] === 0) {
+                        board[y][x] = 1;
+                        if (checkWin(x, y, 1)) {
+                            board[y][x] = 0; // undo test move
+                            return {x, y};
+                        }
+                        board[y][x] = 0;
+                    }
+                }
+            }
+            
+            // Look for strategic positions (simple heuristic)
+            let bestScore = -1;
+            let bestMove = null;
+            
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (board[y][x] === 0) {
+                        const score = evaluatePosition(x, y, 2);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMove = {x, y};
+                        }
+                    }
+                }
+            }
+            
+            return bestMove;
+        }
+        
+        // Evaluate how good a position is for a player
+        function evaluatePosition(x, y, player) {
+            let score = 0;
+            const opponent = 3 - player;
+            
+            // Check all 4 directions
+            const directions = [
+                [1, 0],   // horizontal
+                [0, 1],   // vertical
+                [1, 1],   // diagonal down-right
+                [1, -1]   // diagonal up-right
+            ];
+            
+            for (const [dx, dy] of directions) {
+                let playerCount = 1; // the current empty position we're evaluating
+                let openEnds = 0;
+                
+                // Check in positive direction
+                let blocked = false;
+                for (let i = 1; i <= 4; i++) {
+                    const nx = x + i * dx;
+                    const ny = y + i * dy;
+                    
+                    if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
+                        blocked = true;
+                        break;
+                    }
+                    
+                    if (board[ny][nx] === player) {
+                        playerCount++;
+                    } else if (board[ny][nx] === opponent) {
+                        blocked = true;
+                        break;
+                    } else {
+                        openEnds++;
+                        break;
+                    }
+                }
+                
+                // Check in negative direction
+                for (let i = 1; i <= 4; i++) {
+                    const nx = x - i * dx;
+                    const ny = y - i * dy;
+                    
+                    if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
+                        blocked = true;
+                        break;
+                    }
+                    
+                    if (board[ny][nx] === player) {
+                        playerCount++;
+                    } else if (board[ny][nx] === opponent) {
+                        blocked = true;
+                        break;
+                    } else {
+                        openEnds++;
+                        break;
+                    }
+                }
+                
+                // Score based on consecutive stones
+                if (!blocked) {
+                    if (playerCount >= 4) score += 1000;
+                    else if (playerCount === 3 && openEnds >= 1) score += 100;
+                    else if (playerCount === 2 && openEnds >= 1) score += 10;
+                    else if (playerCount === 1) score += 1;
+                }
+                
+                // Also consider opponent's potential
+                playerCount = 1;
+                openEnds = 0;
+                blocked = false;
+                
+                // Check in positive direction for opponent
+                for (let i = 1; i <= 4; i++) {
+                    const nx = x + i * dx;
+                    const ny = y + i * dy;
+                    
+                    if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
+                        blocked = true;
+                        break;
+                    }
+                    
+                    if (board[ny][nx] === opponent) {
+                        playerCount++;
+                    } else if (board[ny][nx] === player) {
+                        blocked = true;
+                        break;
+                    } else {
+                        openEnds++;
+                        break;
+                    }
+                }
+                
+                // Check in negative direction for opponent
+                for (let i = 1; i <= 4; i++) {
+                    const nx = x - i * dx;
+                    const ny = y - i * dy;
+                    
+                    if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) {
+                        blocked = true;
+                        break;
+                    }
+                    
+                    if (board[ny][nx] === opponent) {
+                        playerCount++;
+                    } else if (board[ny][nx] === player) {
+                        blocked = true;
+                        break;
+                    } else {
+                        openEnds++;
+                        break;
+                    }
+                }
+                
+                // Score based on opponent's consecutive stones (we want to block)
+                if (!blocked) {
+                    if (playerCount >= 4) score += 500;
+                    else if (playerCount === 3 && openEnds >= 1) score += 50;
+                    else if (playerCount === 2 && openEnds >= 1) score += 5;
+                }
+            }
+            
+            return score;
+        }
+        
+        // Check if the last move resulted in a win
+        function checkWin(x, y, player) {
+            const directions = [
+                [1, 0],   // horizontal
+                [0, 1],   // vertical
+                [1, 1],   // diagonal down-right
+                [1, -1]   // diagonal up-right
+            ];
+            
+            for (const [dx, dy] of directions) {
+                let count = 1;
+                
+                // Check in positive direction
+                for (let i = 1; i <= 4; i++) {
+                    const nx = x + i * dx;
+                    const ny = y + i * dy;
+                    
+                    if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE || board[ny][nx] !== player) {
+                        break;
+                    }
+                    count++;
+                }
+                
+                // Check in negative direction
+                for (let i = 1; i <= 4; i++) {
+                    const nx = x - i * dx;
+                    const ny = y - i * dy;
+                    
+                    if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE || board[ny][nx] !== player) {
+                        break;
+                    }
+                    count++;
+                }
+                
+                if (count >= 5) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        // Undo the last move
+        function undoMove() {
+            if (moveHistory.length === 0 || gameOver) return;
+            
+            // Undo up to 2 moves to go back to player's turn
+            let movesUndone = 0;
+            while (movesUndone < 2 && moveHistory.length > 0) {
+                const lastMove = moveHistory.pop();
+                board[lastMove.y][lastMove.x] = 0;
+                movesUndone++;
+                
+                // If we've undone one of the player's moves, it's still their turn
+                if (lastMove.player === 1) {
+                    currentPlayer = 1;
+                }
+            }
+            
+            // Reset turn counter
+            movesThisTurn = 0;
+            gameOver = false;
+            gameInfo.textContent = "Your turn (Black)";
+            moveCounter.textContent = "Moves left this turn: 2";
+            
+            // Redraw board
+            drawBoard();
+        }
+        
+        // Restart the game
+        function restartGame() {
+            board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0));
+            currentPlayer = 1;
+            movesThisTurn = 0;
+            gameOver = false;
+            moveHistory = [];
+            
+            gameInfo.textContent = "Your turn (Black)";
+            moveCounter.textContent = "Moves left this turn: 2";
+            
+            drawBoard();
+        }
+        
+        // Event listeners
+        canvas.addEventListener('click', handleClick);
+        undoBtn.addEventListener('click', undoMove);
+        restartBtn.addEventListener('click', restartGame);
+        
+        // Initialize the game
+        initBoard();
+    </script>
+</body>
+</html>
