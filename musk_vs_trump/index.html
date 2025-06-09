@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Musk vs Trump: Epic Showdown</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #1a2a6c, #b21f1f, #fdbb2d);
+            font-family: 'Arial', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #gameCanvas {
+            display: block;
+        }
+        
+        #healthBars {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        
+        .health-bar {
+            width: 40%;
+            height: 30px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        #elonHealth {
+            background: linear-gradient(to right, #00ff00, #00cc00);
+            width: 100%;
+            height: 100%;
+            transition: width 0.3s;
+        }
+        
+        #trumpHealth {
+            background: linear-gradient(to right, #ff0000, #cc0000);
+            width: 100%;
+            height: 100%;
+            transition: width 0.3s;
+        }
+        
+        .name-tag {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            margin-bottom: 5px;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            border: 3px solid white;
+        }
+        
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+        }
+        
+        #startScreen h1 {
+            font-size: 48px;
+            color: #ffcc00;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #ff6600;
+        }
+        
+        #startBtn {
+            padding: 15px 30px;
+            font-size: 24px;
+            background-color: #ff6600;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 30px;
+        }
+        
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 0 0 10px #000;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 50;
+        }
+        
+        #specialMeter {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #specialBar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #00ccff, #0066ff);
+            transition: width 0.3s;
+        }
+        
+        #specialLabel {
+            position: absolute;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 16px;
+            text-shadow: 0 0 5px #000;
+        }
+        
+        @media (max-width: 768px) {
+            .control-btn {
+                width: 60px;
+                height: 60px;
+                font-size: 18px;
+            }
+            
+            #controls {
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="healthBars">
+            <div style="text-align: left;">
+                <div class="name-tag">Elon Musk</div>
+                <div class="health-bar">
+                    <div id="elonHealth"></div>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div class="name-tag">Donald Trump</div>
+                <div class="health-bar">
+                    <div id="trumpHealth"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="specialMeter">
+            <div id="specialBar"></div>
+        </div>
+        <div id="specialLabel">SPECIAL ATTACK METER</div>
+        
+        <div id="controls">
+            <div class="control-btn" id="leftBtn">←</div>
+            <div class="control-btn" id="rightBtn">→</div>
+            <div class="control-btn" id="jumpBtn">↑</div>
+            <div class="control-btn" id="punchBtn">PUNCH</div>
+            <div class="control-btn" id="specialBtn">SPECIAL</div>
+        </div>
+        
+        <div id="message"></div>
+        
+        <div id="startScreen">
+            <h1>MUSK vs TRUMP</h1>
+            <p>The Ultimate Billionaire Showdown</p>
+            <button id="startBtn">START FIGHT</button>
+        </div>
+    </div>
+
+    <script>
+        // Game setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const startBtn = document.getElementById('startBtn');
+        const messageDiv = document.getElementById('message');
+        
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Game state
+        let gameRunning = false;
+        let gameOver = false;
+        let specialMeter = 0;
+        
+        // Characters
+        const elon = {
+            x: canvas.width * 0.25,
+            y: canvas.height - 150,
+            width: 80,
+            height: 150,
+            velocityX: 0,
+            velocityY: 0,
+            speed: 5,
+            jumpPower: 15,
+            health: 100,
+            facingRight: true,
+            isJumping: false,
+            isPunching: false,
+            punchFrame: 0,
+            specialReady: false,
+            
+            draw: function() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                if (!this.facingRight) {
+                    ctx.scale(-1, 1);
+                }
+                
+                // Body
+                ctx.fillStyle = '#e0e0e0';
+                ctx.fillRect(-this.width/2, -this.height, this.width, this.height);
+                
+                // Head
+                ctx.fillStyle = '#ffcc99';
+                ctx.beginPath();
+                ctx.arc(0, -this.height - 30, 30, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Hair (bald spot)
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(0, -this.height - 40, 20, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Eyes
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(-10, -this.height - 35, 5, 0, Math.PI * 2);
+                ctx.arc(10, -this.height - 35, 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Mouth (smirk)
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, -this.height - 20, 10, 0, Math.PI);
+                ctx.stroke();
+                
+                // Tesla logo on chest
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height + 30);
+                ctx.lineTo(-15, -this.height + 60);
+                ctx.lineTo(15, -this.height + 60);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Punch animation
+                if (this.isPunching) {
+                    ctx.fillStyle = '#ffffff';
+                    if (this.punchFrame < 5) {
+                        ctx.fillRect(this.width/2, -this.height + 50, 30 + this.punchFrame * 5, 20);
+                    } else {
+                        ctx.fillRect(this.width/2, -this.height + 50, 55 - (this.punchFrame-5) * 5, 20);
+                    }
+                    
+                    this.punchFrame++;
+                    if (this.punchFrame >= 10) {
+                        this.isPunching = false;
+                        this.punchFrame = 0;
+                    }
+                }
+                
+                ctx.restore();
+            },
+            
+            update: function() {
+                // Apply gravity
+                this.velocityY += 0.8;
+                
+                // Update position
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+                
+                // Boundary check
+                if (this.x < this.width/2) this.x = this.width/2;
+                if (this.x > canvas.width - this.width/2) this.x = canvas.width - this.width/2;
+                
+                // Ground check
+                if (this.y > canvas.height - 150) {
+                    this.y = canvas.height - 150;
+                    this.velocityY = 0;
+                    this.isJumping = false;
+                }
+                
+                // Check punch hit
+                if (this.isPunching && this.punchFrame === 5) {
+                    const punchX = this.facingRight ? this.x + this.width/2 + 30 : this.x - this.width/2 - 30;
+                    const punchY = this.y - this.height + 70;
+                    
+                    if (Math.abs(punchX - trump.x) < 60 && Math.abs(punchY - (trump.y - trump.height + 70)) < 80) {
+                        trump.takeDamage(10);
+                        specialMeter += 5;
+                        if (specialMeter > 100) specialMeter = 100;
+                        updateSpecialMeter();
+                    }
+                }
+            },
+            
+            moveLeft: function() {
+                this.velocityX = -this.speed;
+                this.facingRight = false;
+            },
+            
+            moveRight: function() {
+                this.velocityX = this.speed;
+                this.facingRight = true;
+            },
+            
+            stopMoving: function() {
+                this.velocityX = 0;
+            },
+            
+            jump: function() {
+                if (!this.isJumping) {
+                    this.velocityY = -this.jumpPower;
+                    this.isJumping = true;
+                }
+            },
+            
+            punch: function() {
+                if (!this.isPunching) {
+                    this.isPunching = true;
+                    this.punchFrame = 0;
+                }
+            },
+            
+            specialAttack: function() {
+                if (this.specialReady) {
+                    this.specialReady = false;
+                    specialMeter = 0;
+                    updateSpecialMeter();
+                    
+                    // Elon's special: Tesla Cyberwhirl
+                    showMessage("TESLA CYBERWHIRL!", "#00ccff");
+                    
+                    // Create spinning Tesla logo projectiles
+                    for (let i = 0; i < 3; i++) {
+                        setTimeout(() => {
+                            const projectile = {
+                                x: this.x,
+                                y: this.y - this.height + 50,
+                                radius: 20,
+                                speed: this.facingRight ? 10 : -10,
+                                rotation: 0,
+                                rotationSpeed: 0.2,
+                                
+                                update: function() {
+                                    this.x += this.speed;
+                                    this.rotation += this.rotationSpeed;
+                                    
+                                    // Check hit
+                                    if (Math.abs(this.x - trump.x) < 50 && Math.abs(this.y - trump.y + trump.height/2) < 80) {
+                                        trump.takeDamage(15);
+                                        return true; // hit
+                                    }
+                                    
+                                    // Check out of bounds
+                                    if (this.x < 0 || this.x > canvas.width) {
+                                        return true; // remove
+                                    }
+                                    
+                                    return false; // continue
+                                },
+                                
+                                draw: function() {
+                                    ctx.save();
+                                    ctx.translate(this.x, this.y);
+                                    ctx.rotate(this.rotation);
+                                    
+                                    // Tesla logo
+                                    ctx.fillStyle = '#ff0000';
+                                    ctx.beginPath();
+                                    ctx.moveTo(0, -this.radius);
+                                    ctx.lineTo(-this.radius/2, this.radius/2);
+                                    ctx.lineTo(this.radius/2, this.radius/2);
+                                    ctx.closePath();
+                                    ctx.fill();
+                                    
+                                    ctx.restore();
+                                }
+                            };
+                            
+                            projectiles.push(projectile);
+                        }, i * 200);
+                    }
+                }
+            },
+            
+            takeDamage: function(amount) {
+                this.health -= amount;
+                if (this.health < 0) this.health = 0;
+                document.getElementById('elonHealth').style.width = this.health + '%';
+                
+                if (this.health <= 0) {
+                    gameOver = true;
+                    showMessage("TRUMP WINS!", "#ff0000");
+                }
+            }
+        };
+        
+        const trump = {
+            x: canvas.width * 0.75,
+            y: canvas.height - 150,
+            width: 80,
+            height: 150,
+            velocityX: 0,
+            velocityY: 0,
+            speed: 4,
+            jumpPower: 12,
+            health: 100,
+            facingLeft: true,
+            isJumping: false,
+            isPunching: false,
+            punchFrame: 0,
+            aiTimer: 0,
+            
+            draw: function() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                if (!this.facingLeft) {
+                    ctx.scale(-1, 1);
+                }
+                
+                // Body (in suit)
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(-this.width/2, -this.height, this.width, this.height - 30);
+                
+                // Pants
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(-this.width/2, -30, this.width, 30);
+                
+                // Tie
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(-10, -this.height + 20, 20, 40);
+                
+                // Head
+                ctx.fillStyle = '#ffcc99';
+                ctx.beginPath();
+                ctx.arc(0, -this.height - 30, 30, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Hair
+                ctx.fillStyle = '#ffff99';
+                ctx.beginPath();
+                ctx.moveTo(-25, -this.height - 50);
+                ctx.quadraticCurveTo(0, -this.height - 70, 25, -this.height - 50);
+                ctx.quadraticCurveTo(0, -this.height - 40, -25, -this.height - 50);
+                ctx.fill();
+                
+                // Eyes
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(-10, -this.height - 35, 5, 0, Math.PI * 2);
+                ctx.arc(10, -this.height - 35, 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Mouth (angry)
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, -this.height - 20, 10, 0.1 * Math.PI, 0.9 * Math.PI);
+                ctx.stroke();
+                
+                // Punch animation
+                if (this.isPunching) {
+                    ctx.fillStyle = '#ffffff';
+                    if (this.punchFrame < 5) {
+                        ctx.fillRect(this.width/2, -this.height + 50, 30 + this.punchFrame * 5, 20);
+                    } else {
+                        ctx.fillRect(this.width/2, -this.height + 50, 55 - (this.punchFrame-5) * 5, 20);
+                    }
+                    
+                    this.punchFrame++;
+                    if (this.punchFrame >= 10) {
+                        this.isPunching = false;
+                        this.punchFrame = 0;
+                    }
+                }
+                
+                ctx.restore();
+            },
+            
+            update: function() {
+                // AI behavior
+                this.aiTimer++;
+                if (this.aiTimer > 60) { // Change behavior every second
+                    this.aiTimer = 0;
+                    const rand = Math.random();
+                    
+                    if (rand < 0.3) {
+                        // Move toward Elon
+                        if (this.x < elon.x) {
+                            this.velocityX = this.speed;
+                            this.facingLeft = false;
+                        } else {
+                            this.velocityX = -this.speed;
+                            this.facingLeft = true;
+                        }
+                    } else if (rand < 0.4) {
+                        // Jump
+                        this.jump();
+                    } else if (rand < 0.6) {
+                        // Punch
+                        this.punch();
+                    } else {
+                        // Stop moving
+                        this.velocityX = 0;
+                    }
+                }
+                
+                // Apply gravity
+                this.velocityY += 0.8;
+                
+                // Update position
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+                
+                // Boundary check
+                if (this.x < this.width/2) this.x = this.width/2;
+                if (this.x > canvas.width - this.width/2) this.x = canvas.width - this.width/2;
+                
+                // Ground check
+                if (this.y > canvas.height - 150) {
+                    this.y = canvas.height - 150;
+                    this.velocityY = 0;
+                    this.isJumping = false;
+                }
+                
+                // Check punch hit
+                if (this.isPunching && this.punchFrame === 5) {
+                    const punchX = this.facingLeft ? this.x - this.width/2 - 30 : this.x + this.width/2 + 30;
+                    const punchY = this.y - this.height + 70;
+                    
+                    if (Math.abs(punchX - elon.x) < 60 && Math.abs(punchY - (elon.y - elon.height + 70)) < 80) {
+                        elon.takeDamage(10);
+                        specialMeter += 5;
+                        if (specialMeter > 100) specialMeter = 100;
+                        updateSpecialMeter();
+                    }
+                }
+            },
+            
+            jump: function() {
+                if (!this.isJumping) {
+                    this.velocityY = -this.jumpPower;
+                    this.isJumping = true;
+                }
+            },
+            
+            punch: function() {
+                if (!this.isPunching) {
+                    this.isPunching = true;
+                    this.punchFrame = 0;
+                }
+            },
+            
+            takeDamage: function(amount) {
+                this.health -= amount;
+                if (this.health < 0) this.health = 0;
+                document.getElementById('trumpHealth').style.width = this.health + '%';
+                
+                if (this.health <= 0) {
+                    gameOver = true;
+                    showMessage("MUSK WINS!", "#00ccff");
+                }
+            }
+        };
+        
+        // Projectiles
+        let projectiles = [];
+        
+        // Game loop
+        function gameLoop() {
+            if (!gameRunning || gameOver) return;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background (gradient is set in CSS)
+            
+            // Update characters
+            elon.update();
+            trump.update();
+            
+            // Update and draw projectiles
+            projectiles = projectiles.filter(projectile => {
+                const shouldRemove = projectile.update();
+                projectile.draw();
+                return !shouldRemove;
+            });
+            
+            // Draw characters
+            elon.draw();
+            trump.draw();
+            
+            // Check special meter
+            if (specialMeter >= 100 && !elon.specialReady) {
+                elon.specialReady = true;
+                document.getElementById('specialBtn').style.backgroundColor = '#ff6600';
+            }
+            
+            // Continue loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // UI functions
+        function updateSpecialMeter() {
+            document.getElementById('specialBar').style.width = specialMeter + '%';
+        }
+        
+        function showMessage(text, color) {
+            messageDiv.textContent = text;
+            messageDiv.style.color = color;
+            messageDiv.style.opacity = 1;
+            
+            setTimeout(() => {
+                messageDiv.style.opacity = 0;
+            }, 2000);
+        }
+        
+        // Event listeners
+        startBtn.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            gameRunning = true;
+            gameLoop();
+        });
+        
+        // Control buttons
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const jumpBtn = document.getElementById('jumpBtn');
+        const punchBtn = document.getElementById('punchBtn');
+        const specialBtn = document.getElementById('specialBtn');
+        
+        leftBtn.addEventListener('mousedown', () => elon.moveLeft());
+        leftBtn.addEventListener('touchstart', () => elon.moveLeft());
+        
+        rightBtn.addEventListener('mousedown', () => elon.moveRight());
+        rightBtn.addEventListener('touchstart', () => elon.moveRight());
+        
+        jumpBtn.addEventListener('click', () => elon.jump());
+        punchBtn.addEventListener('click', () => elon.punch());
+        specialBtn.addEventListener('click', () => elon.specialAttack());
+        
+        // Stop moving when buttons are released
+        document.addEventListener('mouseup', () => elon.stopMoving());
+        document.addEventListener('touchend', () => elon.stopMoving());
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    elon.moveLeft();
+                    break;
+                case 'ArrowRight':
+                    elon.moveRight();
+                    break;
+                case 'ArrowUp':
+                case ' ':
+                    elon.jump();
+                    break;
+                case 'a':
+                case 'A':
+                    elon.punch();
+                    break;
+                case 's':
+                case 'S':
+                    elon.specialAttack();
+                    break;
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                elon.stopMoving();
+            }
+        });
+    </script>
+</body>
+</html>
