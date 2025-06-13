@@ -733,10 +733,7 @@
       @media (max-width: 600px) {
         .game-board {
           grid-template-columns: repeat(6, 1fr);
-          grid-template-rows: repeat(2, auto);
           gap: 6px;
-          max-height: 132px;
-          overflow-y: auto;
         }
         .card {
           min-height: 60px;
@@ -749,16 +746,11 @@
           margin: 2px 0;
           height: 20px;
         }
-        .card:nth-child(n + 13) {
-          display: none;
-        }
       }
       @media (max-width: 480px) {
         .game-board {
           grid-template-columns: repeat(6, 1fr);
-          grid-template-rows: repeat(2, auto);
           gap: 5px;
-          max-height: 110px;
         }
         h1 {
           font-size: 1.6rem;
@@ -781,11 +773,6 @@
       @media (max-width: 350px) {
         .game-board {
           grid-template-columns: repeat(3, 1fr);
-          grid-template-rows: repeat(4, auto);
-          max-height: none;
-        }
-        .card:nth-child(n + 13) {
-          display: flex;
         }
       }
       @keyframes correct-pulse {
