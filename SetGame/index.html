@@ -10,40 +10,80 @@
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3424102604992913"
       crossorigin="anonymous"
     ></script>
+    <style>
+      /* 插屏广告样式 */
+      .interstitial-ad-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 5000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        display: none;
+      }
+
+      .interstitial-ad-container {
+        background-color: #fff;
+        padding: 10px;
+        border-radius: 10px;
+        width: 320px;
+        height: 280px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+
+      .countdown-timer {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        color: white;
+        font-size: 18px;
+        font-weight: bold;
+      }
+    </style>
     <script type="module" crossorigin>
       (function () {
-        const m = document.createElement("link").relList;
-        if (m && m.supports && m.supports("modulepreload")) return;
-        for (const a of document.querySelectorAll('link[rel="modulepreload"]'))
-          p(a);
-        new MutationObserver((a) => {
-          for (const r of a)
-            if (r.type === "childList")
-              for (const f of r.addedNodes)
-                f.tagName === "LINK" && f.rel === "modulepreload" && p(f);
+        const b = document.createElement("link").relList;
+        if (b && b.supports && b.supports("modulepreload")) return;
+        for (const i of document.querySelectorAll('link[rel="modulepreload"]'))
+          x(i);
+        new MutationObserver((i) => {
+          for (const c of i)
+            if (c.type === "childList")
+              for (const k of c.addedNodes)
+                k.tagName === "LINK" && k.rel === "modulepreload" && x(k);
         }).observe(document, {childList: !0, subtree: !0});
-        function y(a) {
-          const r = {};
+        function T(i) {
+          const c = {};
           return (
-            a.integrity && (r.integrity = a.integrity),
-            a.referrerPolicy && (r.referrerPolicy = a.referrerPolicy),
-            a.crossOrigin === "use-credentials"
-              ? (r.credentials = "include")
-              : a.crossOrigin === "anonymous"
-              ? (r.credentials = "omit")
-              : (r.credentials = "same-origin"),
-            r
+            i.integrity && (c.integrity = i.integrity),
+            i.referrerPolicy && (c.referrerPolicy = i.referrerPolicy),
+            i.crossOrigin === "use-credentials"
+              ? (c.credentials = "include")
+              : i.crossOrigin === "anonymous"
+              ? (c.credentials = "omit")
+              : (c.credentials = "same-origin"),
+            c
           );
         }
-        function p(a) {
-          if (a.ep) return;
-          a.ep = !0;
-          const r = y(a);
-          fetch(a.href, r);
+        function x(i) {
+          if (i.ep) return;
+          i.ep = !0;
+          const c = T(i);
+          fetch(i.href, c);
         }
       })();
       document.addEventListener("DOMContentLoaded", () => {
-        const t = {
+        const e = {
             deck: [],
             cardsInPlay: [],
             selectedCards: [],
@@ -52,343 +92,717 @@
             introShown: !1,
             gameStarted: !1,
           },
-          m = ["red", "green", "purple"],
-          y = ["oval", "triangle", "rectangle"],
-          p = [1, 2, 3],
-          a = ["solid", "striped", "open"],
-          r = document.getElementById("game-board"),
-          f = document.getElementById("score"),
-          x = document.getElementById("remaining"),
-          g = document.getElementById("deal-cards"),
-          P = document.getElementById("find-set"),
-          w = document.getElementById("restart"),
-          B = document.getElementById("show-help"),
-          i = document.getElementById("intro-overlay"),
-          S = document.getElementById("start-game"),
-          O = document.getElementById("dont-show-again"),
-          T = document.getElementById("help-button");
-        $(),
-          g.addEventListener("click", M),
-          P.addEventListener("click", _),
-          w.addEventListener("click", k),
-          B.addEventListener("click", v),
-          S.addEventListener("click", C),
-          T.addEventListener("click", v);
-        function $() {
-          localStorage.getItem("set_game_played") ? (C(!0), h()) : (h(), v());
+          b = ["red", "green", "purple"],
+          T = ["oval", "triangle", "rectangle"],
+          x = [1, 2, 3],
+          i = ["solid", "striped", "open"],
+          c = document.getElementById("game-board"),
+          k = document.getElementById("score"),
+          G = document.getElementById("remaining"),
+          v = document.getElementById("deal-cards"),
+          D = document.getElementById("find-set"),
+          H = document.getElementById("restart"),
+          _ = document.getElementById("show-help"),
+          u = document.getElementById("intro-overlay"),
+          j = document.getElementById("start-game"),
+          R = document.getElementById("dont-show-again"),
+          U = document.getElementById("help-button"),
+          O = document.getElementById("interstitial-ad-overlay"),
+          w = document.getElementById("countdown-timer");
+        let $ = null,
+          p = 10,
+          B = null;
+        Y(),
+          v.addEventListener("click", () => P(C)),
+          D.addEventListener("click", () => P(t)),
+          H.addEventListener("click", () => P(o)),
+          _.addEventListener("click", () => P(f)),
+          j.addEventListener("click", F),
+          U.addEventListener("click", f);
+        function P(n) {
+          (B = n),
+            (p = 10),
+            (w.textContent = `广告将在 ${p} 秒后关闭`),
+            (O.style.display = "flex");
+          try {
+            (adsbygoogle = window.adsbygoogle || []).push({});
+          } catch (a) {
+            console.error("插屏广告加载失败:", a);
+          }
+          $ = setInterval(() => {
+            p--,
+              (w.textContent = `广告将在 ${p} 秒后关闭`),
+              p <= 0 && (clearInterval($), W());
+          }, 1e3);
         }
-        function v() {
-          i.classList.remove("hidden"), (t.introShown = !0);
+        function W() {
+          (O.style.display = "none"), B && (B(), (B = null));
         }
-        function C(e) {
-          O.checked && localStorage.setItem("set_game_played", "true"),
-            t.cardsInPlay.length > 0 && d(),
-            e
-              ? (i.classList.add("hidden"),
-                t.gameStarted ||
-                  (t.cardsInPlay.length === 0 ? h() : (d(), u())))
-              : ((i.style.opacity = "1"),
-                (i.style.transition = "opacity 0.5s ease"),
+        function Y() {
+          localStorage.getItem("set_game_played") ? (F(!0), L()) : (L(), f());
+        }
+        function f() {
+          u.classList.remove("hidden"), (e.introShown = !0);
+        }
+        function F(n) {
+          R.checked && localStorage.setItem("set_game_played", "true"),
+            e.cardsInPlay.length > 0 && h(),
+            n
+              ? (u.classList.add("hidden"),
+                e.gameStarted ||
+                  (e.cardsInPlay.length === 0 ? L() : (h(), I())))
+              : ((u.style.opacity = "1"),
+                (u.style.transition = "opacity 0.5s ease"),
                 setTimeout(() => {
-                  (i.style.opacity = "0"),
+                  (u.style.opacity = "0"),
                     setTimeout(() => {
-                      i.classList.add("hidden"),
-                        (i.style.opacity = ""),
-                        (i.style.transition = ""),
-                        t.cardsInPlay.length === 0 ? h() : (d(), u());
+                      u.classList.add("hidden"),
+                        (u.style.opacity = ""),
+                        (u.style.transition = ""),
+                        e.cardsInPlay.length === 0 ? L() : (h(), I());
                     }, 500);
                 }, 10)),
-            (t.introShown = !0);
+            (e.introShown = !0);
         }
-        function h() {
-          (t.gameOver = !1),
-            (t.cardsInPlay = []),
+        function L() {
+          (e.gameOver = !1),
+            (e.cardsInPlay = []),
+            V(),
             N(),
-            F(),
-            q(),
-            r.children.length === 0 &&
-              t.cardsInPlay.length > 0 &&
-              (console.log("Forcing re-render of cards"), d()),
-            u(),
-            (t.gameStarted = !0);
+            K(),
+            c.children.length === 0 &&
+              e.cardsInPlay.length > 0 &&
+              (console.log("Forcing re-render of cards"), h()),
+            I(),
+            (e.gameStarted = !0);
+        }
+        function V() {
+          e.deck = [];
+          for (const n of b)
+            for (const a of T)
+              for (const l of x)
+                for (const r of i)
+                  e.deck.push({color: n, shape: a, number: l, shading: r});
         }
         function N() {
-          t.deck = [];
-          for (const e of m)
-            for (const n of y)
-              for (const o of p)
-                for (const s of a)
-                  t.deck.push({color: e, shape: n, number: o, shading: s});
-        }
-        function F() {
-          for (let e = t.deck.length - 1; e > 0; e--) {
-            const n = Math.floor(Math.random() * (e + 1));
-            [t.deck[e], t.deck[n]] = [t.deck[n], t.deck[e]];
+          for (let n = e.deck.length - 1; n > 0; n--) {
+            const a = Math.floor(Math.random() * (n + 1));
+            [e.deck[n], e.deck[a]] = [e.deck[a], e.deck[n]];
           }
         }
-        function q() {
-          t.cardsInPlay = [];
-          for (let e = 0; e < 12; e++)
-            t.deck.length > 0 && t.cardsInPlay.push(t.deck.pop());
-          d();
+        function K() {
+          e.cardsInPlay = [];
+          for (let n = 0; n < 12; n++)
+            e.deck.length > 0 && e.cardsInPlay.push(e.deck.pop());
+          h();
         }
-        function M() {
-          if (t.gameOver) return;
-          if (b()) {
-            E("There is still a set on the board. Find it first!"), j();
+        function C() {
+          if (e.gameOver) return;
+          if (d()) {
+            m("There is still a set on the board. Find it first!"), g();
             return;
           }
-          const e = [];
-          for (let n = 0; n < 3; n++)
-            if (t.deck.length > 0) {
-              const o = t.deck.pop();
-              t.cardsInPlay.push(o), e.push(t.cardsInPlay.length - 1);
+          const n = [];
+          for (let a = 0; a < 3; a++)
+            if (e.deck.length > 0) {
+              const l = e.deck.pop();
+              e.cardsInPlay.push(l), n.push(e.cardsInPlay.length - 1);
             }
-          d(),
-            e.length > 0 &&
+          h(),
+            n.length > 0 &&
               setTimeout(() => {
-                e.forEach((n) => {
-                  const o = document.querySelector(`.card[data-index="${n}"]`);
-                  o &&
-                    (o.classList.add("new-card"),
-                    setTimeout(() => o.classList.remove("new-card"), 1e3));
+                n.forEach((a) => {
+                  const l = document.querySelector(`.card[data-index="${a}"]`);
+                  l &&
+                    (l.classList.add("new-card"),
+                    setTimeout(() => l.classList.remove("new-card"), 1e3));
                 });
               }, 100),
-            u();
+            I();
         }
-        function d() {
-          (r.innerHTML = ""),
-            t.cardsInPlay.forEach((e, n) => {
-              const o = document.createElement("div");
-              (o.className = "card"),
-                (o.dataset.index = n),
-                t.selectedCards.includes(n) && o.classList.add("selected");
-              const c = G(e);
-              o.appendChild(c),
-                o.addEventListener("click", () => A(n)),
-                r.appendChild(o);
+        function h() {
+          (c.innerHTML = ""),
+            e.cardsInPlay.forEach((n, a) => {
+              const l = document.createElement("div");
+              (l.className = "card"),
+                (l.dataset.index = a),
+                e.selectedCards.includes(a) && l.classList.add("selected");
+              const y = q(n);
+              l.appendChild(y),
+                l.addEventListener("click", () => M(a)),
+                c.appendChild(l);
             }),
-            r.offsetHeight;
+            c.offsetHeight;
         }
-        function G(e) {
-          const n = document.createElement("div");
-          n.className = "card-content";
-          for (let o = 0; o < e.number; o++) {
-            const s = document.createElement("div");
-            (s.className = `symbol ${e.shape} ${e.shading}`),
-              (s.style.color = e.color);
-            let c = "";
-            e.shape === "triangle"
-              ? ((s.style.color = e.color),
-                (s.style.opacity = ""),
-                (s.style.background = ""),
-                (s.style.borderBottomColor = ""))
-              : e.shape === "rectangle"
-              ? e.shading === "open"
-                ? ((s.style.background = "transparent"),
-                  (s.style.border = `2px solid ${e.color}`))
-                : e.shading === "striped"
-                ? ((s.style.background = `repeating-linear-gradient(45deg, ${e.color}, ${e.color} 3px, transparent 3px, transparent 6px)`),
-                  (s.style.border = `1px solid ${e.color}`))
-                : (s.style.background = e.color)
-              : e.shape === "oval" &&
-                (e.shading === "open"
-                  ? ((s.style.background = "transparent"),
-                    (s.style.border = `2px solid ${e.color}`))
-                  : e.shading === "striped"
-                  ? ((s.style.background = `repeating-linear-gradient(45deg, ${e.color}, ${e.color} 3px, transparent 3px, transparent 6px)`),
-                    (s.style.border = `1px solid ${e.color}`))
-                  : (s.style.background = e.color)),
-              (s.textContent = c),
-              e.shape === "triangle" ||
-                (e.shape === "rectangle"
-                  ? ((s.style.width = "60%"),
-                    (s.style.height = e.number > 2 ? "20px" : "25px"))
-                  : e.shape === "oval" &&
-                    ((s.style.width = "60%"),
-                    (s.style.height = e.number > 2 ? "20px" : "25px"),
-                    (s.style.borderRadius = "50%")));
-            const l = document.createElement("div");
-            (l.className = `symbol-wrapper ${e.shape}-wrapper`),
-              (l.style.display = "flex"),
-              (l.style.alignItems = "center"),
-              (l.style.justifyContent = "center"),
-              (l.style.padding = "5px"),
-              (l.style.width = "100%"),
-              (l.style.height = (e.number > 2, "33%")),
-              l.appendChild(s),
-              n.appendChild(l);
+        function q(n) {
+          const a = document.createElement("div");
+          a.className = "card-content";
+          for (let l = 0; l < n.number; l++) {
+            const r = document.createElement("div");
+            (r.className = `symbol ${n.shape} ${n.shading}`),
+              (r.style.color = n.color);
+            let y = "";
+            n.shape === "triangle"
+              ? ((r.style.color = n.color),
+                (r.style.opacity = ""),
+                (r.style.background = ""),
+                (r.style.borderBottomColor = ""))
+              : n.shape === "rectangle"
+              ? n.shading === "open"
+                ? ((r.style.background = "transparent"),
+                  (r.style.border = `2px solid ${n.color}`))
+                : n.shading === "striped"
+                ? ((r.style.background = `repeating-linear-gradient(45deg, ${n.color}, ${n.color} 3px, transparent 3px, transparent 6px)`),
+                  (r.style.border = `1px solid ${n.color}`))
+                : (r.style.background = n.color)
+              : n.shape === "oval" &&
+                (n.shading === "open"
+                  ? ((r.style.background = "transparent"),
+                    (r.style.border = `2px solid ${n.color}`))
+                  : n.shading === "striped"
+                  ? ((r.style.background = `repeating-linear-gradient(45deg, ${n.color}, ${n.color} 3px, transparent 3px, transparent 6px)`),
+                    (r.style.border = `1px solid ${n.color}`))
+                  : (r.style.background = n.color)),
+              (r.textContent = y),
+              n.shape === "triangle" ||
+                (n.shape === "rectangle"
+                  ? ((r.style.width = "60%"),
+                    (r.style.height = n.number > 2 ? "20px" : "25px"))
+                  : n.shape === "oval" &&
+                    ((r.style.width = "60%"),
+                    (r.style.height = n.number > 2 ? "20px" : "25px"),
+                    (r.style.borderRadius = "50%")));
+            const E = document.createElement("div");
+            (E.className = `symbol-wrapper ${n.shape}-wrapper`),
+              (E.style.display = "flex"),
+              (E.style.alignItems = "center"),
+              (E.style.justifyContent = "center"),
+              (E.style.padding = "5px"),
+              (E.style.width = "100%"),
+              (E.style.height = (n.number > 2, "33%")),
+              E.appendChild(r),
+              a.appendChild(E);
           }
-          return n;
+          return a;
         }
-        function A(e) {
-          if (t.gameOver) return;
-          const n = document.querySelector(`.card[data-index="${e}"]`),
-            o = t.selectedCards.indexOf(e);
-          o !== -1
-            ? (t.selectedCards.splice(o, 1), n.classList.remove("selected"))
-            : (t.selectedCards.push(e),
-              n.classList.add("selected"),
-              t.selectedCards.length === 3 && D());
+        function M(n) {
+          if (e.gameOver) return;
+          const a = document.querySelector(`.card[data-index="${n}"]`),
+            l = e.selectedCards.indexOf(n);
+          l !== -1
+            ? (e.selectedCards.splice(l, 1), a.classList.remove("selected"))
+            : (e.selectedCards.push(n),
+              a.classList.add("selected"),
+              e.selectedCards.length === 3 && A());
         }
-        function D() {
-          const e = t.selectedCards.map((o) => t.cardsInPlay[o]),
-            n = t.selectedCards.map((o) =>
-              document.querySelector(`.card[data-index="${o}"]`)
+        function A() {
+          const n = e.selectedCards.map((l) => e.cardsInPlay[l]),
+            a = e.selectedCards.map((l) =>
+              document.querySelector(`.card[data-index="${l}"]`)
             );
-          I(e)
-            ? (n.forEach((o) => {
-                o.classList.add("correct-set");
+          S(n)
+            ? (a.forEach((l) => {
+                l.classList.add("correct-set");
               }),
               setTimeout(() => {
-                H();
+                z();
               }, 800))
-            : (n.forEach((o) => {
-                o.classList.add("incorrect-set");
+            : (a.forEach((l) => {
+                l.classList.add("incorrect-set");
               }),
               setTimeout(() => {
-                n.forEach((o) => {
-                  o.classList.remove("incorrect-set"),
-                    o.classList.remove("selected");
+                a.forEach((l) => {
+                  l.classList.remove("incorrect-set"),
+                    l.classList.remove("selected");
                 }),
-                  (t.selectedCards = []);
+                  (e.selectedCards = []);
               }, 1e3));
         }
-        function I(e) {
-          const n = (o) => {
-            const s = e.map((c) => c[o]);
+        function S(n) {
+          const a = (l) => {
+            const r = n.map((y) => y[l]);
             return (
-              (s[0] === s[1] && s[1] === s[2]) ||
-              (s[0] !== s[1] && s[1] !== s[2] && s[0] !== s[2])
+              (r[0] === r[1] && r[1] === r[2]) ||
+              (r[0] !== r[1] && r[1] !== r[2] && r[0] !== r[2])
             );
           };
-          return n("color") && n("shape") && n("number") && n("shading");
+          return a("color") && a("shape") && a("number") && a("shading");
         }
-        function H() {
-          t.setsFound++;
-          const e = [...t.selectedCards].sort((n, o) => o - n);
-          for (const n of e)
-            t.deck.length > 0
-              ? (t.cardsInPlay[n] = t.deck.pop())
-              : t.cardsInPlay.splice(n, 1);
-          (t.selectedCards = []),
-            d(),
-            u(),
-            E(`Set found! You've found ${t.setsFound} sets so far.`, "success"),
-            t.deck.length === 0 &&
-              !b() &&
-              ((t.gameOver = !0),
+        function z() {
+          e.setsFound++;
+          const n = [...e.selectedCards].sort((a, l) => l - a);
+          for (const a of n)
+            e.deck.length > 0
+              ? (e.cardsInPlay[a] = e.deck.pop())
+              : e.cardsInPlay.splice(a, 1);
+          (e.selectedCards = []),
+            h(),
+            I(),
+            m(`Set found! You've found ${e.setsFound} sets so far.`, "success"),
+            e.deck.length === 0 &&
+              !d() &&
+              ((e.gameOver = !0),
               setTimeout(() => {
-                R();
+                J();
               }, 500));
         }
-        function u() {
-          (f.textContent = t.setsFound),
-            (x.textContent = t.deck.length),
-            (g.disabled = t.deck.length === 0),
-            t.deck.length === 0
-              ? g.classList.add("disabled")
-              : g.classList.remove("disabled");
+        function I() {
+          (k.textContent = e.setsFound),
+            (G.textContent = e.deck.length),
+            (v.disabled = e.deck.length === 0),
+            e.deck.length === 0
+              ? v.classList.add("disabled")
+              : v.classList.remove("disabled");
         }
-        function _() {
-          if (t.gameOver) return;
-          const e = L();
-          e
-            ? ((t.selectedCards = e),
-              d(),
-              e.forEach((n) => {
+        function t() {
+          if (e.gameOver) return;
+          const n = s();
+          n
+            ? ((e.selectedCards = n),
+              h(),
+              n.forEach((a) => {
                 document
-                  .querySelector(`.card[data-index="${n}"]`)
+                  .querySelector(`.card[data-index="${a}"]`)
                   .classList.add("hint-pulse");
               }),
               setTimeout(() => {
-                e.forEach((n) => {
+                n.forEach((a) => {
                   document
-                    .querySelector(`.card[data-index="${n}"]`)
+                    .querySelector(`.card[data-index="${a}"]`)
                     .classList.remove("hint-pulse");
                 }),
-                  (t.selectedCards = []),
-                  d();
+                  (e.selectedCards = []),
+                  h();
               }, 2e3))
-            : E("No sets found on the board. Deal more cards.");
+            : m("No sets found on the board. Deal more cards.");
         }
-        function L() {
-          const e = t.cardsInPlay.length;
-          for (let n = 0; n < e - 2; n++)
-            for (let o = n + 1; o < e - 1; o++)
-              for (let s = o + 1; s < e; s++) {
-                const c = [
-                  t.cardsInPlay[n],
-                  t.cardsInPlay[o],
-                  t.cardsInPlay[s],
+        function s() {
+          const n = e.cardsInPlay.length;
+          for (let a = 0; a < n - 2; a++)
+            for (let l = a + 1; l < n - 1; l++)
+              for (let r = l + 1; r < n; r++) {
+                const y = [
+                  e.cardsInPlay[a],
+                  e.cardsInPlay[l],
+                  e.cardsInPlay[r],
                 ];
-                if (I(c)) return [n, o, s];
+                if (S(y)) return [a, l, r];
               }
           return null;
         }
-        function b() {
-          return L() !== null;
+        function d() {
+          return s() !== null;
         }
-        function k() {
-          (t.deck = []),
-            (t.cardsInPlay = []),
-            (t.selectedCards = []),
-            (t.setsFound = 0),
-            (t.gameOver = !1),
-            (r.innerHTML = ""),
-            r.classList.add("restart-animation"),
+        function o() {
+          (e.deck = []),
+            (e.cardsInPlay = []),
+            (e.selectedCards = []),
+            (e.setsFound = 0),
+            (e.gameOver = !1),
+            (c.innerHTML = ""),
+            c.classList.add("restart-animation"),
             setTimeout(() => {
-              r.classList.remove("restart-animation"), h();
+              c.classList.remove("restart-animation"), L();
             }, 500);
         }
-        function E(e, n = "warning") {
-          const o = document.querySelector(".notification");
-          o && o.remove();
-          const s = document.createElement("div");
-          (s.className = `notification ${n}`),
-            (s.textContent = e),
-            document.body.appendChild(s),
-            setTimeout(() => s.classList.add("show"), 10),
+        function m(n, a = "warning") {
+          const l = document.querySelector(".notification");
+          l && l.remove();
+          const r = document.createElement("div");
+          (r.className = `notification ${a}`),
+            (r.textContent = n),
+            document.body.appendChild(r),
+            setTimeout(() => r.classList.add("show"), 10),
             setTimeout(() => {
-              s.classList.remove("show"), setTimeout(() => s.remove(), 300);
+              r.classList.remove("show"), setTimeout(() => r.remove(), 300);
             }, 3e3);
         }
-        function j() {
-          r.classList.add("highlight"),
+        function g() {
+          c.classList.add("highlight"),
             setTimeout(() => {
-              r.classList.remove("highlight");
+              c.classList.remove("highlight");
             }, 1e3);
         }
-        function R() {
-          const e = document.createElement("div");
-          e.className = "game-over-modal";
+        function J() {
           const n = document.createElement("div");
-          n.className = "modal-content";
-          const o = document.createElement("h2");
-          o.textContent = "Game Over!";
-          const s = document.createElement("p");
-          s.textContent = `Congratulations! You found ${t.setsFound} sets.`;
-          const c = document.createElement("button");
-          (c.textContent = "Play Again"),
-            c.addEventListener("click", () => {
-              e.remove(), k();
+          n.className = "game-over-modal";
+          const a = document.createElement("div");
+          a.className = "modal-content";
+          const l = document.createElement("h2");
+          l.textContent = "Game Over!";
+          const r = document.createElement("p");
+          r.textContent = `Congratulations! You found ${e.setsFound} sets.`;
+          const y = document.createElement("button");
+          (y.textContent = "Play Again"),
+            y.addEventListener("click", () => {
+              n.remove(), o();
             }),
-            n.appendChild(o),
-            n.appendChild(s),
-            n.appendChild(c),
-            e.appendChild(n),
-            document.body.appendChild(e),
+            a.appendChild(l),
+            a.appendChild(r),
+            a.appendChild(y),
+            n.appendChild(a),
+            document.body.appendChild(n),
             setTimeout(() => {
-              e.classList.add("show");
+              n.classList.add("show");
             }, 10);
         }
         window.addEventListener("load", () => {
           setTimeout(() => {
-            r.children.length === 0 &&
-              t.cardsInPlay.length > 0 &&
+            c.children.length === 0 &&
+              e.cardsInPlay.length > 0 &&
               (console.log("Window loaded: Forcing re-render of cards"),
-              d(),
-              u());
+              h(),
+              I());
+          }, 500);
+        });
+      });
+      document.addEventListener("DOMContentLoaded", () => {
+        const e = {
+            deck: [],
+            cardsInPlay: [],
+            selectedCards: [],
+            setsFound: 0,
+            gameOver: !1,
+            introShown: !1,
+            gameStarted: !1,
+          },
+          b = ["red", "green", "purple"],
+          T = ["oval", "triangle", "rectangle"],
+          x = [1, 2, 3],
+          i = ["solid", "striped", "open"],
+          c = document.getElementById("game-board"),
+          k = document.getElementById("score"),
+          G = document.getElementById("remaining"),
+          v = document.getElementById("deal-cards"),
+          D = document.getElementById("find-set"),
+          H = document.getElementById("restart"),
+          _ = document.getElementById("show-help"),
+          u = document.getElementById("intro-overlay"),
+          j = document.getElementById("start-game"),
+          R = document.getElementById("dont-show-again"),
+          U = document.getElementById("help-button");
+        O(),
+          v.addEventListener("click", Y),
+          D.addEventListener("click", h),
+          H.addEventListener("click", A),
+          _.addEventListener("click", w),
+          j.addEventListener("click", $),
+          U.addEventListener("click", w);
+        function O() {
+          localStorage.getItem("set_game_played") ? ($(!0), p()) : (p(), w());
+        }
+        function w() {
+          u.classList.remove("hidden"), (e.introShown = !0);
+        }
+        function $(t) {
+          R.checked && localStorage.setItem("set_game_played", "true"),
+            e.cardsInPlay.length > 0 && f(),
+            t
+              ? (u.classList.add("hidden"),
+                e.gameStarted ||
+                  (e.cardsInPlay.length === 0 ? p() : (f(), C())))
+              : ((u.style.opacity = "1"),
+                (u.style.transition = "opacity 0.5s ease"),
+                setTimeout(() => {
+                  (u.style.opacity = "0"),
+                    setTimeout(() => {
+                      u.classList.add("hidden"),
+                        (u.style.opacity = ""),
+                        (u.style.transition = ""),
+                        e.cardsInPlay.length === 0 ? p() : (f(), C());
+                    }, 500);
+                }, 10)),
+            (e.introShown = !0);
+        }
+        function p() {
+          (e.gameOver = !1),
+            (e.cardsInPlay = []),
+            B(),
+            P(),
+            W(),
+            c.children.length === 0 &&
+              e.cardsInPlay.length > 0 &&
+              (console.log("Forcing re-render of cards"), f()),
+            C(),
+            (e.gameStarted = !0);
+        }
+        function B() {
+          e.deck = [];
+          for (const t of b)
+            for (const s of T)
+              for (const d of x)
+                for (const o of i)
+                  e.deck.push({color: t, shape: s, number: d, shading: o});
+        }
+        function P() {
+          for (let t = e.deck.length - 1; t > 0; t--) {
+            const s = Math.floor(Math.random() * (t + 1));
+            [e.deck[t], e.deck[s]] = [e.deck[s], e.deck[t]];
+          }
+        }
+        function W() {
+          e.cardsInPlay = [];
+          for (let t = 0; t < 12; t++)
+            e.deck.length > 0 && e.cardsInPlay.push(e.deck.pop());
+          f();
+        }
+        function Y() {
+          if (e.gameOver) return;
+          if (M()) {
+            S("There is still a set on the board. Find it first!"), z();
+            return;
+          }
+          const t = [];
+          for (let s = 0; s < 3; s++)
+            if (e.deck.length > 0) {
+              const d = e.deck.pop();
+              e.cardsInPlay.push(d), t.push(e.cardsInPlay.length - 1);
+            }
+          f(),
+            t.length > 0 &&
+              setTimeout(() => {
+                t.forEach((s) => {
+                  const d = document.querySelector(`.card[data-index="${s}"]`);
+                  d &&
+                    (d.classList.add("new-card"),
+                    setTimeout(() => d.classList.remove("new-card"), 1e3));
+                });
+              }, 100),
+            C();
+        }
+        function f() {
+          (c.innerHTML = ""),
+            e.cardsInPlay.forEach((t, s) => {
+              const d = document.createElement("div");
+              (d.className = "card"),
+                (d.dataset.index = s),
+                e.selectedCards.includes(s) && d.classList.add("selected");
+              const m = F(t);
+              d.appendChild(m),
+                d.addEventListener("click", () => L(s)),
+                c.appendChild(d);
+            }),
+            c.offsetHeight;
+        }
+        function F(t) {
+          const s = document.createElement("div");
+          s.className = "card-content";
+          for (let d = 0; d < t.number; d++) {
+            const o = document.createElement("div");
+            (o.className = `symbol ${t.shape} ${t.shading}`),
+              (o.style.color = t.color);
+            let m = "";
+            t.shape === "triangle"
+              ? ((o.style.color = t.color),
+                (o.style.opacity = ""),
+                (o.style.background = ""),
+                (o.style.borderBottomColor = ""))
+              : t.shape === "rectangle"
+              ? t.shading === "open"
+                ? ((o.style.background = "transparent"),
+                  (o.style.border = `2px solid ${t.color}`))
+                : t.shading === "striped"
+                ? ((o.style.background = `repeating-linear-gradient(45deg, ${t.color}, ${t.color} 3px, transparent 3px, transparent 6px)`),
+                  (o.style.border = `1px solid ${t.color}`))
+                : (o.style.background = t.color)
+              : t.shape === "oval" &&
+                (t.shading === "open"
+                  ? ((o.style.background = "transparent"),
+                    (o.style.border = `2px solid ${t.color}`))
+                  : t.shading === "striped"
+                  ? ((o.style.background = `repeating-linear-gradient(45deg, ${t.color}, ${t.color} 3px, transparent 3px, transparent 6px)`),
+                    (o.style.border = `1px solid ${t.color}`))
+                  : (o.style.background = t.color)),
+              (o.textContent = m),
+              t.shape === "triangle" ||
+                (t.shape === "rectangle"
+                  ? ((o.style.width = "60%"),
+                    (o.style.height = t.number > 2 ? "20px" : "25px"))
+                  : t.shape === "oval" &&
+                    ((o.style.width = "60%"),
+                    (o.style.height = t.number > 2 ? "20px" : "25px"),
+                    (o.style.borderRadius = "50%")));
+            const g = document.createElement("div");
+            (g.className = `symbol-wrapper ${t.shape}-wrapper`),
+              (g.style.display = "flex"),
+              (g.style.alignItems = "center"),
+              (g.style.justifyContent = "center"),
+              (g.style.padding = "5px"),
+              (g.style.width = "100%"),
+              (g.style.height = (t.number > 2, "33%")),
+              g.appendChild(o),
+              s.appendChild(g);
+          }
+          return s;
+        }
+        function L(t) {
+          if (e.gameOver) return;
+          const s = document.querySelector(`.card[data-index="${t}"]`),
+            d = e.selectedCards.indexOf(t);
+          d !== -1
+            ? (e.selectedCards.splice(d, 1), s.classList.remove("selected"))
+            : (e.selectedCards.push(t),
+              s.classList.add("selected"),
+              e.selectedCards.length === 3 && V());
+        }
+        function V() {
+          const t = e.selectedCards.map((d) => e.cardsInPlay[d]),
+            s = e.selectedCards.map((d) =>
+              document.querySelector(`.card[data-index="${d}"]`)
+            );
+          N(t)
+            ? (s.forEach((d) => {
+                d.classList.add("correct-set");
+              }),
+              setTimeout(() => {
+                K();
+              }, 800))
+            : (s.forEach((d) => {
+                d.classList.add("incorrect-set");
+              }),
+              setTimeout(() => {
+                s.forEach((d) => {
+                  d.classList.remove("incorrect-set"),
+                    d.classList.remove("selected");
+                }),
+                  (e.selectedCards = []);
+              }, 1e3));
+        }
+        function N(t) {
+          const s = (d) => {
+            const o = t.map((m) => m[d]);
+            return (
+              (o[0] === o[1] && o[1] === o[2]) ||
+              (o[0] !== o[1] && o[1] !== o[2] && o[0] !== o[2])
+            );
+          };
+          return s("color") && s("shape") && s("number") && s("shading");
+        }
+        function K() {
+          e.setsFound++;
+          const t = [...e.selectedCards].sort((s, d) => d - s);
+          for (const s of t)
+            e.deck.length > 0
+              ? (e.cardsInPlay[s] = e.deck.pop())
+              : e.cardsInPlay.splice(s, 1);
+          (e.selectedCards = []),
+            f(),
+            C(),
+            S(`Set found! You've found ${e.setsFound} sets so far.`, "success"),
+            e.deck.length === 0 &&
+              !M() &&
+              ((e.gameOver = !0),
+              setTimeout(() => {
+                I();
+              }, 500));
+        }
+        function C() {
+          (k.textContent = e.setsFound),
+            (G.textContent = e.deck.length),
+            (v.disabled = e.deck.length === 0),
+            e.deck.length === 0
+              ? v.classList.add("disabled")
+              : v.classList.remove("disabled");
+        }
+        function h() {
+          if (e.gameOver) return;
+          const t = q();
+          t
+            ? ((e.selectedCards = t),
+              f(),
+              t.forEach((s) => {
+                document
+                  .querySelector(`.card[data-index="${s}"]`)
+                  .classList.add("hint-pulse");
+              }),
+              setTimeout(() => {
+                t.forEach((s) => {
+                  document
+                    .querySelector(`.card[data-index="${s}"]`)
+                    .classList.remove("hint-pulse");
+                }),
+                  (e.selectedCards = []),
+                  f();
+              }, 2e3))
+            : S("No sets found on the board. Deal more cards.");
+        }
+        function q() {
+          const t = e.cardsInPlay.length;
+          for (let s = 0; s < t - 2; s++)
+            for (let d = s + 1; d < t - 1; d++)
+              for (let o = d + 1; o < t; o++) {
+                const m = [
+                  e.cardsInPlay[s],
+                  e.cardsInPlay[d],
+                  e.cardsInPlay[o],
+                ];
+                if (N(m)) return [s, d, o];
+              }
+          return null;
+        }
+        function M() {
+          return q() !== null;
+        }
+        function A() {
+          (e.deck = []),
+            (e.cardsInPlay = []),
+            (e.selectedCards = []),
+            (e.setsFound = 0),
+            (e.gameOver = !1),
+            (c.innerHTML = ""),
+            c.classList.add("restart-animation"),
+            setTimeout(() => {
+              c.classList.remove("restart-animation"), p();
+            }, 500);
+        }
+        function S(t, s = "warning") {
+          const d = document.querySelector(".notification");
+          d && d.remove();
+          const o = document.createElement("div");
+          (o.className = `notification ${s}`),
+            (o.textContent = t),
+            document.body.appendChild(o),
+            setTimeout(() => o.classList.add("show"), 10),
+            setTimeout(() => {
+              o.classList.remove("show"), setTimeout(() => o.remove(), 300);
+            }, 3e3);
+        }
+        function z() {
+          c.classList.add("highlight"),
+            setTimeout(() => {
+              c.classList.remove("highlight");
+            }, 1e3);
+        }
+        function I() {
+          const t = document.createElement("div");
+          t.className = "game-over-modal";
+          const s = document.createElement("div");
+          s.className = "modal-content";
+          const d = document.createElement("h2");
+          d.textContent = "Game Over!";
+          const o = document.createElement("p");
+          o.textContent = `Congratulations! You found ${e.setsFound} sets.`;
+          const m = document.createElement("button");
+          (m.textContent = "Play Again"),
+            m.addEventListener("click", () => {
+              t.remove(), A();
+            }),
+            s.appendChild(d),
+            s.appendChild(o),
+            s.appendChild(m),
+            t.appendChild(s),
+            document.body.appendChild(t),
+            setTimeout(() => {
+              t.classList.add("show");
+            }, 10);
+        }
+        window.addEventListener("load", () => {
+          setTimeout(() => {
+            c.children.length === 0 &&
+              e.cardsInPlay.length > 0 &&
+              (console.log("Window loaded: Forcing re-render of cards"),
+              f(),
+              C());
           }, 500);
         });
       });
@@ -1397,6 +1811,38 @@
     </style>
   </head>
   <body>
+    <!-- 插屏广告覆盖层 -->
+    <div id="interstitial-ad-overlay" class="interstitial-ad-overlay">
+      <div class="interstitial-ad-container">
+        <div class="countdown-timer" id="countdown-timer">
+          广告将在 10 秒后关闭
+        </div>
+        <ins
+          class="adsbygoogle"
+          style="display: inline-block; width: 300px; height: 250px"
+          data-ad-client="ca-pub-3424102604992913"
+          data-ad-slot="2199356140"
+        ></ins>
+        <script>
+          // 当广告显示时初始化
+          document
+            .getElementById("interstitial-ad-overlay")
+            .addEventListener("DOMNodeInserted", function (event) {
+              if (
+                event.target.tagName === "INS" &&
+                !event.target.hasAttribute("data-ad-status")
+              ) {
+                try {
+                  (adsbygoogle = window.adsbygoogle || []).push({});
+                } catch (e) {
+                  console.error("插屏广告加载失败:", e);
+                }
+              }
+            });
+        </script>
+      </div>
+    </div>
+
     <div id="intro-overlay" class="intro-overlay">
       <div class="intro-content">
         <h2>Welcome to Set!</h2>
