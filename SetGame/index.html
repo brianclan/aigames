@@ -22,7 +22,7 @@
               for (const f of r.addedNodes)
                 f.tagName === "LINK" && f.rel === "modulepreload" && p(f);
         }).observe(document, {childList: !0, subtree: !0});
-        function v(a) {
+        function y(a) {
           const r = {};
           return (
             a.integrity && (r.integrity = a.integrity),
@@ -38,7 +38,7 @@
         function p(a) {
           if (a.ep) return;
           a.ep = !0;
-          const r = v(a);
+          const r = y(a);
           fetch(a.href, r);
         }
       })();
@@ -53,52 +53,40 @@
             gameStarted: !1,
           },
           m = ["red", "green", "purple"],
-          v = ["oval", "triangle", "rectangle"],
+          y = ["oval", "triangle", "rectangle"],
           p = [1, 2, 3],
           a = ["solid", "striped", "open"],
           r = document.getElementById("game-board"),
           f = document.getElementById("score"),
           x = document.getElementById("remaining"),
-          y = document.getElementById("deal-cards"),
+          g = document.getElementById("deal-cards"),
           P = document.getElementById("find-set"),
-          S = document.getElementById("restart"),
+          w = document.getElementById("restart"),
           B = document.getElementById("show-help"),
           i = document.getElementById("intro-overlay"),
-          O = document.getElementById("start-game"),
-          T = document.getElementById("dont-show-again"),
-          $ = document.getElementById("help-button");
-        N(),
-          y.addEventListener("click", M),
-          P.addEventListener("click", j),
-          S.addEventListener("click", w),
-          B.addEventListener("click", E),
-          O.addEventListener("click", b),
-          $.addEventListener("click", E);
-        function h() {
-          try {
-            window.adsbygoogle &&
-              window.adsbygoogle.push &&
-              document.querySelectorAll("ins.adsbygoogle").forEach((e) => {
-                (adsbygoogle = window.adsbygoogle || []).push({});
-              });
-          } catch (e) {
-            console.error("AdSense初始化错误:", e);
-          }
+          S = document.getElementById("start-game"),
+          O = document.getElementById("dont-show-again"),
+          T = document.getElementById("help-button");
+        $(),
+          g.addEventListener("click", M),
+          P.addEventListener("click", _),
+          w.addEventListener("click", k),
+          B.addEventListener("click", v),
+          S.addEventListener("click", C),
+          T.addEventListener("click", v);
+        function $() {
+          localStorage.getItem("set_game_played") ? (C(!0), h()) : (h(), v());
         }
-        function N() {
-          localStorage.getItem("set_game_played") ? (b(!0), g()) : (g(), E());
-        }
-        function E() {
+        function v() {
           i.classList.remove("hidden"), (t.introShown = !0);
         }
-        function b(e) {
-          T.checked && localStorage.setItem("set_game_played", "true"),
-            t.cardsInPlay.length > 0 && c(),
+        function C(e) {
+          O.checked && localStorage.setItem("set_game_played", "true"),
+            t.cardsInPlay.length > 0 && d(),
             e
               ? (i.classList.add("hidden"),
                 t.gameStarted ||
-                  (t.cardsInPlay.length === 0 ? g() : (c(), u())),
-                h())
+                  (t.cardsInPlay.length === 0 ? h() : (d(), u())))
               : ((i.style.opacity = "1"),
                 (i.style.transition = "opacity 0.5s ease"),
                 setTimeout(() => {
@@ -107,49 +95,47 @@
                       i.classList.add("hidden"),
                         (i.style.opacity = ""),
                         (i.style.transition = ""),
-                        t.cardsInPlay.length === 0 ? g() : (c(), u()),
-                        h();
+                        t.cardsInPlay.length === 0 ? h() : (d(), u());
                     }, 500);
                 }, 10)),
             (t.introShown = !0);
         }
-        function g() {
+        function h() {
           (t.gameOver = !1),
             (t.cardsInPlay = []),
+            N(),
             F(),
             q(),
-            A(),
             r.children.length === 0 &&
               t.cardsInPlay.length > 0 &&
-              (console.log("Forcing re-render of cards"), c()),
+              (console.log("Forcing re-render of cards"), d()),
             u(),
-            (t.gameStarted = !0),
-            h();
+            (t.gameStarted = !0);
         }
-        function F() {
+        function N() {
           t.deck = [];
           for (const e of m)
-            for (const n of v)
+            for (const n of y)
               for (const o of p)
                 for (const s of a)
                   t.deck.push({color: e, shape: n, number: o, shading: s});
         }
-        function q() {
+        function F() {
           for (let e = t.deck.length - 1; e > 0; e--) {
             const n = Math.floor(Math.random() * (e + 1));
             [t.deck[e], t.deck[n]] = [t.deck[n], t.deck[e]];
           }
         }
-        function A() {
+        function q() {
           t.cardsInPlay = [];
           for (let e = 0; e < 12; e++)
             t.deck.length > 0 && t.cardsInPlay.push(t.deck.pop());
-          c();
+          d();
         }
         function M() {
           if (t.gameOver) return;
-          if (k()) {
-            C("There is still a set on the board. Find it first!"), R();
+          if (b()) {
+            E("There is still a set on the board. Find it first!"), j();
             return;
           }
           const e = [];
@@ -158,7 +144,7 @@
               const o = t.deck.pop();
               t.cardsInPlay.push(o), e.push(t.cardsInPlay.length - 1);
             }
-          c(),
+          d(),
             e.length > 0 &&
               setTimeout(() => {
                 e.forEach((n) => {
@@ -170,16 +156,16 @@
               }, 100),
             u();
         }
-        function c() {
+        function d() {
           (r.innerHTML = ""),
             t.cardsInPlay.forEach((e, n) => {
               const o = document.createElement("div");
               (o.className = "card"),
                 (o.dataset.index = n),
                 t.selectedCards.includes(n) && o.classList.add("selected");
-              const d = G(e);
-              o.appendChild(d),
-                o.addEventListener("click", () => D(n)),
+              const c = G(e);
+              o.appendChild(c),
+                o.addEventListener("click", () => A(n)),
                 r.appendChild(o);
             }),
             r.offsetHeight;
@@ -191,7 +177,7 @@
             const s = document.createElement("div");
             (s.className = `symbol ${e.shape} ${e.shading}`),
               (s.style.color = e.color);
-            let d = "";
+            let c = "";
             e.shape === "triangle"
               ? ((s.style.color = e.color),
                 (s.style.opacity = ""),
@@ -213,7 +199,7 @@
                   ? ((s.style.background = `repeating-linear-gradient(45deg, ${e.color}, ${e.color} 3px, transparent 3px, transparent 6px)`),
                     (s.style.border = `1px solid ${e.color}`))
                   : (s.style.background = e.color)),
-              (s.textContent = d),
+              (s.textContent = c),
               e.shape === "triangle" ||
                 (e.shape === "rectangle"
                   ? ((s.style.width = "60%"),
@@ -235,7 +221,7 @@
           }
           return n;
         }
-        function D(e) {
+        function A(e) {
           if (t.gameOver) return;
           const n = document.querySelector(`.card[data-index="${e}"]`),
             o = t.selectedCards.indexOf(e);
@@ -243,9 +229,9 @@
             ? (t.selectedCards.splice(o, 1), n.classList.remove("selected"))
             : (t.selectedCards.push(e),
               n.classList.add("selected"),
-              t.selectedCards.length === 3 && H());
+              t.selectedCards.length === 3 && D());
         }
-        function H() {
+        function D() {
           const e = t.selectedCards.map((o) => t.cardsInPlay[o]),
             n = t.selectedCards.map((o) =>
               document.querySelector(`.card[data-index="${o}"]`)
@@ -255,7 +241,7 @@
                 o.classList.add("correct-set");
               }),
               setTimeout(() => {
-                _();
+                H();
               }, 800))
             : (n.forEach((o) => {
                 o.classList.add("incorrect-set");
@@ -270,7 +256,7 @@
         }
         function I(e) {
           const n = (o) => {
-            const s = e.map((d) => d[o]);
+            const s = e.map((c) => c[o]);
             return (
               (s[0] === s[1] && s[1] === s[2]) ||
               (s[0] !== s[1] && s[1] !== s[2] && s[0] !== s[2])
@@ -278,7 +264,7 @@
           };
           return n("color") && n("shape") && n("number") && n("shading");
         }
-        function _() {
+        function H() {
           t.setsFound++;
           const e = [...t.selectedCards].sort((n, o) => o - n);
           for (const n of e)
@@ -286,30 +272,30 @@
               ? (t.cardsInPlay[n] = t.deck.pop())
               : t.cardsInPlay.splice(n, 1);
           (t.selectedCards = []),
-            c(),
+            d(),
             u(),
-            C(`Set found! You've found ${t.setsFound} sets so far.`, "success"),
+            E(`Set found! You've found ${t.setsFound} sets so far.`, "success"),
             t.deck.length === 0 &&
-              !k() &&
+              !b() &&
               ((t.gameOver = !0),
               setTimeout(() => {
-                U();
+                R();
               }, 500));
         }
         function u() {
           (f.textContent = t.setsFound),
             (x.textContent = t.deck.length),
-            (y.disabled = t.deck.length === 0),
+            (g.disabled = t.deck.length === 0),
             t.deck.length === 0
-              ? y.classList.add("disabled")
-              : y.classList.remove("disabled");
+              ? g.classList.add("disabled")
+              : g.classList.remove("disabled");
         }
-        function j() {
+        function _() {
           if (t.gameOver) return;
           const e = L();
           e
             ? ((t.selectedCards = e),
-              c(),
+              d(),
               e.forEach((n) => {
                 document
                   .querySelector(`.card[data-index="${n}"]`)
@@ -322,28 +308,28 @@
                     .classList.remove("hint-pulse");
                 }),
                   (t.selectedCards = []),
-                  c();
+                  d();
               }, 2e3))
-            : C("No sets found on the board. Deal more cards.");
+            : E("No sets found on the board. Deal more cards.");
         }
         function L() {
           const e = t.cardsInPlay.length;
           for (let n = 0; n < e - 2; n++)
             for (let o = n + 1; o < e - 1; o++)
               for (let s = o + 1; s < e; s++) {
-                const d = [
+                const c = [
                   t.cardsInPlay[n],
                   t.cardsInPlay[o],
                   t.cardsInPlay[s],
                 ];
-                if (I(d)) return [n, o, s];
+                if (I(c)) return [n, o, s];
               }
           return null;
         }
-        function k() {
+        function b() {
           return L() !== null;
         }
-        function w() {
+        function k() {
           (t.deck = []),
             (t.cardsInPlay = []),
             (t.selectedCards = []),
@@ -352,10 +338,10 @@
             (r.innerHTML = ""),
             r.classList.add("restart-animation"),
             setTimeout(() => {
-              r.classList.remove("restart-animation"), g(), h();
+              r.classList.remove("restart-animation"), h();
             }, 500);
         }
-        function C(e, n = "warning") {
+        function E(e, n = "warning") {
           const o = document.querySelector(".notification");
           o && o.remove();
           const s = document.createElement("div");
@@ -367,13 +353,13 @@
               s.classList.remove("show"), setTimeout(() => s.remove(), 300);
             }, 3e3);
         }
-        function R() {
+        function j() {
           r.classList.add("highlight"),
             setTimeout(() => {
               r.classList.remove("highlight");
             }, 1e3);
         }
-        function U() {
+        function R() {
           const e = document.createElement("div");
           e.className = "game-over-modal";
           const n = document.createElement("div");
@@ -382,18 +368,18 @@
           o.textContent = "Game Over!";
           const s = document.createElement("p");
           s.textContent = `Congratulations! You found ${t.setsFound} sets.`;
-          const d = document.createElement("button");
-          (d.textContent = "Play Again"),
-            d.addEventListener("click", () => {
-              e.remove(), w();
+          const c = document.createElement("button");
+          (c.textContent = "Play Again"),
+            c.addEventListener("click", () => {
+              e.remove(), k();
             }),
             n.appendChild(o),
             n.appendChild(s),
-            n.appendChild(d),
+            n.appendChild(c),
             e.appendChild(n),
             document.body.appendChild(e),
             setTimeout(() => {
-              e.classList.add("show"), h();
+              e.classList.add("show");
             }, 10);
         }
         window.addEventListener("load", () => {
@@ -401,7 +387,7 @@
             r.children.length === 0 &&
               t.cardsInPlay.length > 0 &&
               (console.log("Window loaded: Forcing re-render of cards"),
-              c(),
+              d(),
               u());
           }, 500);
         });
@@ -1553,9 +1539,6 @@
           data-ad-format="auto"
           data-full-width-responsive="false"
         ></ins>
-        <script>
-          (adsbygoogle = window.adsbygoogle || []).push({});
-        </script>
       </div>
 
       <div class="game-info">
@@ -1588,9 +1571,6 @@
             data-ad-format="auto"
             data-full-width-responsive="false"
           ></ins>
-          <script>
-            (adsbygoogle = window.adsbygoogle || []).push({});
-          </script>
         </div>
       </div>
 
@@ -1616,10 +1596,23 @@
           data-ad-format="auto"
           data-full-width-responsive="false"
         ></ins>
-        <script>
-          (adsbygoogle = window.adsbygoogle || []).push({});
-        </script>
       </div>
     </div>
+
+    <!-- 统一的广告初始化脚本 -->
+    <script>
+      window.onload = function () {
+        // 一次性初始化所有广告
+        try {
+          if (window.adsbygoogle) {
+            document.querySelectorAll("ins.adsbygoogle").forEach(function (ad) {
+              (adsbygoogle = window.adsbygoogle || []).push({});
+            });
+          }
+        } catch (e) {
+          console.error("AdSense初始化错误:", e);
+        }
+      };
+    </script>
   </body>
 </html>
