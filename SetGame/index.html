@@ -10,44 +10,6 @@
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3424102604992913"
       crossorigin="anonymous"
     ></script>
-    <script>
-      // 创建一个全局变量来跟踪广告是否已初始化
-      window.adsInitialized = false;
-
-      // 安全的广告初始化函数
-      function initAdsOnce() {
-        if (window.adsInitialized) {
-          console.log("广告已经初始化，跳过");
-          return;
-        }
-
-        try {
-          if (window.adsbygoogle) {
-            var adElements = document.querySelectorAll("ins.adsbygoogle");
-            console.log("找到" + adElements.length + "个广告元素");
-
-            for (var i = 0; i < adElements.length; i++) {
-              var ad = adElements[i];
-              if (!ad.hasAttribute("data-ad-status")) {
-                console.log("初始化广告 #" + (i + 1));
-                (adsbygoogle = window.adsbygoogle || []).push({});
-              }
-            }
-
-            window.adsInitialized = true;
-            console.log("广告初始化完成");
-          }
-        } catch (e) {
-          console.error("广告初始化错误:", e);
-        }
-      }
-
-      // 当页面加载完成后初始化广告
-      window.addEventListener("load", function () {
-        // 延迟一点时间确保DOM完全加载
-        setTimeout(initAdsOnce, 100);
-      });
-    </script>
     <script type="module" crossorigin>
       (function () {
         const m = document.createElement("link").relList;
@@ -1577,6 +1539,9 @@
           data-ad-format="auto"
           data-full-width-responsive="false"
         ></ins>
+        <script>
+          (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
       </div>
 
       <div class="game-info">
@@ -1609,6 +1574,9 @@
             data-ad-format="auto"
             data-full-width-responsive="false"
           ></ins>
+          <script>
+            (adsbygoogle = window.adsbygoogle || []).push({});
+          </script>
         </div>
       </div>
 
@@ -1634,6 +1602,9 @@
           data-ad-format="auto"
           data-full-width-responsive="false"
         ></ins>
+        <script>
+          (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
       </div>
     </div>
   </body>
