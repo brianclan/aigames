@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZKP Mystery Game</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #4895ef;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --success: #4cc9f0;
+            --warning: #f72585;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background-color: var(--light);
+            padding: 20px;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        
+        .game-phase {
+            display: none;
+        }
+        
+        .active-phase {
+            display: block;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .option-btn {
+            padding: 12px;
+            border: 2px solid var(--accent);
+            border-radius: 8px;
+            background: white;
+            color: var(--dark);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .option-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .option-btn.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--secondary);
+        }
+        
+        .btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .game-log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .log-entry {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .ai-message {
+            color: var(--primary);
+            font-weight: bold;
+        }
+        
+        .player-message {
+            color: var(--secondary);
+            font-weight: bold;
+        }
+        
+        .proof-message {
+            color: #6c757d;
+            font-style: italic;
+            font-size: 0.9rem;
+        }
+        
+        .status-message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .status-waiting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        @media (max-width: 480px) {
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ZKP Mystery Game</h1>
+        
+        <!-- Setup Phase -->
+        <div id="setup-phase" class="game-phase active-phase">
+            <h2>1. Choose a Category</h2>
+            <div class="options-grid" id="category-options">
+                <button class="option-btn" data-category="animals">Animals</button>
+                <button class="option-btn" data-category="fruits">Fruits</button>
+                <button class="option-btn" data-category="countries">Countries</button>
+                <button class="option-btn" data-category="movies">Movies</button>
+            </div>
+            
+            <h2>2. Select Your Secret</h2>
+            <div class="options-grid" id="secret-options"></div>
+            
+            <button id="start-game" class="btn" disabled>Start Game</button>
+        </div>
+        
+        <!-- Game Phase -->
+        <div id="game-phase" class="game-phase">
+            <div class="status-message status-waiting" id="game-status">AI is thinking...</div>
+            <div class="game-log" id="game-log"></div>
+            <div id="response-area">
+                <div id="current-question" style="margin: 15px 0; font-weight: bold;"></div>
+                <div class="options-grid" id="answer-options"></div>
+                <button id="submit-answer" class="btn">Submit Answer</button>
+            </div>
+        </div>
+        
+        <!-- Result Phase -->
+        <div id="result-phase" class="game-phase">
+            <div class="status-message" id="final-status"></div>
+            <div id="result-details" style="margin-top: 15px;"></div>
+            <button id="play-again" class="btn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Game data
+        const gameData = {
+            categories: {
+                animals: ["Lion", "Elephant", "Dolphin", "Eagle", "Giraffe"],
+                fruits: ["Apple", "Banana", "Orange", "Watermelon", "Strawberry"],
+                countries: ["USA", "Japan", "France", "Brazil", "Australia"],
+                movies: ["Avatar", "Titanic", "Inception", "The Godfather", "Interstellar"]
+            },
+            questions: {
+                animals: [
+                    "Is it a mammal?",
+                    "Does it live in water?",
+                    "Is it a carnivore?",
+                    "Does it have four legs?",
+                    "Is it commonly domesticated?"
+                ],
+                fruits: [
+                    "Is it red in color?",
+                    "Does it grow in tropical regions?",
+                    "Does it have a hard shell?",
+                    "Is it typically sweet?",
+                    "Does it have seeds?"
+                ],
+                countries: [
+                    "Is it in Asia?",
+                    "Is it an island nation?",
+                    "Does it use the Euro currency?",
+                    "Is its name starting with A-M?",
+                    "Does it have a population over 100 million?"
+                ],
+                movies: [
+                    "Is it a sci-fi movie?",
+                    "Did it win an Oscar?",
+                    "Is the lead actor male?",
+                    "Was it released in the 21st century?",
+                    "Is its runtime over 2 hours?"
+                ]
+            },
+            answers: {
+                animals: {
+                    "Lion": [true, false, true, true, false],
+                    "Elephant": [true, false, false, true, false],
+                    "Dolphin": [true, true, true, false, false],
+                    "Eagle": [false, false, true, false, false],
+                    "Giraffe": [true, false, false, true, false]
+                },
+                fruits: {
+                    "Apple": [true, false, false, true, true],
+                    "Banana": [false, true, false, true, false],
+                    "Orange": [true, false, false, true, true],
+                    "Watermelon": [true, false, true, true, true],
+                    "Strawberry": [true, false, false, true, true]
+                },
+                countries: {
+                    "USA": [false, false, false, false, true],
+                    "Japan": [true, true, false, true, true],
+                    "France": [false, false, true, true, false],
+                    "Brazil": [false, false, false, true, true],
+                    "Australia": [false, true, false, true, false]
+                },
+                movies: {
+                    "Avatar": [true, false, true, true, true],
+                    "Titanic": [false, true, false, false, true],
+                    "Inception": [true, false, true, true, true],
+                    "The Godfather": [false, true, true, false, true],
+                    "Interstellar": [true, false, true, true, true]
+                }
+            }
+        };
+
+        // Game state
+        const gameState = {
+            category: "",
+            secret: "",
+            questions: [],
+            currentQuestionIndex: 0,
+            gameOver: false,
+            aiGuess: ""
+        };
+
+        // DOM elements
+        const elements = {
+            setupPhase: document.getElementById("setup-phase"),
+            gamePhase: document.getElementById("game-phase"),
+            resultPhase: document.getElementById("result-phase"),
+            categoryOptions: document.getElementById("category-options"),
+            secretOptions: document.getElementById("secret-options"),
+            startGameBtn: document.getElementById("start-game"),
+            gameStatus: document.getElementById("game-status"),
+            gameLog: document.getElementById("game-log"),
+            currentQuestion: document.getElementById("current-question"),
+            answerOptions: document.getElementById("answer-options"),
+            submitAnswerBtn: document.getElementById("submit-answer"),
+            finalStatus: document.getElementById("final-status"),
+            resultDetails: document.getElementById("result-details"),
+            playAgainBtn: document.getElementById("play-again")
+        };
+
+        // Initialize game
+        function initGame() {
+            // Set up category selection
+            elements.categoryOptions.querySelectorAll(".option-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    // Reset selections
+                    elements.categoryOptions.querySelectorAll(".option-btn").forEach(b => {
+                        b.classList.remove("selected");
+                    });
+                    
+                    // Select new category
+                    btn.classList.add("selected");
+                    gameState.category = btn.dataset.category;
+                    
+                    // Populate secret options
+                    populateSecretOptions(gameState.category);
+                    
+                    // Enable start button only when both category and secret are selected
+                    elements.startGameBtn.disabled = !(gameState.category && gameState.secret);
+                });
+            });
+            
+            // Set up start game button
+            elements.startGameBtn.addEventListener("click", startGame);
+            
+            // Set up answer submission
+            elements.submitAnswerBtn.addEventListener("click", handleAnswerSubmission);
+            
+            // Set up play again button
+            elements.playAgainBtn.addEventListener("click", resetGame);
+        }
+
+        // Populate secret options based on category
+        function populateSecretOptions(category) {
+            elements.secretOptions.innerHTML = "";
+            gameData.categories[category].forEach(secret => {
+                const btn = document.createElement("button");
+                btn.className = "option-btn";
+                btn.textContent = secret;
+                btn.addEventListener("click", () => {
+                    // Reset selections
+                    elements.secretOptions.querySelectorAll(".option-btn").forEach(b => {
+                        b.classList.remove("selected");
+                    });
+                    
+                    // Select new secret
+                    btn.classList.add("selected");
+                    gameState.secret = secret;
+                    
+                    // Enable start button only when both category and secret are selected
+                    elements.startGameBtn.disabled = !(gameState.category && gameState.secret);
+                });
+                elements.secretOptions.appendChild(btn);
+            });
+        }
+
+        // Start the game
+        function startGame() {
+            // Hide setup, show game phase
+            elements.setupPhase.classList.remove("active-phase");
+            elements.gamePhase.classList.add("active-phase");
+            
+            // Reset game state
+            gameState.questions = [];
+            gameState.currentQuestionIndex = 0;
+            gameState.gameOver = false;
+            gameState.aiGuess = "";
+            elements.gameLog.innerHTML = "";
+            
+            // AI asks first question
+            setTimeout(askAIQuestion, 1000);
+        }
+
+        // AI asks a question
+        function askAIQuestion() {
+            // Check if AI should try to guess
+            if (gameState.currentQuestionIndex >= gameData.questions[gameState.category].length) {
+                makeAIGuess();
+                return;
+            }
+            
+            // Get the next question
+            const question = gameData.questions[gameState.category][gameState.currentQuestionIndex];
+            
+            // Simulate ZKP proof generation
+            const proof = generateZKPProof(question);
+            
+            // Add to game log
+            addToGameLog(`<div class="log-entry"><span class="ai-message">AI asks: ${question}</span><br>
+                         <span class="proof-message">ZKP Proof: ${proof}</span></div>`);
+            
+            // Update UI
+            elements.gameStatus.textContent = "Please answer the question";
+            elements.currentQuestion.textContent = question;
+            
+            // Set up answer options
+            elements.answerOptions.innerHTML = `
+                <button class="option-btn" data-answer="yes">Yes</button>
+                <button class="option-btn" data-answer="no">No</button>
+            `;
+            
+            // Add event listeners to answer buttons
+            elements.answerOptions.querySelectorAll(".option-btn").forEach(btn => {
+                btn.addEventListener("click", function() {
+                    // Remove any existing selections
+                    elements.answerOptions.querySelectorAll(".option-btn").forEach(b => {
+                        b.classList.remove("selected");
+                    });
+                    
+                    // Select this button
+                    this.classList.add("selected");
+                });
+            });
+            
+            // Store current question in state
+            gameState.currentQuestion = {
+                text: question,
+                index: gameState.currentQuestionIndex,
+                proof: proof
+            };
+        }
+
+        // AI makes a guess
+        function makeAIGuess() {
+            // Get all possible secrets in this category
+            const possibleSecrets = gameData.categories[gameState.category];
+            
+            // For simplicity, AI just picks randomly from remaining possibilities
+            // In a real implementation, this would use the answers to previous questions
+            const randomIndex = Math.floor(Math.random() * possibleSecrets.length);
+            const guess = possibleSecrets[randomIndex];
+            gameState.aiGuess = guess;
+            
+            // Simulate ZKP proof generation
+            const proof = generateZKPProof(`Guess: ${guess}`);
+            
+            // Add to game log
+            addToGameLog(`<div class="log-entry"><span class="ai-message">AI guesses: Is it ${guess}?</span><br>
+                         <span class="proof-message">ZKP Proof: ${proof}</span></div>`);
+            
+            // Update UI
+            elements.gameStatus.textContent = "Is the AI correct?";
+            elements.currentQuestion.textContent = `AI guesses: Is it ${guess}?`;
+            
+            // Set up answer options
+            elements.answerOptions.innerHTML = `
+                <button class="option-btn" data-answer="correct">Correct!</button>
+                <button class="option-btn" data-answer="incorrect">Incorrect</button>
+            `;
+            
+            // Add event listeners to answer buttons
+            elements.answerOptions.querySelectorAll(".option-btn").forEach(btn => {
+                btn.addEventListener("click", function() {
+                    // Remove any existing selections
+                    elements.answerOptions.querySelectorAll(".option-btn").forEach(b => {
+                        b.classList.remove("selected");
+                    });
+                    
+                    // Select this button
+                    this.classList.add("selected");
+                });
+            });
+        }
+
+        // Handle player's answer submission
+        function handleAnswerSubmission() {
+            // Check if an option is selected
+            const selectedOption = elements.answerOptions.querySelector(".option-btn.selected");
+            if (!selectedOption) {
+                alert("Please select an answer");
+                return;
+            }
+            
+            const answer = selectedOption.dataset.answer;
+            
+            // Add player's answer to game log
+            if (gameState.currentQuestion.text.startsWith("AI guesses")) {
+                // This is a guess verification
+                addToGameLog(`<div class="log-entry"><span class="player-message">You say: ${answer === "correct" ? "Yes, it's correct!" : "No, that's wrong."}</span></div>`);
+                
+                if (answer === "correct") {
+                    // AI guessed correctly
+                    endGame(true);
+                } else {
+                    // AI failed to guess
+                    endGame(false);
+                }
+            } else {
+                // This is a regular question answer
+                addToGameLog(`<div class="log-entry"><span class="player-message">You answer: ${answer === "yes" ? "Yes" : "No"}</span></div>`);
+                
+                // Move to next question
+                gameState.currentQuestionIndex++;
+                setTimeout(askAIQuestion, 1000);
+            }
+        }
+
+        // End the game
+        function endGame(aiWon) {
+            gameState.gameOver = true;
+            
+            // Hide game phase, show result phase
+            elements.gamePhase.classList.remove("active-phase");
+            elements.resultPhase.classList.add("active-phase");
+            
+            // Set result message
+            if (aiWon) {
+                elements.finalStatus.textContent = "AI guessed correctly!";
+                elements.finalStatus.className = "status-message status-success";
+                elements.resultDetails.innerHTML = `
+                    <p>The AI correctly guessed your secret: <strong>${gameState.aiGuess}</strong></p>
+                    <p>Your secret was: <strong>${gameState.secret}</strong></p>
+                    <p>Questions asked: ${gameState.currentQuestionIndex}</p>
+                `;
+            } else {
+                elements.finalStatus.textContent = "AI didn't guess correctly";
+                elements.finalStatus.className = "status-message status-waiting";
+                elements.resultDetails.innerHTML = `
+                    <p>The AI failed to guess your secret.</p>
+                    <p>Your secret was: <strong>${gameState.secret}</strong></p>
+                    <p>Questions asked: ${gameState.currentQuestionIndex}</p>
+                `;
+            }
+        }
+
+        // Reset the game
+        function resetGame() {
+            // Reset game state
+            gameState.category = "";
+            gameState.secret = "";
+            gameState.questions = [];
+            gameState.currentQuestionIndex = 0;
+            gameState.gameOver = false;
+            gameState.aiGuess = "";
+            
+            // Reset UI
+            elements.categoryOptions.querySelectorAll(".option-btn").forEach(b => {
+                b.classList.remove("selected");
+            });
+            elements.secretOptions.innerHTML = "";
+            elements.startGameBtn.disabled = true;
+            elements.gameLog.innerHTML = "";
+            elements.currentQuestion.textContent = "";
+            elements.answerOptions.innerHTML = "";
+            
+            // Show setup phase, hide others
+            elements.setupPhase.classList.add("active-phase");
+            elements.gamePhase.classList.remove("active-phase");
+            elements.resultPhase.classList.remove("active-phase");
+        }
+
+        // Add message to game log
+        function addToGameLog(html) {
+            elements.gameLog.innerHTML += html;
+            elements.gameLog.scrollTop = elements.gameLog.scrollHeight;
+        }
+
+        // Generate a simulated ZKP proof
+        function generateZKPProof(data) {
+            return `zkp_${Math.random().toString(36).substring(2, 10)}_${data.substring(0, 3).toLowerCase()}`;
+        }
+
+        // Initialize the game when DOM is loaded
+        document.addEventListener("DOMContentLoaded", initGame);
+    </script>
+</body>
+</html>
