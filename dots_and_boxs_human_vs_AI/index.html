@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dots and Boxes: Human vs AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: manipulation;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 12px;
+            width: 100%;
+            max-width: 800px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(to right, #ff9966, #ff5e62);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-width: 1000px;
+            width: 100%;
+        }
+        
+        .game-board {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            flex: 1;
+            min-width: 280px;
+            max-width: 95vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .game-info {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 95vw;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .scores {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        
+        .score-card {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 10px;
+            flex: 1;
+        }
+        
+        .score-title {
+            font-size: 1rem;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .score-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        
+        .player-score .score-value {
+            color: #4CAF50;
+        }
+        
+        .ai-score .score-value {
+            color: #FF5252;
+        }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        button {
+            padding: 12px 16px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(45deg, #2196F3, #21CBF3);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        #reset-btn {
+            background: linear-gradient(45deg, #FF9800, #FF5722);
+        }
+        
+        .status {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            padding: 12px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .instructions {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 8px;
+            text-align: center;
+            color: #FFD700;
+            font-size: 1.1rem;
+        }
+        
+        .instructions ul {
+            padding-left: 18px;
+        }
+        
+        .instructions li {
+            margin-bottom: 6px;
+        }
+        
+        canvas {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            display: block;
+            margin: 0 auto;
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+            max-width: 100%;
+            height: auto;
+        }
+        
+        footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 0.8rem;
+            opacity: 0.8;
+            padding: 12px;
+            max-width: 95vw;
+        }
+        
+        .sound-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 6px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 50px;
+        }
+        
+        .sound-toggle label {
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 22px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 22px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        
+        .difficulty-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .difficulty-container label {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        
+        .difficulty-container select {
+            padding: 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 0.95rem;
+        }
+        
+        .difficulty-container select option {
+            background: rgba(30, 30, 40, 0.9);
+            color: white;
+        }
+        
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .subtitle {
+                font-size: 0.9rem;
+            }
+            
+            .game-container {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .status {
+                font-size: 1.1rem;
+                min-height: 55px;
+            }
+            
+            .score-value {
+                font-size: 1.8rem;
+            }
+            
+            .controls {
+                gap: 10px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.6rem;
+            }
+            
+            .subtitle {
+                font-size: 0.85rem;
+            }
+            
+            .score-title {
+                font-size: 0.9rem;
+            }
+            
+            .score-value {
+                font-size: 1.6rem;
+            }
+            
+            .status {
+                font-size: 1rem;
+                padding: 10px;
+            }
+            
+            button {
+                padding: 10px 14px;
+                font-size: 0.95rem;
+            }
+            
+            .instructions {
+                font-size: 0.85rem;
+            }
+        }
+        
+        /* Tablet adjustments */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .game-container {
+                max-width: 95vw;
+            }
+            
+            .game-board {
+                max-width: 65vw;
+            }
+            
+            .game-info {
+                max-width: 30vw;
+            }
+        }
+        
+        /* Desktop adjustments */
+        @media (min-width: 1025px) {
+            .game-board {
+                min-width: 450px;
+            }
+            
+            .game-info {
+                width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Dots and Boxes: Human vs AI</h1>
+        <p class="subtitle">Challenge the AI! Connect adjacent dots to complete boxes. Complete a box to score and get an extra turn.</p>
+    </header>
+    
+    <div class="game-container">
+        <div class="game-board">
+            <canvas id="gameCanvas" width="450" height="450"></canvas>
+        </div>
+        
+        <div class="game-info">
+            <div class="scores">
+                <div class="score-card player-score">
+                    <div class="score-title">Player Score</div>
+                    <div class="score-value" id="player-score">0</div>
+                </div>
+                <div class="score-card ai-score">
+                    <div class="score-title">AI Score</div>
+                    <div class="score-value" id="ai-score">0</div>
+                </div>
+            </div>
+            
+            <div class="status" id="game-status">Your turn - Tap/Click to connect dots</div>
+            
+            <div class="controls">
+                <button id="new-game-btn">New Game</button>
+                <button id="reset-btn">Reset Game</button>
+                
+                <div class="difficulty-container">
+                    <label for="difficulty">AI Difficulty:</label>
+                    <select id="difficulty">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                
+                <div class="sound-toggle">
+                    <label class="switch">
+                        <input type="checkbox" id="sound-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <label for="sound-toggle">Sound Effects</label>
+                </div>
+            </div>
+            
+            <div class="instructions">
+                <h3>Game Rules</h3>
+                <ul>
+                    <li>Players take turns connecting adjacent dots with a line</li>
+                    <li>Complete the fourth side of a box to claim it and get an extra turn</li>
+                    <li>The player with the most boxes wins</li>
+                    <li>Player: <strong style="color:#4CAF50">Green</strong>, AI: <strong style="color:#FF5252">Red</strong></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Dots and Boxes: Human vs AI | Fixed for both desktop and mobile</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const playerScoreEl = document.getElementById('player-score');
+            const aiScoreEl = document.getElementById('ai-score');
+            const gameStatusEl = document.getElementById('game-status');
+            const newGameBtn = document.getElementById('new-game-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const difficultySelect = document.getElementById('difficulty');
+            const soundToggle = document.getElementById('sound-toggle');
+            
+            // Game configuration
+            const config = {
+                rows: 5,
+                cols: 5,
+                dotSize: 8,
+                dotSpacing: 90,
+                colors: {
+                    player: '#4CAF50',
+                    ai: '#FF5252',
+                    grid: 'rgba(255, 255, 255, 0.7)',
+                    background: 'rgba(30, 30, 40, 0.7)'
+                }
+            };
+            
+            // Sound effects using the Web Audio API
+            let audioContext;
+            
+            // Initialize audio context on user interaction
+            function initAudioContext() {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            
+            // Play sound effect
+            function playSound(type) {
+                if (!soundToggle.checked || !audioContext) return;
+                
+                try {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Configure sound based on type
+                    switch(type) {
+                        case 'playerLine':
+                            oscillator.type = 'sine';
+                            oscillator.frequency.value = 523.25; // C5
+                            gainNode.gain.value = 0.2;
+                            oscillator.start();
+                            oscillator.stop(audioContext.currentTime + 0.1);
+                            break;
+                        case 'aiLine':
+                            oscillator.type = 'sine';
+                            oscillator.frequency.value = 392; // G4
+                            gainNode.gain.value = 0.2;
+                            oscillator.start();
+                            oscillator.stop(audioContext.currentTime + 0.1);
+                            break;
+                        case 'completeBox':
+                            oscillator.type = 'triangle';
+                            oscillator.frequency.value = 659.25; // E5
+                            gainNode.gain.value = 0.3;
+                            oscillator.start();
+                            oscillator.stop(audioContext.currentTime + 0.3);
+                            break;
+                        case 'win':
+                            oscillator.type = 'sawtooth';
+                            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+                            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+                            oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+                            gainNode.gain.value = 0.3;
+                            oscillator.start();
+                            oscillator.stop(audioContext.currentTime + 0.5);
+                            break;
+                    }
+                } catch (e) {
+                    console.log("Error playing sound", e);
+                }
+            }
+            
+            // Game state
+            let gameState = {
+                playerScore: 0,
+                aiScore: 0,
+                currentPlayer: 'player', // 'player' or 'ai'
+                gameOver: false,
+                boxes: [],
+                edges: {
+                    horizontal: [],
+                    vertical: []
+                }
+            };
+            
+            // Initialize game
+            function initGame() {
+                // Reset game state
+                gameState = {
+                    playerScore: 0,
+                    aiScore: 0,
+                    currentPlayer: 'player',
+                    gameOver: false,
+                    boxes: [],
+                    edges: {
+                        horizontal: [],
+                        vertical: []
+                    }
+                };
+                
+                // Initialize box state
+                for (let row = 0; row < config.rows - 1; row++) {
+                    gameState.boxes[row] = [];
+                    for (let col = 0; col < config.cols - 1; col++) {
+                        gameState.boxes[row][col] = {
+                            owner: null, // 'player', 'ai', or null
+                            edges: 0 // number of edges drawn (0-4)
+                        };
+                    }
+                }
+                
+                // Initialize horizontal edges
+                for (let row = 0; row < config.rows; row++) {
+                    gameState.edges.horizontal[row] = [];
+                    for (let col = 0; col < config.cols - 1; col++) {
+                        gameState.edges.horizontal[row][col] = false;
+                    }
+                }
+                
+                // Initialize vertical edges
+                for (let row = 0; row < config.rows - 1; row++) {
+                    gameState.edges.vertical[row] = [];
+                    for (let col = 0; col < config.cols; col++) {
+                        gameState.edges.vertical[row][col] = false;
+                    }
+                }
+                
+                updateScores();
+                gameStatusEl.textContent = "Your turn - Tap/Click to connect dots";
+                gameStatusEl.style.color = "#4CAF50";
+                drawBoard();
+            }
+            
+            // Draw game board
+            function drawBoard() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw background
+                ctx.fillStyle = config.colors.background;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw dots
+                ctx.fillStyle = config.colors.grid;
+                for (let row = 0; row < config.rows; row++) {
+                    for (let col = 0; col < config.cols; col++) {
+                        const x = col * config.dotSpacing + 25;
+                        const y = row * config.dotSpacing + 25;
+                        ctx.beginPath();
+                        ctx.arc(x, y, config.dotSize, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                
+                // Draw horizontal lines
+                for (let row = 0; row < config.rows; row++) {
+                    for (let col = 0; col < config.cols - 1; col++) {
+                        if (gameState.edges.horizontal[row][col]) {
+                            const x1 = col * config.dotSpacing + 25;
+                            const y1 = row * config.dotSpacing + 25;
+                            const x2 = (col + 1) * config.dotSpacing + 25;
+                            const y2 = row * config.dotSpacing + 25;
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            ctx.lineWidth = 4;
+                            ctx.strokeStyle = gameState.edges.horizontal[row][col] === 'player' ? 
+                                config.colors.player : config.colors.ai;
+                            ctx.stroke();
+                        }
+                    }
+                }
+                
+                // Draw vertical lines
+                for (let row = 0; row < config.rows - 1; row++) {
+                    for (let col = 0; col < config.cols; col++) {
+                        if (gameState.edges.vertical[row][col]) {
+                            const x1 = col * config.dotSpacing + 25;
+                            const y1 = row * config.dotSpacing + 25;
+                            const x2 = col * config.dotSpacing + 25;
+                            const y2 = (row + 1) * config.dotSpacing + 25;
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            ctx.lineWidth = 4;
+                            ctx.strokeStyle = gameState.edges.vertical[row][col] === 'player' ? 
+                                config.colors.player : config.colors.ai;
+                            ctx.stroke();
+                        }
+                    }
+                }
+                
+                // Draw completed boxes
+                for (let row = 0; row < config.rows - 1; row++) {
+                    for (let col = 0; col < config.cols - 1; col++) {
+                        if (gameState.boxes[row][col].owner) {
+                            const x = col * config.dotSpacing + 25;
+                            const y = row * config.dotSpacing + 25;
+                            const width = config.dotSpacing;
+                            const height = config.dotSpacing;
+                            
+                            ctx.globalAlpha = 0.3;
+                            ctx.fillStyle = gameState.boxes[row][col].owner === 'player' ? 
+                                config.colors.player : config.colors.ai;
+                            ctx.fillRect(x, y, width, height);
+                            ctx.globalAlpha = 1.0;
+                            
+                            // Draw owner mark
+                            ctx.font = 'bold 40px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = gameState.boxes[row][col].owner === 'player' ? 
+                                config.colors.player : config.colors.ai;
+                            ctx.fillText(gameState.boxes[row][col].owner === 'player' ? 'P' : 'A', 
+                                          x + width/2, y + height/2);
+                        }
+                    }
+                }
+            }
+            
+            // Update score display
+            function updateScores() {
+                playerScoreEl.textContent = gameState.playerScore;
+                aiScoreEl.textContent = gameState.aiScore;
+            }
+            
+            // Check if a box is completed
+            function checkBoxCompletion(row, col, player) {
+                let completedBoxes = 0;
+                
+                // Check if the current box is completed
+                if (row >= 0 && row < config.rows - 1 && col >= 0 && col < config.cols - 1) {
+                    if (gameState.boxes[row][col].edges === 4 && !gameState.boxes[row][col].owner) {
+                        gameState.boxes[row][col].owner = player;
+                        if (player === 'player') {
+                            gameState.playerScore++;
+                        } else {
+                            gameState.aiScore++;
+                        }
+                        completedBoxes++;
+                        playSound('completeBox');
+                    }
+                }
+                
+                return completedBoxes;
+            }
+            
+            // Handle player move (fixed for both desktop and mobile)
+            function handlePlayerMove(x, y) {
+                if (gameState.gameOver || gameState.currentPlayer !== 'player') return;
+                
+                // Get canvas dimensions
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
+                // Adjust coordinates for canvas scaling
+                const adjustedX = (x - rect.left) * scaleX;
+                const adjustedY = (y - rect.top) * scaleY;
+                
+                // Calculate grid position without offset
+                const gridX = adjustedX - 25;
+                const gridY = adjustedY - 25;
+                
+                // Calculate fractional row and column
+                const colFrac = gridX / config.dotSpacing;
+                const rowFrac = gridY / config.dotSpacing;
+                
+                // Find the nearest horizontal and vertical lines
+                const horizontalRow = Math.round(rowFrac);
+                const horizontalCol = Math.floor(colFrac);
+                
+                const verticalRow = Math.floor(rowFrac);
+                const verticalCol = Math.round(colFrac);
+                
+                // Calculate distances to the lines
+                const distToHorizontal = Math.abs(rowFrac - horizontalRow) * config.dotSpacing;
+                const distToVertical = Math.abs(colFrac - verticalCol) * config.dotSpacing;
+                
+                // Threshold for selecting a line
+                const threshold = window.innerWidth < 768 ? 30 : 20;
+                
+                // Check if we're close to a horizontal line
+                if (distToHorizontal < threshold && 
+                    horizontalRow >= 0 && 
+                    horizontalRow < config.rows &&
+                    horizontalCol >= 0 && 
+                    horizontalCol < config.cols - 1) {
+                    
+                    // Check if this horizontal line is not already drawn
+                    if (!gameState.edges.horizontal[horizontalRow][horizontalCol]) {
+                        gameState.edges.horizontal[horizontalRow][horizontalCol] = 'player';
+                        playSound('playerLine');
+                        
+                        // Update adjacent boxes
+                        if (horizontalRow > 0) {
+                            gameState.boxes[horizontalRow-1][horizontalCol].edges++;
+                        }
+                        if (horizontalRow < config.rows - 1) {
+                            gameState.boxes[horizontalRow][horizontalCol].edges++;
+                        }
+                        
+                        // Check for completed boxes
+                        let boxesCompleted = 0;
+                        boxesCompleted += checkBoxCompletion(horizontalRow - 1, horizontalCol, 'player');
+                        boxesCompleted += checkBoxCompletion(horizontalRow, horizontalCol, 'player');
+                        
+                        if (boxesCompleted === 0) {
+                            gameState.currentPlayer = 'ai';
+                            gameStatusEl.textContent = "AI's turn...";
+                            gameStatusEl.style.color = "#FF5252";
+                            setTimeout(makeAIMove, 600);
+                        } else {
+                            gameStatusEl.textContent = "You completed a box! Go again";
+                            gameStatusEl.style.color = "#4CAF50";
+                        }
+                        
+                        updateScores();
+                        drawBoard();
+                        checkGameOver();
+                        return;
+                    }
+                }
+                
+                // Check if we're close to a vertical line
+                if (distToVertical < threshold && 
+                    verticalRow >= 0 && 
+                    verticalRow < config.rows - 1 &&
+                    verticalCol >= 0 && 
+                    verticalCol < config.cols) {
+                    
+                    // Check if this vertical line is not already drawn
+                    if (!gameState.edges.vertical[verticalRow][verticalCol]) {
+                        gameState.edges.vertical[verticalRow][verticalCol] = 'player';
+                        playSound('playerLine');
+                        
+                        // Update adjacent boxes
+                        if (verticalCol > 0) {
+                            gameState.boxes[verticalRow][verticalCol-1].edges++;
+                        }
+                        if (verticalCol < config.cols - 1) {
+                            gameState.boxes[verticalRow][verticalCol].edges++;
+                        }
+                        
+                        // Check for completed boxes
+                        let boxesCompleted = 0;
+                        boxesCompleted += checkBoxCompletion(verticalRow, verticalCol - 1, 'player');
+                        boxesCompleted += checkBoxCompletion(verticalRow, verticalCol, 'player');
+                        
+                        if (boxesCompleted === 0) {
+                            gameState.currentPlayer = 'ai';
+                            gameStatusEl.textContent = "AI's turn...";
+                            gameStatusEl.style.color = "#FF5252";
+                            setTimeout(makeAIMove, 600);
+                        } else {
+                            gameStatusEl.textContent = "You completed a box! Go again";
+                            gameStatusEl.style.color = "#4CAF50";
+                        }
+                        
+                        updateScores();
+                        drawBoard();
+                        checkGameOver();
+                        return;
+                    }
+                }
+            }
+            
+            // AI move logic
+            function makeAIMove() {
+                if (gameState.gameOver || gameState.currentPlayer !== 'ai') return;
+                
+                // Get all possible moves
+                const possibleMoves = [];
+                
+                // Check all horizontal edges
+                for (let row = 0; row < config.rows; row++) {
+                    for (let col = 0; col < config.cols - 1; col++) {
+                        if (!gameState.edges.horizontal[row][col]) {
+                            possibleMoves.push({ type: 'horizontal', row, col });
+                        }
+                    }
+                }
+                
+                // Check all vertical edges
+                for (let row = 0; row < config.rows - 1; row++) {
+                    for (let col = 0; col < config.cols; col++) {
+                        if (!gameState.edges.vertical[row][col]) {
+                            possibleMoves.push({ type: 'vertical', row, col });
+                        }
+                    }
+                }
+                
+                if (possibleMoves.length === 0) {
+                    checkGameOver();
+                    return;
+                }
+                
+                // Choose move based on difficulty
+                const difficulty = difficultySelect.value;
+                let move;
+                
+                if (difficulty === 'easy') {
+                    // Easy AI - random move
+                    move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                } else {
+                    // Find moves that complete a box
+                    let winningMoves = [];
+                    
+                    for (const move of possibleMoves) {
+                        if (move.type === 'horizontal') {
+                            // Check top box
+                            if (move.row > 0) {
+                                if (gameState.boxes[move.row-1][move.col].edges === 3) {
+                                    winningMoves.push(move);
+                                }
+                            }
+                            
+                            // Check bottom box
+                            if (move.row < config.rows - 1) {
+                                if (gameState.boxes[move.row][move.col].edges === 3) {
+                                    winningMoves.push(move);
+                                }
+                            }
+                        } else { // vertical
+                            // Check left box
+                            if (move.col > 0) {
+                                if (gameState.boxes[move.row][move.col-1].edges === 3) {
+                                    winningMoves.push(move);
+                                }
+                            }
+                            
+                            // Check right box
+                            if (move.col < config.cols - 1) {
+                                if (gameState.boxes[move.row][move.col].edges === 3) {
+                                    winningMoves.push(move);
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (winningMoves.length > 0) {
+                        move = winningMoves[Math.floor(Math.random() * winningMoves.length)];
+                    } else if (difficulty === 'hard') {
+                        // Hard AI: Avoid moves that would give the player an opportunity
+                        let safeMoves = [];
+                        
+                        for (const move of possibleMoves) {
+                            let safe = true;
+                            
+                            // Simulate this move
+                            if (move.type === 'horizontal') {
+                                // Check if this move would create a chain reaction opportunity for player
+                                if (move.row > 0) {
+                                    if (gameState.boxes[move.row-1][move.col].edges === 2) {
+                                        // Check if this box has adjacent boxes that could be completed
+                                        if ((move.row > 1 && gameState.boxes[move.row-2][move.col].edges === 3) ||
+                                            (move.col > 0 && gameState.boxes[move.row-1][move.col-1].edges === 3) ||
+                                            (move.col < config.cols - 2 && gameState.boxes[move.row-1][move.col+1].edges === 3)) {
+                                            safe = false;
+                                        }
+                                    }
+                                }
+                                
+                                if (move.row < config.rows - 1) {
+                                    if (gameState.boxes[move.row][move.col].edges === 2) {
+                                        if ((move.row < config.rows - 2 && gameState.boxes[move.row+1][move.col].edges === 3) ||
+                                            (move.col > 0 && gameState.boxes[move.row][move.col-1].edges === 3) ||
+                                            (move.col < config.cols - 2 && gameState.boxes[move.row][move.col+1].edges === 3)) {
+                                            safe = false;
+                                        }
+                                    }
+                                }
+                            } else { // vertical
+                                if (move.col > 0) {
+                                    if (gameState.boxes[move.row][move.col-1].edges === 2) {
+                                        if ((move.col > 1 && gameState.boxes[move.row][move.col-2].edges === 3) ||
+                                            (move.row > 0 && gameState.boxes[move.row-1][move.col-1].edges === 3) ||
+                                            (move.row < config.rows - 2 && gameState.boxes[move.row+1][move.col-1].edges === 3)) {
+                                            safe = false;
+                                        }
+                                    }
+                                }
+                                
+                                if (move.col < config.cols - 1) {
+                                    if (gameState.boxes[move.row][move.col].edges === 2) {
+                                        if ((move.col < config.cols - 2 && gameState.boxes[move.row][move.col+1].edges === 3) ||
+                                            (move.row > 0 && gameState.boxes[move.row-1][move.col].edges === 3) ||
+                                            (move.row < config.rows - 2 && gameState.boxes[move.row+1][move.col].edges === 3)) {
+                                            safe = false;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if (safe) {
+                                safeMoves.push(move);
+                            }
+                        }
+                        
+                        move = safeMoves.length > 0 ? 
+                            safeMoves[Math.floor(Math.random() * safeMoves.length)] :
+                            possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                    } else {
+                        // Medium AI: Random move from possible moves
+                        move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                    }
+                }
+                
+                // Execute AI move
+                if (move.type === 'horizontal') {
+                    gameState.edges.horizontal[move.row][move.col] = 'ai';
+                    playSound('aiLine');
+                    
+                    // Update adjacent boxes
+                    if (move.row > 0) {
+                        gameState.boxes[move.row-1][move.col].edges++;
+                    }
+                    if (move.row < config.rows - 1) {
+                        gameState.boxes[move.row][move.col].edges++;
+                    }
+                    
+                    // Check for completed boxes
+                    let boxesCompleted = 0;
+                    boxesCompleted += checkBoxCompletion(move.row - 1, move.col, 'ai');
+                    boxesCompleted += checkBoxCompletion(move.row, move.col, 'ai');
+                    
+                    if (boxesCompleted === 0) {
+                        gameState.currentPlayer = 'player';
+                        gameStatusEl.textContent = "Your turn - Tap/Click to connect dots";
+                        gameStatusEl.style.color = "#4CAF50";
+                    } else {
+                        gameStatusEl.textContent = "AI completed a box! Moving again...";
+                        gameStatusEl.style.color = "#FF5252";
+                        setTimeout(makeAIMove, 600);
+                    }
+                } else { // vertical
+                    gameState.edges.vertical[move.row][move.col] = 'ai';
+                    playSound('aiLine');
+                    
+                    // Update adjacent boxes
+                    if (move.col > 0) {
+                        gameState.boxes[move.row][move.col-1].edges++;
+                    }
+                    if (move.col < config.cols - 1) {
+                        gameState.boxes[move.row][move.col].edges++;
+                    }
+                    
+                    // Check for completed boxes
+                    let boxesCompleted = 0;
+                    boxesCompleted += checkBoxCompletion(move.row, move.col - 1, 'ai');
+                    boxesCompleted += checkBoxCompletion(move.row, move.col, 'ai');
+                    
+                    if (boxesCompleted === 0) {
+                        gameState.currentPlayer = 'player';
+                        gameStatusEl.textContent = "Your turn - Tap/Click to connect dots";
+                        gameStatusEl.style.color = "#4CAF50";
+                    } else {
+                        gameStatusEl.textContent = "AI completed a box! Moving again...";
+                        gameStatusEl.style.color = "#FF5252";
+                        setTimeout(makeAIMove, 600);
+                    }
+                }
+                
+                updateScores();
+                drawBoard();
+                checkGameOver();
+            }
+            
+            // Check if game is over
+            function checkGameOver() {
+                // Check if any moves are available
+                let movesAvailable = false;
+                
+                for (let row = 0; row < config.rows; row++) {
+                    for (let col = 0; col < config.cols - 1; col++) {
+                        if (!gameState.edges.horizontal[row][col]) {
+                            movesAvailable = true;
+                            break;
+                        }
+                    }
+                    if (movesAvailable) break;
+                }
+                
+                if (!movesAvailable) {
+                    for (let row = 0; row < config.rows - 1; row++) {
+                        for (let col = 0; col < config.cols; col++) {
+                            if (!gameState.edges.vertical[row][col]) {
+                                movesAvailable = true;
+                                break;
+                            }
+                        }
+                        if (movesAvailable) break;
+                    }
+                }
+                
+                if (!movesAvailable) {
+                    gameState.gameOver = true;
+                    
+                    // Determine winner
+                    if (gameState.playerScore > gameState.aiScore) {
+                        gameStatusEl.textContent = `Game Over! You Win ${gameState.playerScore}-${gameState.aiScore}`;
+                        gameStatusEl.style.color = "#4CAF50";
+                        playSound('win');
+                    } else if (gameState.aiScore > gameState.playerScore) {
+                        gameStatusEl.textContent = `Game Over! AI Wins ${gameState.aiScore}-${gameState.playerScore}`;
+                        gameStatusEl.style.color = "#FF5252";
+                        playSound('win');
+                    } else {
+                        gameStatusEl.textContent = `Game Over! Draw ${gameState.playerScore}-${gameState.aiScore}`;
+                        gameStatusEl.style.color = "#FFD700";
+                        playSound('win');
+                    }
+                }
+            }
+            
+            // Event listeners (fixed for desktop and mobile)
+            canvas.addEventListener('click', (e) => {
+                handlePlayerMove(e.clientX, e.clientY);
+            });
+            
+            // Touch event support
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                initAudioContext();
+                const touch = e.touches[0];
+                handlePlayerMove(touch.clientX, touch.clientY);
+            }, { passive: false });
+            
+            newGameBtn.addEventListener('click', initGame);
+            resetBtn.addEventListener('click', initGame);
+            
+            // Initialize audio context on any user interaction
+            document.addEventListener('click', initAudioContext);
+            document.addEventListener('touchstart', initAudioContext);
+            
+            // Initialize game
+            initGame();
+        });
+    </script>
+</body>
+</html>
