@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Snake</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --primary-light: #4895ef;
+            --secondary-color: #3f37c9;
+            --accent-color: #4cc9f0;
+            --text-color: #2b2d42;
+            --light-bg: #f8f9fa;
+            --white: #ffffff;
+            --danger: #f72585;
+            --success: #4adc7f;
+            --warning: #f77f00;
+            --info: #4cc9f0;
+        }
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Poppins', sans-serif;
+            color: var(--text-color);
+            touch-action: manipulation;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            text-align: center;
+            margin: 20px 0 10px;
+            width: 100%;
+            position: relative;
+        }
+        
+        .game-title {
+            font-family: 'Fredoka One', cursive;
+            font-size: 2.8rem;
+            color: var(--primary-color);
+            margin: 0;
+            text-shadow: 3px 3px 0 rgba(0,0,0,0.05);
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .game-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-color);
+            opacity: 0.8;
+            margin: 5px 0 15px;
+            font-weight: 400;
+        }
+        
+        #gameContainer {
+            margin-top: 10px;
+            position: relative;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            padding-bottom: 150px;
+        }
+        
+        #gameCanvas {
+            border-radius: 18px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            background: var(--white);
+            width: 100%;
+            max-width: 100%;
+            border: none;
+            display: block;
+            margin: 0 auto;
+            transition: all 0.3s ease;
+        }
+        
+        #scoreBoard {
+            font-size: 1.5rem;
+            color: var(--white);
+            margin: 15px 0;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            border-radius: 50px;
+            box-shadow: 0 8px 20px rgba(67,97,238,0.2);
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-align: center;
+            display: inline-block;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #scoreBoard::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(30deg);
+            animation: shine 3s infinite;
+        }
+        
+        @keyframes shine {
+            0% { transform: rotate(30deg) translate(-30%, -30%); }
+            100% { transform: rotate(30deg) translate(30%, 30%); }
+        }
+        
+        #questionBox {
+            font-size: 1.3rem;
+            color: var(--text-color);
+            margin: 15px 0;
+            padding: 20px;
+            background: var(--white);
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            width: 90%;
+            max-width: 500px;
+            line-height: 1.5;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #questionBox::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--primary-color), var(--accent-color));
+        }
+        
+        .button-container {
+            margin: 25px 0;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            position: relative;
+            z-index: 200;
+        }
+        
+        #startButton {
+            padding: 16px 40px;
+            font-size: 1.1rem;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(67,97,238,0.3);
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #startButton::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: all 0.5s ease;
+        }
+        
+        #startButton:hover::before {
+            left: 100%;
+        }
+        
+        #startButton:hover, #startButton:active {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(67,97,238,0.4);
+        }
+        
+        #startButton:active {
+            transform: translateY(-1px);
+        }
+        
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 25px;
+            width: 100%;
+            justify-content: center;
+            gap: 15px;
+            touch-action: none;
+            z-index: 100;
+        }
+        
+        .control-btn {
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            background: var(--white);
+            border: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            color: var(--primary-color);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .control-btn::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(67,97,238,0.1) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+            color: var(--secondary-color);
+        }
+        
+        .control-btn:active::after {
+            opacity: 1;
+        }
+        
+        .controls-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .controls-row {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .game-info {
+            background: var(--white);
+            border-radius: 18px;
+            padding: 25px;
+            margin: 20px 0;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            border: none;
+        }
+        
+        .info-title {
+            font-size: 1.4rem;
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-weight: 700;
+            position: relative;
+            padding-bottom: 10px;
+        }
+        
+        .info-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 50px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+            border-radius: 2px;
+        }
+        
+        .info-text {
+            line-height: 1.7;
+            margin-bottom: 15px;
+            color: var(--text-color);
+            opacity: 0.9;
+        }
+        
+        .rules-list {
+            padding-left: 20px;
+            margin: 0;
+        }
+        
+        .rules-list li {
+            margin-bottom: 12px;
+            position: relative;
+            padding-left: 25px;
+            line-height: 1.6;
+        }
+        
+        .rules-list li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+        
+        .key {
+            display: inline-block;
+            background: var(--light-bg);
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-family: 'Poppins', monospace;
+            font-weight: 600;
+            color: var(--primary-color);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 18px;
+            z-index: 300;
+        }
+        
+        .game-over-text {
+            font-size: 2.5rem;
+            color: white;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        
+        .final-score {
+            font-size: 1.8rem;
+            color: var(--accent-color);
+            font-weight: 600;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                margin: 15px 0 5px;
+            }
+            
+            .game-title {
+                font-size: 2.2rem;
+            }
+            
+            .game-subtitle {
+                font-size: 1rem;
+            }
+            
+            #scoreBoard {
+                font-size: 1.3rem;
+                padding: 10px 25px;
+            }
+            
+            #questionBox {
+                font-size: 1.1rem;
+                padding: 15px;
+            }
+            
+            .mobile-controls {
+                display: flex;
+                bottom: 20px;
+            }
+            
+            .control-btn {
+                width: 70px;
+                height: 70px;
+                font-size: 28px;
+            }
+            
+            #startButton {
+                padding: 15px 35px;
+                font-size: 1rem;
+            }
+            
+            #gameContainer {
+                padding-bottom: 130px;
+            }
+            
+            .game-info {
+                padding: 20px;
+            }
+            
+            .info-title {
+                font-size: 1.3rem;
+            }
+            
+            .game-over-text {
+                font-size: 2rem;
+            }
+            
+            .final-score {
+                font-size: 1.5rem;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .header {
+                margin: 30px 0 20px;
+            }
+            
+            .game-title {
+                font-size: 3.2rem;
+            }
+            
+            #gameContainer {
+                margin-top: 20px;
+                padding-bottom: 0;
+            }
+            
+            #scoreBoard {
+                font-size: 1.7rem;
+                padding: 15px 40px;
+            }
+            
+            #questionBox {
+                font-size: 1.5rem;
+                padding: 25px;
+            }
+            
+            .game-info {
+                margin: 30px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="game-title">Math Snake</h1>
+        <p class="game-subtitle">Solve math problems to grow your snake!</p>
+    </div>
+    
+    <div class="game-info">
+        <h2 class="info-title">How to Play</h2>
+        <p class="info-text">
+            Control your snake to eat the correct answer to the math problem. 
+            Each correct answer makes your snake grow longer and earns you points. 
+            Be careful - eating the wrong answer will end the game!
+        </p>
+        
+        <h2 class="info-title">Game Rules</h2>
+        <ul class="rules-list">
+            <li>Use <span class="key">arrow keys</span> or the on-screen buttons to control the snake</li>
+            <li>Eat the food with the correct answer to the math problem</li>
+            <li>Each correct answer gives you <strong>10 points</strong></li>
+            <li>Avoid walls, obstacles, and your own tail</li>
+            <li>Eating the wrong answer ends the game immediately</li>
+        </ul>
+    </div>
+    
+    <div id="scoreBoard">Score: 0</div>
+    <div id="questionBox"></div>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <div class="button-container">
+            <button id="startButton">Start Game</button>
+        </div>
+    </div>
+    
+    <div class="mobile-controls">
+        <div class="controls-container">
+            <div class="controls-row">
+                <div class="control-btn" data-direction="up">↑</div>
+            </div>
+            <div class="controls-row">
+                <div class="control-btn" data-direction="left">←</div>
+                <div class="control-btn" data-direction="right">→</div>
+            </div>
+            <div class="controls-row">
+                <div class="control-btn" data-direction="down">↓</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreBoard = document.getElementById('scoreBoard');
+        const questionBox = document.getElementById('questionBox');
+        const startButton = document.getElementById('startButton');
+        const controlBtns = document.querySelectorAll('.control-btn');
+        let gridSize = 24;
+        let tileCount = Math.floor(canvas.width / gridSize);
+        
+        // 游戏状态
+        let snake = [];
+        let foods = [];
+        let obstacles = [];
+        let dx = 1; // 初始向右移动
+        let dy = 0;
+        let score = 0;
+        let gameInterval = null;
+        let currentQuestion = {};
+        let correctAnswerKey = '';
+        let isMobile = false;
+        let gameStarted = false;
+        let lastDirectionChange = 0;
+
+        // 游戏设置
+        const gameSettings = {
+            obstacles: 5,
+            speed: 150,
+            maxFoodAttempts: 1000,
+            minDirectionChangeInterval: 100
+        };
+
+        function generateMathQuestion() {
+            let a, b, result, operator;
+            const operators = ['+', '-', '×', '÷'];
+            operator = operators[Math.floor(Math.random() * operators.length)];
+            
+            do {
+                a = Math.floor(Math.random() * 50) + 1;
+                b = Math.floor(Math.random() * 50) + 1;
+                
+                switch(operator) {
+                    case '+': result = a + b; break;
+                    case '-': [a, b] = a < b ? [b, a] : [a, b]; result = a - b; break;
+                    case '×': result = a * b; break;
+                    case '÷': [a, result] = [a * b, a]; break;
+                }
+            } while(result > 1000 || result % 1 !== 0);
+
+            const answers = new Set([result]);
+            while(answers.size < 4) {
+                let wrong = result + (Math.floor(Math.random() * 10) - 5);
+                if(wrong < 0) wrong = Math.abs(wrong);
+                if(wrong !== result) answers.add(wrong);
+            }
+
+            const answerArray = Array.from(answers).sort(() => Math.random() - 0.5);
+            correctAnswerKey = String.fromCharCode(65 + answerArray.indexOf(result));
+
+            currentQuestion = {
+                text: `${a} ${operator} ${b} = ?`,
+                answers: { A: answerArray[0], B: answerArray[1], C: answerArray[2], D: answerArray[3] }
+            };
+
+            questionBox.innerHTML = `${currentQuestion.text}<br>
+                A: ${currentQuestion.answers.A} 
+                B: ${currentQuestion.answers.B}<br>
+                C: ${currentQuestion.answers.C} 
+                D: ${currentQuestion.answers.D}`;
+        }
+
+        function generateObstacles() {
+            obstacles = [];
+            const maxObstacleTiles = Math.floor(tileCount * tileCount * 0.3);
+            let createdWalls = 0;
+            
+            // 蛇的出生点区域（中心2×2区域）
+            const spawnCenter = Math.floor(tileCount / 2);
+            const spawnArea = {
+                x1: spawnCenter - 1,
+                x2: spawnCenter + 1,
+                y1: spawnCenter - 1,
+                y2: spawnCenter + 1
+            };
+            
+            while(createdWalls < gameSettings.obstacles && obstacles.length < maxObstacleTiles) {
+                const startX = Math.floor(Math.random() * (tileCount - 8)) + 2;
+                const startY = Math.floor(Math.random() * (tileCount - 8)) + 2;
+                const direction = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+                const length = 3 + Math.floor(Math.random() * 4);
+
+                let valid = true;
+                for(let i = 0; i < length; i++) {
+                    const x = startX + (direction === 'horizontal' ? i : 0);
+                    const y = startY + (direction === 'vertical' ? i : 0);
+                    
+                    // 检查是否在蛇的出生点区域内
+                    const inSpawnArea = 
+                        x >= spawnArea.x1 && x <= spawnArea.x2 &&
+                        y >= spawnArea.y1 && y <= spawnArea.y2;
+                    
+                    if(obstacles.some(o => o.x === x && o.y === y) || inSpawnArea) {
+                        valid = false;
+                    }
+                }
+
+                if(valid) {
+                    for(let i = 0; i < length; i++) {
+                        obstacles.push({ 
+                            x: startX + (direction === 'horizontal' ? i : 0),
+                            y: startY + (direction === 'vertical' ? i : 0)
+                        });
+                    }
+                    createdWalls++;
+                }
+            }
+        }
+
+        function generateFoods() {
+            foods = [];
+            const positions = new Set();
+            let attempts = 0;
+            
+            // 蛇的出生点区域（中心2×2区域）
+            const spawnCenter = Math.floor(tileCount / 2);
+            const spawnArea = {
+                x1: spawnCenter - 1,
+                x2: spawnCenter + 1,
+                y1: spawnCenter - 1,
+                y2: spawnCenter + 1
+            };
+            
+            // 确保生成4个食物
+            while(foods.length < 4 && attempts < gameSettings.maxFoodAttempts) {
+                attempts++;
+                const pos = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
+                };
+                
+                const posKey = `${pos.x},${pos.y}`;
+                if(!positions.has(posKey)) {
+                    // 检查是否在蛇的出生点区域内
+                    const inSpawnArea = 
+                        pos.x >= spawnArea.x1 && pos.x <= spawnArea.x2 &&
+                        pos.y >= spawnArea.y1 && pos.y <= spawnArea.y2;
+                    
+                    const isValid = 
+                        !obstacles.some(o => o.x === pos.x && o.y === pos.y) &&
+                        !snake.some(s => s.x === pos.x && s.y === pos.y) &&
+                        pos.x > 2 && pos.x < tileCount - 3 &&
+                        pos.y > 2 && pos.y < tileCount - 3 &&
+                        !inSpawnArea; // 不在出生点区域内
+
+                    if(isValid) {
+                        foods.push({
+                            ...pos,
+                            color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'][foods.length],
+                            answerKey: String.fromCharCode(65 + foods.length)
+                        });
+                        positions.add(posKey);
+                    }
+                }
+            }
+
+            // 如果无法生成4个食物，重新生成障碍物和食物
+            if(foods.length < 4) {
+                generateObstacles();
+                generateFoods();
+            }
+        }
+
+        function drawRoundedSquare(x, y, size, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + size - radius, y);
+            ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+            ctx.lineTo(x + size, y + size - radius);
+            ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+            ctx.lineTo(x + radius, y + size);
+            ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function drawSnake() {
+            snake.forEach((segment, index) => {
+                const x = segment.x * gridSize;
+                const y = segment.y * gridSize;
+                
+                // 蛇头样式
+                if(index === 0) {
+                    ctx.fillStyle = '#2b2d42';
+                    drawRoundedSquare(x, y, gridSize, 5);
+                    ctx.fill();
+                    
+                    // 蛇眼
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize/3, y + gridSize/3, gridSize/8, 0, Math.PI*2);
+                    ctx.arc(x + gridSize*2/3, y + gridSize/3, gridSize/8, 0, Math.PI*2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#4361ee';
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize/3, y + gridSize/3, gridSize/12, 0, Math.PI*2);
+                    ctx.arc(x + gridSize*2/3, y + gridSize/3, gridSize/12, 0, Math.PI*2);
+                    ctx.fill();
+                    
+                    // 蛇嘴
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize/2, y + gridSize*2/3, gridSize/4, 0, Math.PI);
+                    ctx.stroke();
+                } 
+                // 蛇身样式
+                else {
+                    const progress = index / snake.length;
+                    const hue = 220 + progress * 40;
+                    ctx.fillStyle = `hsl(${hue}, 70%, 55%)`;
+                    drawRoundedSquare(x, y, gridSize, 5);
+                    ctx.fill();
+                    
+                    // 蛇身花纹
+                    ctx.fillStyle = `hsla(${hue}, 80%, 70%, 0.3)`;
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize/2, y + gridSize/2, gridSize/3, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        function drawFoods() {
+            foods.forEach(food => {
+                const x = food.x * gridSize;
+                const y = food.y * gridSize;
+                
+                // 食物发光效果
+                ctx.shadowColor = food.color;
+                ctx.shadowBlur = 15;
+                
+                // 食物主体
+                ctx.fillStyle = food.color;
+                ctx.beginPath();
+                ctx.arc(x + gridSize/2, y + gridSize/2, gridSize/2.5, 0, Math.PI*2);
+                ctx.fill();
+                
+                // 食物高光
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.beginPath();
+                ctx.arc(x + gridSize/3, y + gridSize/3, gridSize/6, 0, Math.PI*2);
+                ctx.fill();
+                
+                // 字母
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${gridSize/2}px Poppins`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(food.answerKey, x + gridSize/2, y + gridSize/2);
+                
+                // 重置阴影
+                ctx.shadowColor = 'transparent';
+            });
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                const x = obstacle.x * gridSize;
+                const y = obstacle.y * gridSize;
+                
+                // 障碍物主体
+                ctx.fillStyle = '#6c757d';
+                drawRoundedSquare(x, y, gridSize, 3);
+                ctx.fill();
+                
+                // 障碍物纹理
+                ctx.fillStyle = '#495057';
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + gridSize, y + gridSize);
+                ctx.moveTo(x + gridSize, y);
+                ctx.lineTo(x, y + gridSize);
+                ctx.strokeStyle = '#495057';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // 障碍物阴影
+                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                ctx.lineWidth = 2;
+                drawRoundedSquare(x, y, gridSize, 3);
+                ctx.stroke();
+            });
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制网格背景
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制网格线
+            ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+            ctx.lineWidth = 0.5;
+            for(let i = 0; i < tileCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * gridSize, 0);
+                ctx.lineTo(i * gridSize, canvas.height);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, i * gridSize);
+                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.stroke();
+            }
+            
+            drawObstacles();
+            drawFoods();
+            drawSnake();
+        }
+
+        function moveSnake() {
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+            
+            // 检查是否撞墙
+            if(head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                gameOver();
+                return;
+            }
+            
+            // 检查是否撞到自己
+            if(snake.some((segment, index) => index > 0 && segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+            
+            // 检查是否撞到障碍物
+            if(obstacles.some(obstacle => obstacle.x === head.x && obstacle.y === head.y)) {
+                gameOver();
+                return;
+            }
+            
+            snake.unshift(head);
+            
+            // 检查是否吃到食物
+            let foodIndex = -1;
+            foods.forEach((food, index) => {
+                if(food.x === head.x && food.y === head.y) {
+                    foodIndex = index;
+                }
+            });
+            
+            if(foodIndex !== -1) {
+                const eatenFood = foods[foodIndex];
+                
+                if(eatenFood.answerKey === correctAnswerKey) {
+                    score += 10;
+                    scoreBoard.textContent = `Score: ${score}`;
+                    generateMathQuestion();
+                    generateFoods(); // 刷新所有苹果位置
+                    
+                    // 吃到正确食物时的动画效果
+                    const x = eatenFood.x * gridSize;
+                    const y = eatenFood.y * gridSize;
+                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                    ctx.beginPath();
+                    ctx.arc(x + gridSize/2, y + gridSize/2, gridSize, 0, Math.PI*2);
+                    ctx.fill();
+                } else {
+                    // 吃到错误答案，游戏结束
+                    gameOver();
+                    return;
+                }
+                
+                // 移除被吃掉的食物
+                foods.splice(foodIndex, 1);
+                
+                // 确保总是有4个食物
+                while(foods.length < 4) {
+                    generateFoods();
+                }
+            } else {
+                snake.pop();
+            }
+        }
+
+        function gameOver() {
+            clearInterval(gameInterval);
+            gameStarted = false;
+            startButton.textContent = 'Play Again';
+            startButton.style.display = 'block';
+            
+            // 创建游戏结束覆盖层
+            const overlay = document.createElement('div');
+            overlay.className = 'game-overlay';
+            overlay.innerHTML = `
+                <div class="game-over-text">Game Over!</div>
+                <div class="final-score">Score: ${score}</div>
+            `;
+            
+            // 添加到游戏容器
+            const gameContainer = document.getElementById('gameContainer');
+            gameContainer.appendChild(overlay);
+            
+            // 点击覆盖层重新开始游戏
+            overlay.addEventListener('click', () => {
+                gameContainer.removeChild(overlay);
+                startGame();
+            });
+        }
+
+        function startGame() {
+            if(gameStarted) return;
+            
+            // 移除可能存在的游戏结束覆盖层
+            const existingOverlay = document.querySelector('.game-overlay');
+            if(existingOverlay) {
+                existingOverlay.parentNode.removeChild(existingOverlay);
+            }
+            
+            gameStarted = true;
+            score = 0;
+            scoreBoard.textContent = `Score: ${score}`;
+            startButton.style.display = 'none';
+            
+            // 蛇的初始位置（中心点）
+            const spawnCenter = Math.floor(tileCount / 2);
+            snake = [
+                {x: spawnCenter, y: spawnCenter}
+            ];
+            
+            // 初始方向设置为向右
+            dx = 1;
+            dy = 0;
+            
+            generateObstacles();
+            generateFoods();
+            generateMathQuestion();
+            
+            if(gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(() => {
+                moveSnake();
+                drawGame();
+            }, gameSettings.speed);
+        }
+
+        function changeDirection(newDx, newDy) {
+            const now = Date.now();
+            if(now - lastDirectionChange < gameSettings.minDirectionChangeInterval) {
+                return;
+            }
+            lastDirectionChange = now;
+            
+            // 防止180度转弯
+            if(!(dx !== 0 && newDx === -dx) && !(dy !== 0 && newDy === -dy)) {
+                dx = newDx;
+                dy = newDy;
+            }
+        }
+
+        function handleKeyDown(e) {
+            if(!gameStarted) return;
+            
+            e.preventDefault();
+            
+            switch(e.key) {
+                case 'ArrowUp': changeDirection(0, -1); break;
+                case 'ArrowDown': changeDirection(0, 1); break;
+                case 'ArrowLeft': changeDirection(-1, 0); break;
+                case 'ArrowRight': changeDirection(1, 0); break;
+                case 'w': changeDirection(0, -1); break;
+                case 's': changeDirection(0, 1); break;
+                case 'a': changeDirection(-1, 0); break;
+                case 'd': changeDirection(1, 0); break;
+            }
+        }
+
+        function handleControlBtnClick(direction) {
+            if(!gameStarted) return;
+            
+            switch(direction) {
+                case 'up': changeDirection(0, -1); break;
+                case 'down': changeDirection(0, 1); break;
+                case 'left': changeDirection(-1, 0); break;
+                case 'right': changeDirection(1, 0); break;
+            }
+        }
+
+        function init() {
+            isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            startButton.addEventListener('click', startGame);
+            startButton.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                startGame();
+            }, {passive: false});
+            
+            document.addEventListener('keydown', handleKeyDown);
+            
+            controlBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    handleControlBtnClick(btn.dataset.direction);
+                });
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    handleControlBtnClick(btn.dataset.direction);
+                }, {passive: false});
+            });
+            
+            // 初始绘制
+            drawGame();
+            questionBox.textContent = 'Press Start Game to begin!';
+            
+            // 调整画布大小以适应设备
+            function resizeCanvas() {
+                const maxWidth = Math.min(600, window.innerWidth - 40);
+                const canvasSize = Math.floor(maxWidth / gridSize) * gridSize;
+                canvas.width = canvasSize;
+                canvas.height = canvasSize;
+                tileCount = Math.floor(canvas.width / gridSize);
+                drawGame();
+            }
+            
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+        }
+
+        init();
+    </script>
+</body>
+</html>
