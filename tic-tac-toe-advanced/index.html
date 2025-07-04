@@ -2,8 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Enhanced Tic-Tac-Toe 4x4</title>
+
+    <!-- Google AdSense -->
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3424102604992913"
+      crossorigin="anonymous"
+    ></script>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -304,6 +314,173 @@
       }
       .tutorial-start-btn:hover {
         background-color: #45a049;
+      }
+
+      /* Mobile-specific styles */
+      @media (max-width: 768px) {
+        body {
+          padding: 10px;
+          display: flex;
+          flex-direction: column;
+          min-height: 100vh;
+        }
+
+        h1 {
+          font-size: 24px;
+          margin-bottom: 15px;
+        }
+
+        .board {
+          width: 90vw;
+          height: 90vw;
+          max-width: 350px;
+          max-height: 350px;
+          margin: 15px auto;
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(4, 1fr);
+        }
+
+        .cell {
+          width: auto;
+          height: auto;
+          font-size: 24px;
+          border-width: 2px;
+        }
+
+        .game-options button,
+        .reset-button,
+        .tutorial-start-btn {
+          padding: 12px 20px;
+          font-size: 16px;
+          margin: 8px;
+          min-height: 44px;
+          touch-action: manipulation;
+        }
+
+        .status {
+          font-size: 16px;
+          margin: 15px 0;
+        }
+
+        .rules {
+          max-width: 90vw;
+          padding: 15px;
+          font-size: 14px;
+        }
+
+        .toggle-rules {
+          padding: 10px 15px;
+          font-size: 14px;
+          margin: 10px 0;
+        }
+
+        .tutorial-container {
+          padding: 15px;
+          max-width: 95vw;
+          max-height: 90vh;
+        }
+
+        .tutorial-content h3 {
+          font-size: 18px;
+        }
+
+        .tutorial-content p {
+          font-size: 14px;
+          line-height: 1.4;
+        }
+
+        .tutorial-btn {
+          padding: 10px 16px;
+          font-size: 14px;
+          margin: 5px;
+        }
+
+        .tutorial-progress {
+          margin: 15px 0;
+        }
+
+        .progress-dot {
+          width: 8px;
+          height: 8px;
+          margin: 0 3px;
+        }
+
+        /* 确保广告在游戏下方显示 */
+        #ads_bottom-div {
+          margin-top: 15px !important;
+          margin-bottom: 15px !important;
+          flex-shrink: 0;
+        }
+      }
+
+      @media (max-width: 480px) {
+        h1 {
+          font-size: 20px;
+        }
+
+        .board {
+          width: 95vw;
+          height: 95vw;
+          max-width: 300px;
+          max-height: 300px;
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(4, 1fr);
+        }
+
+        .cell {
+          width: auto;
+          height: auto;
+          font-size: 20px;
+          border-width: 1px;
+        }
+
+        .game-options button,
+        .reset-button,
+        .tutorial-start-btn {
+          padding: 10px 16px;
+          font-size: 14px;
+          margin: 6px;
+        }
+
+        .status {
+          font-size: 14px;
+        }
+
+        .rules {
+          padding: 10px;
+          font-size: 13px;
+        }
+
+        .tutorial-container {
+          padding: 10px;
+        }
+
+        .tutorial-content h3 {
+          font-size: 16px;
+        }
+
+        .tutorial-content p {
+          font-size: 13px;
+        }
+      }
+
+      /* Touch-friendly styles */
+      * {
+        touch-action: manipulation;
+      }
+
+      .cell {
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* AdSense responsive styles */
+      @media (max-width: 320px) {
+        .adsbygoogle {
+          width: 300px !important;
+          height: 100px !important;
+        }
       }
     </style>
   </head>
@@ -1389,6 +1566,123 @@
         cells.forEach((cell) => {
           cell.addEventListener("click", handleCellClick);
         });
+      });
+    </script>
+
+    <!-- AdSense Bottom Banner Ad -->
+    <div
+      id="ads_bottom-div"
+      style="
+        text-align: center;
+        margin-top: 20px;
+        margin-bottom: 20px;
+        max-width: 100vw;
+        overflow: hidden;
+        width: 100%;
+        display: block;
+        clear: both;
+      "
+    >
+      <ins
+        class="adsbygoogle"
+        style="
+          display: inline-block;
+          width: 320px;
+          height: 100px;
+          background-color: #f0f0f0;
+          border: 1px solid #ddd;
+        "
+        data-ad-client="ca-pub-3424102604992913"
+        data-ad-slot="2199356140"
+      ></ins>
+      <script>
+        (adsbygoogle = window.adsbygoogle || []).push({});
+      </script>
+    </div>
+
+    <!-- AdSense Configuration -->
+    <script>
+      window.adsbygoogle = window.adsbygoogle || [];
+      var adBreak = (adConfig = function (o) {
+        adsbygoogle.push(o);
+      });
+      adConfig({preloadAdBreaks: "on"});
+
+      // showHintRewardAd function for first button click
+      function showHintRewardAd() {
+        // 检测是否为移动设备
+        const isMobile = window.innerWidth <= 768;
+
+        adBreak({
+          type: "reward",
+          name: "hint_reward",
+          // 为移动端设置合适的广告尺寸
+          adSize: isMobile ? "320x480" : "640x480",
+          beforeAd: () => {
+            console.log("准备显示提示广告");
+          },
+          afterAd: () => {
+            console.log("广告播放完成");
+          },
+          beforeReward: (showAdFn) => {
+            console.log("广告准备就绪");
+            showAdFn();
+          },
+          adDismissed: () => {
+            console.log("用户关闭了广告，不执行游戏逻辑");
+          },
+          adViewed: () => {
+            console.log("用户观看完广告，执行游戏逻辑");
+            // 执行教程开始逻辑
+            startTutorialOriginal();
+          },
+          adBreakDone: (placementInfo) => {
+            console.log("广告流程结束:", placementInfo);
+            if (placementInfo.breakStatus !== "viewed") {
+              console.log("广告未完整观看");
+            }
+          },
+        });
+      }
+
+      // 保存原始的教程开始函数
+      let startTutorialOriginal = null;
+      let isFirstClick = true;
+
+      // 等待DOM加载完成后修改按钮事件
+      document.addEventListener("DOMContentLoaded", function () {
+        const startTutorialBtn = document.getElementById("startTutorial");
+        if (startTutorialBtn) {
+          // 保存原始的点击处理函数
+          startTutorialOriginal = function () {
+            localStorage.removeItem("tutorialClosed");
+            const tutorialContainer =
+              document.getElementById("tutorialContainer");
+            tutorialContainer.classList.remove("hidden");
+            tutorialContainer.style.display = "flex";
+            const emergencyExitBtn = document.getElementById("emergencyExit");
+            setTimeout(() => {
+              emergencyExitBtn.style.display = "block";
+            }, 1000);
+          };
+
+          // 移除原有的事件监听器并添加新的
+          const newStartTutorialBtn = startTutorialBtn.cloneNode(true);
+          startTutorialBtn.parentNode.replaceChild(
+            newStartTutorialBtn,
+            startTutorialBtn
+          );
+
+          newStartTutorialBtn.addEventListener("click", function () {
+            if (isFirstClick) {
+              isFirstClick = false;
+              showHintRewardAd();
+            } else {
+              // 直接执行教程逻辑
+              startTutorialOriginal();
+            }
+          });
+        }
       });
     </script>
   </body>
