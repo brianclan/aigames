@@ -901,8 +901,8 @@
         adBreak({
           type: "reward",
           name: "hint_reward",
-          // 为移动端设置合适的广告尺寸
-          adSize: isMobile ? "320x480" : "640x480",
+          // 为移动端设置更小的广告尺寸以确保完整显示
+          adSize: isMobile ? "300x250" : "640x480",
           beforeAd: () => {
             console.log("准备显示提示广告");
           },
