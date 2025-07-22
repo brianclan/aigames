@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SLERF Disaster Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #f0f0f0;
+            padding: 20px;
+        }
+        #game {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #button {
+            background: #ff4444;
+            color: white;
+            font-size: 24px;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: transform 0.1s;
+        }
+        #button:active {
+            transform: scale(0.95);
+        }
+        #message {
+            min-height: 60px;
+            margin: 20px 0;
+            font-size: 18px;
+            color: #d32f2f;
+        }
+        #stats {
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        .burn-effect {
+            animation: burn 0.5s;
+        }
+        @keyframes burn {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; transform: scale(1.2); }
+            100% { opacity: 1; }
+        }
+        #muteBtn {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background: #ddd;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <h1>SLERF Disaster Simulator</h1>
+        <p>Try to deploy LP tokens without burning them all!</p>
+        
+        <div id="message">Click the button to start...</div>
+        <button id="button">DEPLOY LP TOKENS</button>
+        
+        <div id="stats">
+            <p>Loss: $<span id="loss">0</span></p>
+            <p>Time: <span id="time">0</span>s</p>
+        </div>
+        
+        <div class="controls">
+            <button id="muteBtn">🔊 Sound ON</button>
+            <button id="voiceBtn">🗣️ Voice ON</button>
+        </div>
+    </div>
+
+    <script>
+        // Game variables
+        const disasters = [
+            "OH FUCK! You accidentally burned the LP tokens!",
+            "Wrong button! Sent to Vitalik's wallet instead!",
+            "CEX just delisted SLERF!",
+            "Community found out you messed up!",
+            "Telegram admin ran away!",
+            "Someone called this a scam!"
+        ];
+        
+        let loss = 0;
+        let startTime = Date.now();
+        let soundEnabled = true;
+        let voiceEnabled = true;
+        const button = document.getElementById("button");
+        const message = document.getElementById("message");
+        const lossDisplay = document.getElementById("loss");
+        const timeDisplay = document.getElementById("time");
+        const muteBtn = document.getElementById("muteBtn");
+        const voiceBtn = document.getElementById("voiceBtn");
+        
+        // Audio context and sounds
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Speech synthesis
+        function speak(text) {
+            if (!voiceEnabled) return;
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 0.8;
+            utterance.volume = 1.0;
+            
+            // Try to get a male voice if available
+            const voices = window.speechSynthesis.getVoices();
+            const maleVoice = voices.find(v => v.name.includes("Male"));
+            if (maleVoice) utterance.voice = maleVoice;
+            
+            // Special emphasis for "OH FUCK"
+            if (text.startsWith("OH FUCK")) {
+                utterance.rate = 1.3;
+                utterance.pitch = 1.2;
+            }
+            
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // Initialize voices (needed for some browsers)
+        speechSynthesis.onvoiceschanged = function() {
+            console.log("Voices loaded:", speechSynthesis.getVoices());
+        };
+        
+        function playSound(type) {
+            if (!soundEnabled) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            switch(type) {
+                case 'burn':
+                    oscillator.type = 'sawtooth';
+                    oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(20, audioContext.currentTime + 0.5);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    break;
+                case 'error':
+                    oscillator.type = 'square';
+                    oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(220, audioContext.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    break;
+                case 'success':
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
+                    oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
+                    oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    break;
+            }
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+        
+        // Mute buttons
+        muteBtn.addEventListener("click", () => {
+            soundEnabled = !soundEnabled;
+            muteBtn.textContent = soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF";
+        });
+        
+        voiceBtn.addEventListener("click", () => {
+            voiceEnabled = !voiceEnabled;
+            voiceBtn.textContent = voiceEnabled ? "🗣️ Voice ON" : "🔇 Voice OFF";
+        });
+        
+        // Time updater
+        function updateTime() {
+            const seconds = Math.floor((Date.now() - startTime) / 1000);
+            timeDisplay.textContent = seconds;
+            setTimeout(updateTime, 1000);
+        }
+        
+        // Main button click handler
+        button.addEventListener("click", () => {
+            // Add burn effect
+            button.classList.add("burn-effect");
+            setTimeout(() => button.classList.remove("burn-effect"), 500);
+            
+            // Play burn sound
+            playSound('burn');
+            
+            // Show random disaster
+            const disaster = disasters[Math.floor(Math.random() * disasters.length)];
+            message.textContent = disaster;
+            
+            // Speak the disaster
+            speak(disaster);
+            
+            // Play error sound
+            setTimeout(() => playSound('error'), 200);
+            
+            // Update loss ($1M-$10M random)
+            loss += Math.floor(Math.random() * 9000000) + 1000000;
+            lossDisplay.textContent = loss.toLocaleString();
+            
+            // 1% chance of fake success
+            if (Math.random() < 0.01) {
+                setTimeout(() => {
+                    const joke = "(PS: Just kidding, you failed)";
+                    message.textContent += " " + joke;
+                    playSound('success');
+                    speak(joke);
+                    setTimeout(() => playSound('error'), 500);
+                }, 800);
+            }
+        });
+        
+        // Initial voice setup
+        if (speechSynthesis.getVoices().length === 0) {
+            speechSynthesis.addEventListener('voiceschanged', () => {
+                console.log("Voices loaded after event:", speechSynthesis.getVoices());
+            });
+        }
+        
+        updateTime();
+        
+        // First message
+        setTimeout(() => speak("Welcome to SLERF Disaster Simulator. Try not to burn all the tokens!"), 500);
+    </script>
+</body>
+</html>
