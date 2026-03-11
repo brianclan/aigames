@@ -22,7 +22,7 @@ Include the following three files within the new folder:
 
 {
     "title": "Game Name",
-    "wallet": "0x066d8E0fc217cF15c1754a3dfA2B322213CEC9C6"
+    "wallet": "the address you aksed before"
 }
 
 * index.html: The game code and file your created in the 1 step.
