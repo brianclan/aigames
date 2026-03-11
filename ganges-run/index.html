@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ganges River Run</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(180deg, #ff9933 0%, #ff6633 50%, #cc3300 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        h1 {
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        #gameCanvas {
+            border: 4px solid #ffcc00;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: linear-gradient(180deg, #87ceeb 0%, #4a90c2 30%, #2d5a7b 100%);
+        }
+        #score {
+            color: #fff;
+            font-size: 1.5rem;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #instructions {
+            color: #fff;
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            border: 3px solid #ffcc00;
+        }
+        #gameOver h2 {
+            font-size: 2rem;
+            color: #ff6633;
+            margin-bottom: 20px;
+        }
+        #restartBtn {
+            background: linear-gradient(180deg, #ffcc00 0%, #ff9933 100%);
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            color: #333;
+            font-weight: bold;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+        #restartBtn:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>🪷 Ganges River Run 🪷</h1>
+    <p id="instructions">Use LEFT/RIGHT arrow keys or A/D to move</p>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <p id="score">Score: 0</p>
+    <div id="gameOver">
+        <h2>Namaste! 🙏</h2>
+        <p id="finalScore">Your Score: 0</p>
+        <button id="restartBtn" onclick="restartGame()">Play Again</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const gameOverEl = document.getElementById('gameOver');
+        const finalScoreEl = document.getElementById('finalScore');
+
+        // Game state
+        let score = 0;
+        let gameRunning = true;
+        let speed = 3;
+        let frameCount = 0;
+
+        // Boat (player)
+        const boat = {
+            x: 175,
+            y: 500,
+            width: 50,
+            height: 70,
+            speed: 7
+        };
+
+        // Objects
+        let lotuses = [];
+        let bananas = [];
+        let rocks = [];
+        let templeTowers = [];
+
+        // Controls
+        const keys = {};
+        document.addEventListener('keydown', e => keys[e.key] = true);
+        document.addEventListener('keyup', e => keys[e.key] = false);
+
+        function drawBoat() {
+            // Boat body
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            ctx.moveTo(boat.x + 25, boat.y);
+            ctx.lineTo(boat.x + 50, boat.y + 60);
+            ctx.lineTo(boat.x, boat.y + 60);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Decorative pattern
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(boat.x + 15, boat.y + 20, 20, 20);
+            
+            // Small temple on boat
+            ctx.fillStyle = '#FF6600';
+            ctx.fillRect(boat.x + 18, boat.y + 10, 14, 15);
+            ctx.beginPath();
+            ctx.moveTo(boat.x + 15, boat.y + 10);
+            ctx.lineTo(boat.x + 25, boat.y);
+            ctx.lineTo(boat.x + 35, boat.y + 10);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawLotus(lotus) {
+            // Lotus flower
+            ctx.fillStyle = '#FF69B4';
+            for (let i = 0; i < 8; i++) {
+                ctx.beginPath();
+                ctx.ellipse(
+                    lotus.x + 15 + Math.cos(i * Math.PI / 4) * 10,
+                    lotus.y + 10 + Math.sin(i * Math.PI / 4) * 8,
+                    8, 5, i * Math.PI / 4, 0, Math.PI * 2
+                );
+                ctx.fill();
+            }
+            // Center
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(lotus.x + 15, lotus.y + 12, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawBanana(banana) {
+            // Banana bunch
+            ctx.fillStyle = '#FFE135';
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.ellipse(banana.x + 10, banana.y + 8 + i * 6, 12, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawRock(rock) {
+            // Rock
+            ctx.fillStyle = '#696969';
+            ctx.beginPath();
+            ctx.moveTo(rock.x + 20, rock.y);
+            ctx.lineTo(rock.x + 40, rock.y + 25);
+            ctx.lineTo(rock.x, rock.y + 25);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawTempleTower(tower) {
+            // Temple tower (ghat)
+            ctx.fillStyle = '#DEB887';
+            ctx.fillRect(tower.x, tower.y, 40, 80);
+            // Decorative dots
+            ctx.fillStyle = '#FF6600';
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(tower.x + 10 + (i % 2) * 20, tower.y + 15 + i * 12, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawWater() {
+            // Animated water effect
+            ctx.fillStyle = 'rgba(135, 206, 235, 0.3)';
+            for (let i = 0; i < 5; i++) {
+                const waveY = (frameCount * 2 + i * 120) % 600;
+                ctx.beginPath();
+                ctx.ellipse(200, waveY, 150, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function spawnObjects() {
+            // Spawn lotus (good - gives points)
+            if (Math.random() < 0.02) {
+                lotuses.push({
+                    x: Math.random() * 360,
+                    y: -30,
+                    size: 30
+                });
+            }
+            
+            // Spawn banana (good - bonus points)
+            if (Math.random() < 0.015) {
+                bananas.push({
+                    x: Math.random() * 360,
+                    y: -30,
+                    size: 20
+                });
+            }
+            
+            // Spawn rock (bad - game over)
+            if (Math.random() < 0.015 && score > 50) {
+                rocks.push({
+                    x: Math.random() * 360,
+                    y: -30,
+                    size: 40
+                });
+            }
+            
+            // Spawn temple towers on sides
+            if (Math.random() < 0.01) {
+                templeTowers.push({
+                    x: Math.random() < 0.5 ? -10 : 370,
+                    y: -80,
+                    size: 40
+                });
+            }
+        }
+
+        function update() {
+            if (!gameRunning) return;
+            
+            frameCount++;
+            
+            // Move boat
+            if ((keys['ArrowLeft'] || keys['a'] || keys['A']) && boat.x > 5) {
+                boat.x -= boat.speed;
+            }
+            if ((keys['ArrowRight'] || keys['d'] || keys['D']) && boat.x < 350) {
+                boat.x += boat.speed;
+            }
+            
+            // Increase speed gradually
+            if (frameCount % 300 === 0) {
+                speed += 0.2;
+            }
+            
+            // Update lotuses
+            lotuses.forEach((lotus, i) => {
+                lotus.y += speed;
+                if (lotus.y > 650) {
+                    lotuses.splice(i, 1);
+                }
+                // Collision with boat
+                if (Math.abs(lotus.x + 15 - boat.x - 25) < 40 && Math.abs(lotus.y + 10 - boat.y - 30) < 50) {
+                    score += 10;
+                    lotuses.splice(i, 1);
+                }
+            });
+            
+            // Update bananas
+            bananas.forEach((banana, i) => {
+                banana.y += speed;
+                if (banana.y > 650) {
+                    bananas.splice(i, 1);
+                }
+                if (Math.abs(banana.x + 10 - boat.x - 25) < 40 && Math.abs(banana.y + 10 - boat.y - 30) < 50) {
+                    score += 25;
+                    bananas.splice(i, 1);
+                }
+            });
+            
+            // Update rocks
+            rocks.forEach((rock, i) => {
+                rock.y += speed;
+                if (rock.y > 650) {
+                    rocks.splice(i, 1);
+                }
+                // Collision with boat - game over!
+                if (Math.abs(rock.x + 20 - boat.x - 25) < 35 && Math.abs(rock.y + 15 - boat.y - 30) < 45) {
+                    gameOver();
+                }
+            });
+            
+            // Update temple towers
+            templeTowers.forEach((tower, i) => {
+                tower.y += speed;
+                if (tower.y > 650) {
+                    templeTowers.splice(i, 1);
+                }
+                // Collision
+                if (tower.x < 50 && boat.x < 50) {
+                    gameOver();
+                }
+                if (tower.x > 350 && boat.x > 330) {
+                    gameOver();
+                }
+            });
+            
+            score++;
+            scoreEl.textContent = 'Score: ' + score;
+            
+            spawnObjects();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawWater();
+            
+            templeTowers.forEach(drawTempleTower);
+            lotuses.forEach(drawLotus);
+            bananas.forEach(drawBanana);
+            rocks.forEach(drawRock);
+            drawBoat();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            finalScoreEl.textContent = 'Your Score: ' + score;
+            gameOverEl.style.display = 'block';
+        }
+
+        function restartGame() {
+            score = 0;
+            speed = 3;
+            frameCount = 0;
+            lotuses = [];
+            bananas = [];
+            rocks = [];
+            templeTowers = [];
+            boat.x = 175;
+            gameRunning = true;
+            gameOverEl.style.display = 'none';
+            scoreEl.textContent = 'Score: 0';
+            gameLoop();
+        }
+
+        // Start game
+        gameLoop();
+    </script>
+</body>
+</html>
