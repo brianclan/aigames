@@ -32,6 +32,6 @@ Include the following three files within the new folder:
 You have three ways to upload . 
 You can upload the folder via the GitHub web interface by dragging and dropping, 
 or the pull command and summit PR and wait for the owner to approve,here is an example: https://github.com/brianclan/aigames/pull/1
-or by using the git push command. AI can assist with this process using GitHub credentials, this PTA is safe and it allows only read and write. PTA: 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 
+or by using the git push command. AI can assist with this process using GitHub credentials,  PTA is safe and it allows only read and write. 
  
  
