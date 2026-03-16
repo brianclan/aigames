@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bali Beach Run</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:linear-gradient(180deg,#87CEEB,#40E0D0,#20B2AA);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;overflow:hidden}
+h1{color:#fff;text-shadow:2px 2px 4px rgba(0,0,0,0.5);margin-bottom:10px;font-size:2rem}
+#gameCanvas{border:4px solid #FFD700;border-radius:10px;box-shadow:0 10px 30px0,0, rgba(0,0.5);background:linear-gradient(180deg,#87CEEB,#40E0D0,#20B2AA,#8B4513)}
+#score{color:#fff;font-size:1.5rem;margin:10px 0;text-shadow:2px 2px 4px rgba(0,0,0,0.5)}
+#instructions{color:#fff;font-size:1rem;opacity:0.9}
+#gameOver{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);color:#fff;padding:40px;border-radius:20px;text-align:center;border:3px solid #FFD700}
+#gameOver h2{font-size:2rem;color:#FF6B6B;margin-bottom:20px}
+#restartBtn{background:linear-gradient(180deg,#FFD700,#FFA500);border:none;padding:15px 40px;font-size:1.2rem;border-radius:30px;cursor:pointer;color:#333;font-weight:bold;margin-top:20px}
+</style>
+</head>
+<body>
+<h1>🌺 Bali Beach Run 🌺</h1>
+<p id="instructions">Use LEFT/RIGHT or A/D to move</p>
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+<p id="score">Score: 0</p>
+<div id="gameOver">
+<h2>Selamat! 🙏</h2>
+<p id="finalScore">Your Score: 0</p>
+<button id="restartBtn" onclick="restartGame()">Play Again</button>
+</div>
+<script>
+const c=document.getElementById('gameCanvas'),ctx=c.getContext('2d'),s=document.getElementById('score'),g=document.getElementById('gameOver'),f=document.getElementById('finalScore');
+let sc=0,gR=!0,sp=3,fc=0,bt={x:175,y:500,w:50,h:60,sp:7},fl=[],cn=[],rk=[];
+
+document.addEventListener('keydown',e=>keys[e.key]=!0);
+document.addEventListener('keyup',e=>keys[e.key]=!1);
+const keys={};
+
+function dB(){
+ctx.fillStyle='#8B4513';
+ctx.beginPath();
+ctx.moveTo(bt.x+25,bt.y);
+ctx.quadraticCurveTo(bt.x+55,bt.y+40,bt.x+45,bt.y+55);
+ctx.lineTo(bt.x+5,bt.y+55);
+ctx.quadraticCurveTo(bt.x-5,bt.y+40,bt.x+25,bt.y);
+ctx.fill();
+ctx.fillStyle='#FF6347';
+ctx.beginPath();
+ctx.moveTo(bt.x+25,bt.y);
+ctx.lineTo(bt.x+25,bt.y-30);
+ctx.lineTo(bt.x+45,bt.y+10);
+ctx.fill();
+}
+
+function dFl(o){
+ctx.fillStyle=o.c||'#FFF';
+for(let i=0;i<5;i++){
+ctx.beginPath();
+ctx.ellipse(o.x+12+Math.cos(i*Math.PI*2/5)*8,o.y+12+Math.sin(i*Math.PI*2/5)*8,8,5,i*Math.PI*2/5,0,Math.PI*2);
+ctx.fill()}
+ctx.fillStyle='#FFD700';
+ctx.beginPath();ctx.arc(o.x+12,o.y+12,4,0,Math.PI*2);ctx.fill();
+}
+
+function dCn(o){
+ctx.fillStyle='#8B4513';
+ctx.beginPath();ctx.arc(o.x+10,o.y+10,10,0,Math.PI*2);ctx.fill();
+}
+
+function dRk(o){
+ctx.fillStyle='#FF69B4';
+ctx.beginPath();ctx.arc(o.x+15,o.y+15,15,0,Math.PI*2);ctx.fill();
+}
+
+function spO(){
+if(Math.random()<.025)fl.push({x:Math.random()*360,y:-30,c:Math.random()<.5?'#FFF':'#FF9'});
+if(Math.random()<.015)cn.push({x:Math.random()*360,y:-30});
+if(Math.random()<.012&&sc>30)rk.push({x:Math.random()*360,y:-30});
+}
+
+function upd(){
+if(!gR)return;fc++;
+if((keys['ArrowLeft']||keys['a']||keys['A'])&&bt.x>5)bt.x-=bt.sp;
+if((keys['ArrowRight']||keys['d']||keys['D'])&&bt.x<350)bt.x+=bt.sp;
+if(fc%300==0)sp+=.2;
+fl.forEach((o,i)=>{o.y+=sp;if(o.y>650)fl.splice(i,1);
+if(Math.abs(o.x+12-bt.x-25)<40&&Math.abs(o.y+12-bt.y-30)<50){sc+=15;fl.splice(i,1)}});
+cn.forEach((o,i)=>{o.y+=sp;if(o.y>650)cn.splice(i,1);
+if(Math.abs(o.x+10-bt.x-25)<40&&Math.abs(o.y+10-bt.y-30)<50){sc+=25;cn.splice(i,1)}});
+rk.forEach((o,i)=>{o.y+=sp;if(o.y>650)rk.splice(i,1);
+if(Math.abs(o.x+15-bt.x-25)<35&&Math.abs(o.y+15-bt.y-30)<45)gO()});
+sc++;s.textContent='Score: '+sc;spO();
+}
+
+function dr(){ctx.clearRect(0,0,400,600);
+ctx.fillStyle='#FFD700';ctx.beginPath();ctx.arc(350,80,40,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#228B22';ctx.fillRect(20,200,15,200);
+rk.forEach(dRk);fl.forEach(dFl);cn.forEach(dCn);dB();}
+
+function gO(){gR=!1;f.textContent='Your Score: '+sc;g.style.display='block'}
+function rst(){sc=0;sp=3;fc=0;fl=[];cn=[];rk=[];bt.x=175;gR=!0;g.style.display='none';s.textContent='Score: 0';lp()}
+
+function lp(){upd();dr();if(gR)requestAnimationFrame(lp)}
+lp();
+</script>
+</body>
+</html>
