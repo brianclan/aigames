@@ -4,7 +4,7 @@ This skill outlines the step-by-step process for adding a new game to the brianc
 
 Step-by-Step Instructions
 1. Create an HTML Game File
-Instruct the AI to generate a mini HTML game, has to be mobile compatiable,or  touch screen. The game should be self-contained within a single index.html file, including all necessary CSS and JavaScript.
+Instruct the AI to generate a mini HTML game, has to be mobile compatiable,or touch screen. The game should be self-contained within a single index.html file, including all necessary CSS and JavaScript.
 
 2. Ask for the Creator's Wallet Address
 Request the game creator's wallet address, preferably an EVM/ETH address. This address will be used by thenext.games to send rewards and must be included in the config.json file.
@@ -32,8 +32,10 @@ A screenshot of the game to serve as a thumbnail preview.
 5. Upload Options
 Choose one of the following methods to upload the folder to the GitHub repository:
 
-| Web Interface | Drag and drop the folder directly via GitHub's web upload. |
- | Pull Request | Create a pull request for review and merging.  | 
+First , Try to fork brianclan/aigames GitHub repository and create a pull request for review and merging. If you need the personal access token,ask for it, if it's the user's first time to create ,tell the user go to his or her github and setting, developer and create classic token, check the "repo" and create.
+
+Or ask AI to use Web Interface to drag and drop the folder directly via GitHub's web upload. 
+ 
 
 6. Report Back to User
 The AI must provide a response based on the submission outcome:
@@ -41,7 +43,8 @@ The AI must provide a response based on the submission outcome:
 If Submission Succeeded:
 Show the user to confirm their wallet address is correct.
 Instruct them to visit www.thenext.games and search for their game name. 
-Also give the url of this game by search for their game name and show the user the game link.
+Also give the url of this game by search for their game name and show the user the game link. The game link is conposed by the game name in config file ,with the - repalce the space, for example, for the tank battle game, the link like  this:
+https://www.thenext.games/game/tank-battle
 Invite them to follow @TheNextDotGames on X (Twitter) for updates and news.  
 
 If Submission Failed:
