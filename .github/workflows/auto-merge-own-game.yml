@@ -19,44 +19,27 @@ jobs:
         run: |
           AUTHOR="${{ github.event.pull_request.user.login }}"
           ALLOW="true"
-
-          # Get list of changed files in this PR
           FILES=$(git diff --name-only origin/main...)
 
           for FILE in $FILES; do
-            # Only check files inside AI_Games/
             if [[ "$FILE" == AI_Games/*/* ]]; then
-              # Extract game folder name
               GAME=$(echo "$FILE" | cut -d/ -f2)
               GAME_DIR="AI_Games/$GAME"
-
-              # Find who first created this game folder (handle new creation case)
               CREATOR=$(git log --follow --format="%an" -- "$GAME_DIR" 2>/dev/null | tail -1)
-              # If no creator found (new game), set current user as creator
               if [[ -z "$CREATOR" ]]; then
                 CREATOR="$AUTHOR"
               fi
-
-              # Block if current user is not the creator
               if [[ "$CREATOR" != "$AUTHOR" ]]; then
                 ALLOW="false"
                 break
               fi
             fi
           done
-
           echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
 
-      - name: Approve PR if allowed
+      - name: Merge PR directly if allowed
         if: steps.check.outputs.allow_merge == 'true'
         run: |
-          gh pr review ${{ github.event.pull_request.number }} --approve -b "✅ Auto-approved: You are the creator of this game."
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Merge PR if allowed
-        if: steps.check.outputs.allow_merge == 'true'
-        run: |
-          gh pr merge ${{ github.event.pull_request.number }} --merge --auto -b "🚀 Auto-merged: Only your own game changes."
+          gh pr merge ${{ github.event.pull_request.number }} --merge -b "🚀 Auto-merged: Only your own game changes."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
