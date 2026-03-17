@@ -30,8 +30,12 @@ jobs:
               GAME=$(echo "$FILE" | cut -d/ -f2)
               GAME_DIR="AI_Games/$GAME"
 
-              # Find who first created this game folder
-              CREATOR=$(git log --follow --format="%an" -- "$GAME_DIR" | tail -1)
+              # Find who first created this game folder (handle new creation case)
+              CREATOR=$(git log --follow --format="%an" -- "$GAME_DIR" 2>/dev/null | tail -1)
+              # If no creator found (new game), set current user as creator
+              if [[ -z "$CREATOR" ]]; then
+                CREATOR="$AUTHOR"
+              fi
 
               # Block if current user is not the creator
               if [[ "$CREATOR" != "$AUTHOR" ]]; then
@@ -43,9 +47,16 @@ jobs:
 
           echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
 
-      - name: Auto merge if allowed
+      - name: Approve PR if allowed
         if: steps.check.outputs.allow_merge == 'true'
-        uses: pascalgn/automerge-action@v0.16.0
+        run: |
+          gh pr review ${{ github.event.pull_request.number }} --approve -b "✅ Auto-approved: You are the creator of this game."
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MERGE_LABELS: ""
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge PR if allowed
+        if: steps.check.outputs.allow_merge == 'true'
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --merge --auto -b "🚀 Auto-merged: Only your own game changes."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
