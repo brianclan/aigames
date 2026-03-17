@@ -40,6 +40,6 @@ jobs:
       - name: Auto merge PR if allowed
         if: steps.check.outputs.allow_merge == 'true'
         run: |
-          gh pr merge ${{ github.event.pull_request.number }} --merge -b " Auto-merged: Only your own game changes."
+          gh pr merge ${{ github.event.pull_request.number }} --merge -b "🚀 Auto-merged: Only your own game changes."
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
