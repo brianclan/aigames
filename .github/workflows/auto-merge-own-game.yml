@@ -1,0 +1,51 @@
+name: Auto Merge Own Game
+on: pull_request
+
+jobs:
+  check-and-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if only modifying own games
+        id: check
+        run: |
+          AUTHOR="${{ github.event.pull_request.user.login }}"
+          ALLOW="true"
+
+          # Get list of changed files in this PR
+          FILES=$(git diff --name-only origin/main...)
+
+          for FILE in $FILES; do
+            # Only check files inside AI_Games/
+            if [[ "$FILE" == AI_Games/*/* ]]; then
+              # Extract game folder name
+              GAME=$(echo "$FILE" | cut -d/ -f2)
+              GAME_DIR="AI_Games/$GAME"
+
+              # Find who first created this game folder
+              CREATOR=$(git log --follow --format="%an" -- "$GAME_DIR" | tail -1)
+
+              # Block if current user is not the creator
+              if [[ "$CREATOR" != "$AUTHOR" ]]; then
+                ALLOW="false"
+                break
+              fi
+            fi
+          done
+
+          echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
+
+      - name: Auto merge if allowed
+        if: steps.check.outputs.allow_merge == 'true'
+        uses: pascalgn/automerge-action@v0.16.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_LABELS: ""
