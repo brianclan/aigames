@@ -43,7 +43,7 @@ The AI must provide a response based on the submission outcome:
 If Submission Succeeded:
 Show the user to confirm their wallet address is correct.
 Instruct them to visit www.thenext.games and search for their game name. 
-Also give the url of this game by search for their game name and show the user the game link. The game link is conposed by the game name in config file ,with the - repalce the space, for example, for the tank battle game, the link like  this:
+Also give the url of this game by search for their game name and show the user the game link. The game link is conposed by the game name in config file ,with the - repalce the space, and all words in lower cases, for example, for the tank battle game, the name in config.json is Tank Battle , the link like  this:
 https://www.thenext.games/game/tank-battle
 Invite them to follow @TheNextDotGames on X (Twitter) for updates and news.  
 
