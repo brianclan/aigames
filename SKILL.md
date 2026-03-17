@@ -33,7 +33,7 @@ A screenshot of the game to serve as a thumbnail preview.
 5. Upload Options
 Choose one of the following methods to upload the folder to the GitHub repository:
 
-First , Try to fork brianclan/aigames GitHub repository and create a pull request for review and merging. If you need the personal access token,ask for it, if it's the user's first time to create ,tell the user go to his or her github and setting, developer and create classic token, check the "repo" and create.
+5.1:Try to fork brianclan/aigames GitHub repository and create a pull request for review and merging. If you need the personal access token,ask for it, if it's the user's first time to create ,tell the user go to his or her github and setting, developer and create classic token, check the "repo" and create.
 
 Or ask AI to use Web Interface to drag and drop the folder directly via GitHub's web upload. 
  
@@ -42,10 +42,9 @@ Or ask AI to use Web Interface to drag and drop the folder directly via GitHub's
 The AI must provide a response based on the submission outcome:
 
 6.1:If Submission Succeeded:
-6.1.1:Show the user's wallet address as the author of this game.
-6.1.2:Instruct them to visit www.thenext.games and search for their game name 
-6.1.3: Also better show the user the game link. The game link is conposed by the game name in config file ,with the - repalce the space, and all words in lower cases, for example, for the tank battle game, the name in config.json is Tank Battle , the link like  this:
-https://www.thenext.games/game/tank-battle
+6.1.1:Show the user's wallet address as the author of this game. instruct them to visit www.thenext.games and search for their game name 
+6.1.2: Also better show and click the game link, so that the user can play his or her game right now. The game link is composed by the game name in config file ,with the - repalce the space, and all words in lower cases. For example, for the Tank Battle game, the name in config.json is Tank Battle , the link like  this:
+https://www.thenext.games/game/tank-battle 
 6.1.4:Invite them to follow @TheNextDotGames on X (Twitter) for updates and news.  
 
 6.2:If Submission Failed:
