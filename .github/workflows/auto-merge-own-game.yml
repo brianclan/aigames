@@ -1,12 +1,14 @@
 name: Auto Merge Own Game
-on: pull_request
+on:
+  pull_request:
+    types: [opened, synchronize] # 只要 PR 被创建或更新，立刻跑
 
 jobs:
   check-and-merge:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
-      contents: write
+      contents: write # 必须写这个，允许写入代码
+      pull-requests: write # 必须写这个，允许合并 PR
 
     steps:
       - name: Checkout code
@@ -37,11 +39,10 @@ jobs:
           done
           echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
 
-      - name: Auto merge PR via API
+      - name: Auto merge PR instantly
         if: steps.check.outputs.allow_merge == 'true'
         run: |
-          curl -X PUT \
-            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/merge \
-            -d '{"commit_title":"Auto-merged: Only your own game changes","merge_method":"merge"}'
+          # 直接合并，不需要你点任何按钮
+          gh pr merge ${{ github.event.pull_request.number }} --merge --auto --subject "Auto-merged: Own game changes"
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }} # 这里使用你的 PAT
