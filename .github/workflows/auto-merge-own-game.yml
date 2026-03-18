@@ -5,30 +5,29 @@ on:
     branches: [main]
 
 jobs:
-  check-and-merge:
+  auto-merge:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Check if only modifying own games
+      - name: Check only own game
         id: check
         run: |
           AUTHOR="${{ github.event.pull_request.user.login }}"
           ALLOW="true"
+
           FILES=$(git diff --name-only origin/main...)
 
           for FILE in $FILES; do
             if [[ "$FILE" == AI_Games/*/* ]]; then
               GAME=$(echo "$FILE" | cut -d/ -f2)
-              GAME_DIR="AI_Games/$GAME"
-              CREATOR=$(git log --follow --format="%an" -- "$GAME_DIR" 2>/dev/null | tail -1)
+              CREATOR=$(git log --follow --format="%an" -- "AI_Games/$GAME" 2>/dev/null | tail -1)
               if [[ -z "$CREATOR" ]]; then
                 CREATOR="$AUTHOR"
               fi
@@ -38,13 +37,14 @@ jobs:
               fi
             fi
           done
+
           echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
 
-      - name: Auto merge PR via API
+      - name: Merge PR automatically
         if: steps.check.outputs.allow_merge == 'true'
         run: |
           curl -X PUT \
             -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/merge \
-            -d '{"commit_title":"Auto-merged: Only your own game changes","merge_method":"merge"}'
+            -d '{"merge_method":"merge"}'
