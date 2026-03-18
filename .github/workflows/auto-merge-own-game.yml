@@ -2,6 +2,7 @@ name: Auto Merge Own Game
 on:
   pull_request:
     types: [opened, synchronize]
+    branches: [main]
 
 jobs:
   check-and-merge:
