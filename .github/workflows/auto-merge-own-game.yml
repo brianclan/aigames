@@ -40,15 +40,21 @@ jobs:
           done
           echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
 
-      - name: Merge PR with GitHub App Token
+      - name: Generate GitHub App Token
+        if: steps.check.outputs.allow_merge == 'true'
+        uses: actions/create-github-app-token@v1
+        id: generate-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Merge PR with App Token
         if: steps.check.outputs.allow_merge == 'true'
         env:
-          APP_ID: ${{ secrets.APP_ID }}
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
-          sudo apt install -y gh jq
-          echo "$PRIVATE_KEY" > private-key.pem
-          TOKEN=$(gh app token --app-id "$APP_ID" --private-key private-key.pem --installation-target-repo ${{ github.repository }})
           curl -v -X PUT \
             -H "Authorization: token $TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
