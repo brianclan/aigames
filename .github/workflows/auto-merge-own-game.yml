@@ -1,50 +1,107 @@
-name: Auto Merge Own Game
+name: Auto Check PR Quality (No Merge)
 on:
   pull_request:
     types: [opened, synchronize]
     branches: [main]
 
 jobs:
-  auto-merge:
+  check-pr-quality:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Main Repo
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: main
 
-      - name: Check only own game
+      - name: Checkout PR Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          path: pr-source
+
+      - name: Verify PR Quality & Ownership
         id: check
         run: |
           AUTHOR="${{ github.event.pull_request.user.login }}"
           ALLOW="true"
+          ERROR_LOG=""
 
-          FILES=$(git diff --name-only origin/main...)
+          # 1. Check if only AI_Games directory is modified
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          for FILE in $CHANGED_FILES; do
+            if [[ "$FILE" != AI_Games/*/* ]]; then
+              ERROR_LOG+="❌ Error: Modified non-game directory: $FILE\n"
+              ALLOW="false"
+            fi
+          done
 
-          for FILE in $FILES; do
+          # 2. Check required files for each game
+          for FILE in $CHANGED_FILES; do
             if [[ "$FILE" == AI_Games/*/* ]]; then
-              GAME=$(echo "$FILE" | cut -d/ -f2)
-              CREATOR=$(git log --follow --format="%an" -- "AI_Games/$GAME" 2>/dev/null | tail -1)
-              if [[ -z "$CREATOR" ]]; then
-                CREATOR="$AUTHOR"
-              fi
-              if [[ "$CREATOR" != "$AUTHOR" ]]; then
+              GAME_NAME=$(echo "$FILE" | cut -d/ -f2)
+              GAME_PATH="AI_Games/$GAME_NAME"
+
+              # Check 3 mandatory files
+              if [ ! -f "$GAME_PATH/index.html" ]; then
+                ERROR_LOG+="❌ Error: Game $GAME_NAME is missing index.html\n"
                 ALLOW="false"
-                break
+              fi
+              if [ ! -f "$GAME_PATH/config.json" ]; then
+                ERROR_LOG+="❌ Error: Game $GAME_NAME is missing config.json\n"
+                ALLOW="false"
+              fi
+              if [ ! -f "$GAME_PATH/preview.png" ]; then
+                ERROR_LOG+="❌ Error: Game $GAME_NAME is missing preview.png\n"
+                ALLOW="false"
+              fi
+
+              # 3. Validate config.json format (only name + wallet)
+              if [ -f "$GAME_PATH/config.json" ]; then
+                sudo apt install -y jq
+                KEY_COUNT=$(jq -r 'keys | length' "$GAME_PATH/config.json")
+                GAME_NAME_FIELD=$(jq -r '.name' "$GAME_PATH/config.json")
+                WALLET_FIELD=$(jq -r '.wallet' "$GAME_PATH/config.json")
+
+                if [[ "$KEY_COUNT" -ne 2 ]]; then
+                  ERROR_LOG+="❌ Error: config.json must have exactly 2 keys (name, wallet), found $KEY_COUNT\n"
+                  ALLOW="false"
+                elif [[ -z "$GAME_NAME_FIELD" || "$GAME_NAME_FIELD" == "null" ]]; then
+                  ERROR_LOG+="❌ Error: config.json missing 'name' field\n"
+                  ALLOW="false"
+                elif [[ -z "$WALLET_FIELD" || "$WALLET_FIELD" == "null" ]]; then
+                  ERROR_LOG+="❌ Error: config.json missing 'wallet' field\n"
+                  ALLOW="false"
+                else
+                  echo "✅ config.json valid: name=$GAME_NAME_FIELD, wallet=$WALLET_FIELD"
+                fi
               fi
             fi
           done
 
-          echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
+          # 4. Verify ownership (only allow modifying own games)
+          for FILE in $CHANGED_FILES; do
+            if [[ "$FILE" == AI_Games/*/* ]]; then
+              GAME_NAME=$(echo "$FILE" | cut -d/ -f2)
+              cd pr-source
+              CREATOR=$(git log --follow --format="%an" -- "AI_Games/$GAME_NAME" 2>/dev/null | tail -1)
+              if [[ -z "$CREATOR" ]]; then CREATOR="$AUTHOR"; fi
+              if [[ "$CREATOR" != "$AUTHOR" ]]; then
+                ERROR_LOG+="❌ Permission denied: You ($AUTHOR) cannot modify $GAME_NAME (original author: $CREATOR)\n"
+                ALLOW="false"
+              fi
+              cd ..
+            fi
+          done
 
-      - name: Merge PR automatically
-        if: steps.check.outputs.allow_merge == 'true'
-        run: |
-          curl -X PUT \
-            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/merge \
-            -d '{"merge_method":"merge"}'
+          # Output results
+          echo "check_passed=$ALLOW" >> $GITHUB_OUTPUT
+          echo -e "\n=== Final Check Result ==="
+          echo -e "$ERROR_LOG"
+          if [[ "$ALLOW" == "true" ]]; then
+            echo "✅ All checks passed! Ready for manual merge."
+          else
+            echo "❌ Checks failed! Please fix the issues above and resubmit."
+          fi
