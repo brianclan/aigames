@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhutan Thunder Dragon 🐉</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a0a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Georgia, serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            border: 4px solid #FF6600;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(255,102,0,0.5);
+        }
+        canvas { display: block; background: #1a0a2e; }
+        #ui {
+            position: absolute;
+            top: 10px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between;
+            color: #FFD700;
+            font-size: 20px; font-weight: bold;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        #overlay {
+            position: absolute; inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            color: #fff; border-radius: 8px;
+        }
+        #overlay h1 { font-size: 36px; margin-bottom: 8px; text-shadow: 2px 2px 4px #000; }
+        #overlay .sub { font-size: 16px; color: #FFD700; margin-bottom: 24px; }
+        #overlay button {
+            padding: 12px 36px; font-size: 20px;
+            background: linear-gradient(to bottom, #FF6600, #cc3300);
+            color: #fff; border: 3px solid #FFD700;
+            border-radius: 28px; cursor: pointer;
+        }
+        #overlay button:hover { transform: scale(1.05); }
+        #overlay.hidden { display: none; }
+        #hint {
+            margin-top: 16px; font-size: 13px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="game" width="480" height="640"></canvas>
+    <div id="ui">
+        <span id="score">⚡ 0</span>
+        <span id="hiScore">Best: 0</span>
+    </div>
+    <div id="overlay">
+        <h1>🇧🇹 Bhutan Thunder Dragon</h1>
+        <div class="sub">Dodge red dragons, collect dorje & tashi tags!</div>
+        <button id="startBtn">Start</button>
+        <div id="hint">← → or A / D to move</div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+const scoreEl = document.getElementById('score');
+const hiScoreEl = document.getElementById('hiScore');
+
+let running = false, score = 0, hiScore = parseInt(localStorage.getItem('bhutanBest')||'0'), frame = 0, speed = 3;
+const lanes = [canvas.width*0.2, canvas.width*0.5, canvas.width*0.8];
+const player = { x: canvas.width/2, lane: 1, targetX: canvas.width/2, tilt: 0 };
+let items = [], particles = [];
+const clouds = [{x:50,y:60,w:70,spd:0.4},{x:200,y:90,w:50,spd:0.3},{x:350,y:40,w:60,spd:0.5}];
+
+// Mountain bg
+const mountains = [
+    {x:0,w:180,h:200},{x:150,w:120,h:260},{x:260,w:100,h:180},{x:340,w:140,h:220}
+];
+
+function spawnItem() {
+    const types = ['rice','tashi','dorje','firework'];
+    const type = types[Math.floor(Math.random()*types.length)];
+    items.push({
+        x: lanes[Math.floor(Math.random()*3)],
+        y: -40,
+        type,
+        size: type==='firework'?36:30,
+        rot: 0,
+        wing: 0
+    });
+}
+
+function spawnParticle(x,y,emoji) {
+    particles.push({x,y,vy:-2,life:35,emoji});
+}
+
+function drawCloud(c) {
+    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.w*0.3, 0, Math.PI*2);
+    ctx.arc(c.x+c.w*0.25, c.y-c.w*0.1, c.w*0.28, 0, Math.PI*2);
+    ctx.arc(c.x+c.w*0.5, c.y, c.w*0.32, 0, Math.PI*2);
+    ctx.fill();
+}
+
+function drawMountain(m, i) {
+    const grad = ctx.createLinearGradient(m.x, canvas.height*0.5-m.h, m.x, canvas.height*0.5);
+    grad.addColorStop(0, `rgba(${80+i*30},${40+i*10},${100+i*20},0.8)`);
+    grad.addColorStop(1, `rgba(${40+i*15},${20+i*5},${60+i*10},0.5)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(m.x, canvas.height*0.5);
+    ctx.lineTo(m.x + m.w*0.5, canvas.height*0.5 - m.h);
+    ctx.lineTo(m.x + m.w, canvas.height*0.5);
+    ctx.closePath();
+    ctx.fill();
+    // Snow cap
+    ctx.fillStyle='rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.moveTo(m.x + m.w*0.3, canvas.height*0.5 - m.h*0.6);
+    ctx.lineTo(m.x + m.w*0.5, canvas.height*0.5 - m.h);
+    ctx.lineTo(m.x + m.w*0.7, canvas.height*0.5 - m.h*0.6);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawRice(x,y,size,rot) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(rot);
+    const s = size/30;
+    ctx.fillStyle='#f5f5dc';
+    for(let i=0;i<3;i++) {
+        ctx.beginPath();
+        ctx.ellipse((-6+i*6)*s, 0, 3*s, 8*s, 0, 0, Math.PI*2);
+        ctx.fill();
+    }
+    // Yellow grains
+    ctx.fillStyle='#daa520';
+    for(let i=0;i<3;i++) {
+        ctx.beginPath();
+        ctx.ellipse((-6+i*6)*s, 0, 2.5*s, 6*s, 0, 0, Math.PI*2);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawTashi(x,y,size,rot) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(rot);
+    const s = size/30;
+    // Tashi tag - colorful triangular flag
+    ctx.fillStyle='#FF6600';
+    ctx.beginPath();
+    ctx.moveTo(0, -14*s);
+    ctx.lineTo(12*s, 10*s);
+    ctx.lineTo(-12*s, 10*s);
+    ctx.closePath();
+    ctx.fill();
+    // Orange stripe
+    ctx.fillStyle='#FFD700';
+    ctx.beginPath();
+    ctx.moveTo(0, -14*s);
+    ctx.lineTo(12*s, 0);
+    ctx.lineTo(-12*s, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawDorje(x,y,size,rot) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(rot);
+    const s = size/30;
+    ctx.strokeStyle='#FFD700';
+    ctx.lineWidth=3*s;
+    ctx.lineCap='round';
+    // Dorje vajra shape
+    ctx.beginPath();
+    ctx.moveTo(0,-14*s);
+    ctx.lineTo(0,14*s);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-8*s,-4*s);
+    ctx.lineTo(8*s,-4*s);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0,-12*s,5*s,0,Math.PI*2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0,12*s,5*s,0,Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawFirework(x,y,size,wing) {
+    ctx.save();
+    ctx.translate(x,y);
+    const s = size/36;
+    // Body
+    ctx.fillStyle='#EF3340';
+    ctx.beginPath();
+    ctx.ellipse(0,0,10*s,14*s,0,0,Math.PI*2);
+    ctx.fill();
+    // Stripes
+    ctx.fillStyle='#FFD700';
+    ctx.fillRect(-10*s,-4*s,20*s,3*s);
+    ctx.fillRect(-9*s,3*s,18*s,3*s);
+    // Angry eyes
+    ctx.fillStyle='#fff';
+    ctx.beginPath();
+    ctx.arc(-4*s,-6*s,3*s,0,Math.PI*2);
+    ctx.arc(4*s,-6*s,3*s,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath();
+    ctx.arc(-4*s,-6*s,1.5*s,0,Math.PI*2);
+    ctx.arc(4*s,-6*s,1.5*s,0,Math.PI*2);
+    ctx.fill();
+    // Wings
+    ctx.fillStyle='rgba(200,80,80,0.5)';
+    ctx.save();
+    ctx.translate(-12*s,-8*s);
+    ctx.rotate(Math.sin(wing)*0.3);
+    ctx.beginPath();
+    ctx.ellipse(0,0,10*s,5*s,-0.4,0,Math.PI*2);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.ellipse(-12*s+Math.sin(wing)*3,-8*s,10*s,5*s,-0.4,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(12*s+Math.sin(wing+1)*3,-8*s,10*s,5*s,0.4,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawTigerNest() {
+    // Tiger's Nest temple silhouette
+    ctx.fillStyle='rgba(200,150,100,0.3)';
+    ctx.beginPath();
+    ctx.moveTo(canvas.width-90, canvas.height*0.5);
+    ctx.lineTo(canvas.width-50, canvas.height*0.5-30);
+    ctx.lineTo(canvas.width-30, canvas.height*0.5-30);
+    ctx.lineTo(canvas.width-30, canvas.height*0.5-55);
+    ctx.lineTo(canvas.width-20, canvas.height*0.5-55);
+    ctx.lineTo(canvas.width-20, canvas.height*0.5-80);
+    ctx.lineTo(canvas.width-10, canvas.height*0.5-80);
+    ctx.lineTo(canvas.width-10, canvas.height*0.5-55);
+    ctx.lineTo(canvas.width, canvas.height*0.5-55);
+    ctx.lineTo(canvas.width, canvas.height*0.5);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawRoad() {
+    // Road
+    ctx.fillStyle='#3a2a1a';
+    ctx.fillRect(0, canvas.height*0.55, canvas.width, canvas.height*0.45);
+    // Lane markings
+    ctx.fillStyle='#FFD700';
+    for(let i=0;i<4;i++) {
+        const y = ((i*100 + frame*speed*0.8) % (canvas.height+40)) - 20;
+        ctx.fillRect(lanes[0]-2, y, 4, 20);
+        ctx.fillRect(lanes[1]-2, y, 4, 20);
+        ctx.fillRect(lanes[2]-2, y, 4, 20);
+    }
+    // Edges
+    ctx.fillStyle='#8B4513';
+    ctx.fillRect(0, canvas.height*0.55, canvas.width, 6);
+    ctx.fillRect(0, canvas.height-6, canvas.width, 6);
+    // Prayer flags on road sides
+    const flagColors=['#FF6600','#FFD700','#00aa44','#4169E1','#EF3340'];
+    for(let i=0;i<canvas.width/30+5;i++) {
+        const fx = i*30 - (frame*speed*0.4)%30;
+        const y0 = canvas.height*0.55-8;
+        for(let c=0;c<5;c++) {
+            ctx.fillStyle=flagColors[c];
+            ctx.fillRect(fx, y0+c*5, 20, 4);
+        }
+    }
+}
+
+function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.tilt*0.1);
+    const s = 1;
+
+    // Dragon body
+    ctx.fillStyle='#4169E1';
+    ctx.beginPath();
+    ctx.ellipse(0,0,22*s,28*s,0,0,Math.PI*2);
+    ctx.fill();
+    // Belly
+    ctx.fillStyle='#87CEEB';
+    ctx.beginPath();
+    ctx.ellipse(0,4*s,14*s,18*s,0,0,Math.PI*2);
+    ctx.fill();
+    // Eyes
+    ctx.fillStyle='#FFD700';
+    ctx.beginPath();
+    ctx.arc(-8*s,-14*s,6*s,0,Math.PI*2);
+    ctx.arc(8*s,-14*s,6*s,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath();
+    ctx.arc(-8*s,-14*s,3*s,0,Math.PI*2);
+    ctx.arc(8*s,-14*s,3*s,0,Math.PI*2);
+    ctx.fill();
+    // Horns
+    ctx.fillStyle='#4169E1';
+    ctx.beginPath();
+    ctx.moveTo(-8*s,-22*s);
+    ctx.lineTo(-12*s,-35*s);
+    ctx.lineTo(-4*s,-22*s);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(8*s,-22*s);
+    ctx.lineTo(12*s,-35*s);
+    ctx.lineTo(4*s,-22*s);
+    ctx.fill();
+    // Wings
+    ctx.fillStyle='rgba(65,105,225,0.6)';
+    ctx.beginPath();
+    ctx.ellipse(-24*s,-5*s,16*s,8*s,-0.3,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(24*s,-5*s,16*s,8*s,0.3,0,Math.PI*2);
+    ctx.fill();
+    // Tail
+    ctx.strokeStyle='#4169E1';
+    ctx.lineWidth=6*s;
+    ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(0,28*s);
+    ctx.quadraticCurveTo(15*s+Math.sin(frame*0.1)*5,40*s,10*s,50*s);
+    ctx.stroke();
+    // Claws
+    ctx.strokeStyle='#FFD700';
+    ctx.lineWidth=2*s;
+    for(let side of [-1,1]) {
+        for(let i=0;i<3;i++) {
+            ctx.beginPath();
+            ctx.moveTo(side*12*s,28*s);
+            ctx.lineTo(side*(18*s+i*3),34*s+i*2);
+            ctx.stroke();
+        }
+    }
+
+    ctx.restore();
+}
+
+function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Sky gradient
+    const sky=ctx.createLinearGradient(0,0,0,canvas.height*0.55);
+    sky.addColorStop(0,'#1a0a2e');
+    sky.addColorStop(0.5,'#2d1b4e');
+    sky.addColorStop(1,'#4a2060');
+    ctx.fillStyle=sky;
+    ctx.fillRect(0,0,canvas.width,canvas.height*0.55);
+
+    // Stars
+    ctx.fillStyle='rgba(255,255,255,0.7)';
+    for(let i=0;i<30;i++) {
+        const sx=(i*73+frame*0.1)%canvas.width;
+        const sy=(i*47)%(canvas.height*0.5);
+        const ss=1+i%3;
+        ctx.beginPath();
+        ctx.arc(sx,sy,ss,0,Math.PI*2);
+        ctx.fill();
+    }
+
+    // Clouds
+    for(let c of clouds) {
+        c.x-=c.spd;
+        if(c.x+c.w<0) c.x=canvas.width+c.w;
+        drawCloud(c);
+    }
+
+    // Mountains
+    for(let i=0;i<mountains.length;i++) drawMountain(mountains[i], i);
+    drawTigerNest();
+
+    drawRoad();
+
+    for(let item of items) {
+        if(item.type==='rice') drawRice(item.x,item.y,item.size,item.rot);
+        else if(item.type==='tashi') drawTashi(item.x,item.y,item.size,item.rot);
+        else if(item.type==='dorje') drawDorje(item.x,item.y,item.size,item.rot);
+        else if(item.type==='firework') drawFirework(item.x,item.y,item.size,item.wing);
+    }
+
+    drawPlayer();
+
+    // Particles
+    for(let p of particles) {
+        ctx.save();
+        ctx.globalAlpha=p.life/35;
+        ctx.font=`bold 18px Georgia`;
+        ctx.textAlign='center';
+        ctx.fillText(p.emoji,p.x,p.y);
+        ctx.restore();
+    }
+
+    // Milestone
+    if(score>0 && score%30===0) {
+        ctx.save();
+        ctx.font='bold 24px Georgia';
+        ctx.textAlign='center';
+        ctx.fillStyle='#FFD700';
+        ctx.strokeStyle='#8B4513';
+        ctx.lineWidth=3;
+        ctx.strokeText('🇧🇹 Druk Power!', canvas.width/2, canvas.height/2-60);
+        ctx.fillText('🇧🇹 Druk Power!', canvas.width/2, canvas.height/2-60);
+        ctx.restore();
+    }
+}
+
+function update() {
+    frame++;
+    speed=3+Math.floor(score/20)*0.25;
+    if(speed>7) speed=7;
+
+    player.targetX=lanes[player.lane];
+    player.x+=(player.targetX-player.x)*0.2;
+    player.tilt=(player.targetX-player.x)*0.1;
+
+    if(frame%Math.max(18,45-Math.floor(score/15))===0) spawnItem();
+
+    for(let i=items.length-1;i>=0;i--) {
+        let it=items[i];
+        it.y+=speed;
+        it.rot+=0.06;
+        if(it.type==='firework') it.wing+=0.25;
+
+        const dx=Math.abs(it.x-player.x), dy=Math.abs(it.y-player.y);
+        if(dx<26 && dy<28) {
+            if(it.type==='firework') {
+                spawnParticle(player.x,player.y-30,'💥');
+                gameOver(); return;
+            } else {
+                let pts=1, txt='🌾';
+                if(it.type==='tashi'){pts=3;txt='🙏';}
+                if(it.type==='dorje'){pts=5;txt='⚡';}
+                score+=pts;
+                scoreEl.textContent=`⚡ ${score}`;
+                spawnParticle(it.x,it.y,txt);
+                items.splice(i,1);
+                continue;
+            }
+        }
+        if(it.y>canvas.height+50) items.splice(i,1);
+    }
+
+    for(let i=particles.length-1;i>=0;i--) {
+        particles[i].y+=particles[i].vy;
+        particles[i].life--;
+        if(particles[i].life<=0) particles.splice(i,1);
+    }
+
+    draw();
+    if(running) requestAnimationFrame(update);
+}
+
+function gameOver() {
+    running=false;
+    if(score>hiScore){hiScore=score;localStorage.setItem('bhutanBest',hiScore);hiScoreEl.textContent=`Best: ${hiScore}`;}
+    overlay.classList.remove('hidden');
+    overlay.querySelector('h1').textContent='💥 Game Over!';
+    overlay.querySelector('.sub').textContent=`Score: ${score} - Druk collects ${score} blessings!`;
+    startBtn.textContent='Play Again';
+}
+
+function startGame() {
+    score=0; frame=0; speed=3; items=[]; particles=[];
+    player.x=canvas.width/2; player.lane=1; player.tilt=0;
+    scoreEl.textContent='⚡ 0';
+    overlay.classList.add('hidden');
+    running=true;
+    update();
+}
+
+document.addEventListener('keydown',e=>{
+    if(!running) return;
+    if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){if(player.lane>0)player.lane--;}
+    if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){if(player.lane<2)player.lane++;}
+});
+
+let touchX=null;
+canvas.addEventListener('touchstart',e=>{touchX=e.touches[0].clientX;});
+canvas.addEventListener('touchend',e=>{
+    if(!running||touchX===null)return;
+    const dx=e.changedTouches[0].clientX-touchX;
+    if(dx>25&&player.lane<2)player.lane++;
+    if(dx<-25&&player.lane>0)player.lane--;
+    touchX=null;
+});
+
+startBtn.addEventListener('click', startGame);
+hiScoreEl.textContent=`Best: ${hiScore}`;
+draw();
+</script>
+</body>
+</html>
