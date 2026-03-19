@@ -1,4 +1,4 @@
-name: Auto Merge Own Game (Final Python Version)
+name: Auto Merge Own Game
 on:
   pull_request:
     types: [opened, synchronize]
@@ -7,89 +7,44 @@ on:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
     steps:
-      - name: Checkout Main Repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: main
 
-      - name: Checkout PR Source
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          path: pr-source
-
-      - name: Verify Ownership
+      - name: Check only own game
         id: check
         run: |
           AUTHOR="${{ github.event.pull_request.user.login }}"
           ALLOW="true"
-          FILES=$(git diff --name-only origin/main...HEAD)
+
+          FILES=$(git diff --name-only origin/main...)
+
           for FILE in $FILES; do
             if [[ "$FILE" == AI_Games/*/* ]]; then
               GAME=$(echo "$FILE" | cut -d/ -f2)
-              cd pr-source
               CREATOR=$(git log --follow --format="%an" -- "AI_Games/$GAME" 2>/dev/null | tail -1)
-              if [[ -z "$CREATOR" ]]; then CREATOR="$AUTHOR"; fi
-              if [[ "$CREATOR" != "$AUTHOR" ]]; then ALLOW="false"; break; fi
-              cd ..
+              if [[ -z "$CREATOR" ]]; then
+                CREATOR="$AUTHOR"
+              fi
+              if [[ "$CREATOR" != "$AUTHOR" ]]; then
+                ALLOW="false"
+                break
+              fi
             fi
           done
+
           echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
 
-      - name: Merge PR with Python App Token
+      - name: Merge PR automatically
         if: steps.check.outputs.allow_merge == 'true'
-        env:
-          APP_ID: ${{ secrets.APP_ID }}
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_EVENT_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          sudo apt update && sudo apt install -y python3-pip
-          pip3 install PyJWT requests
-          python3 - << 'EOF'
-          import jwt
-          import requests
-          import time
-          import os
-
-          app_id = os.environ["APP_ID"]
-          private_key = os.environ["PRIVATE_KEY"]
-          repo = os.environ["GITHUB_REPOSITORY"]
-          pr_number = os.environ["GITHUB_EVENT_PULL_REQUEST_NUMBER"]
-
-          # 生成 JWT
-          now = int(time.time())
-          payload = {"iat": now, "exp": now + 600, "iss": app_id}
-          jwt_token = jwt.encode(payload, private_key, algorithm="RS256")
-
-          # 获取安装 ID
-          headers = {"Authorization": f"Bearer {jwt_token}", "Accept": "application/vnd.github.v3+json"}
-          res = requests.get("https://api.github.com/app/installations", headers=headers)
-          res.raise_for_status()
-          installation_id = res.json()[0]["id"]
-
-          # 获取访问令牌
-          res = requests.post(
-              f"https://api.github.com/app/installations/{installation_id}/access_tokens",
-              headers=headers
-          )
-          res.raise_for_status()
-          access_token = res.json()["token"]
-
-          # 合并 PR
-          merge_url = f"https://api.github.com/repos/{repo}/pulls/{pr_number}/merge"
-          merge_res = requests.put(
-              merge_url,
-              headers={
-                  "Authorization": f"token {access_token}",
-                  "Accept": "application/vnd.github.v3+json"
-              },
-              json={"merge_method": "merge"}
-          )
-          print(f"Merge status: {merge_res.status_code}")
-          print(f"Merge response: {merge_res.text}")
-          EOF
+          curl -X PUT \
+            -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/merge \
+            -d '{"merge_method":"merge"}'
