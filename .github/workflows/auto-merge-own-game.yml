@@ -1,15 +1,42 @@
-name: Test PAT Validity
+name: Auto Merge Own Game (Final)
 on:
   pull_request:
     types: [opened, synchronize]
     branches: [main]
 
 jobs:
-  test-pat:
+  auto-merge:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - name: Test PAT with GitHub API
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check own game
+        id: check
         run: |
-          echo "🔍 Testing PAT validity..."
-          curl -v -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
-            https://api.github.com/user
+          AUTHOR="${{ github.event.pull_request.user.login }}"
+          ALLOW="true"
+          FILES=$(git diff --name-only origin/main...)
+          for FILE in $FILES; do
+            if [[ "$FILE" == AI_Games/*/* ]]; then
+              GAME=$(echo "$FILE" | cut -d/ -f2)
+              CREATOR=$(git log --follow --format="%an" -- "AI_Games/$GAME" 2>/dev/null | tail -1)
+              if [[ -z "$CREATOR" ]]; then CREATOR="$AUTHOR"; fi
+              if [[ "$CREATOR" != "$AUTHOR" ]]; then ALLOW="false"; break; fi
+            fi
+          done
+          echo "allow_merge=$ALLOW" >> $GITHUB_OUTPUT
+
+      - name: Merge PR
+        if: steps.check.outputs.allow_merge == 'true'
+        run: |
+          curl -v -X PUT \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/merge \
+            -d '{"merge_method":"merge"}'
