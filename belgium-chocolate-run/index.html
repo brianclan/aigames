@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Belgium Chocolate Rush 🍫</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a0a00;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Georgia', serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            border: 4px solid #8B4513;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(139, 69, 19, 0.5);
+        }
+        canvas {
+            display: block;
+            background: linear-gradient(to bottom, #87CEEB 0%, #FFE4B5 60%, #8B7355 100%);
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            color: #3d1a00;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+            pointer-events: none;
+        }
+        #overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            border-radius: 8px;
+        }
+        #overlay h1 {
+            font-size: 42px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px #000;
+        }
+        #overlay .subtitle {
+            font-size: 18px;
+            color: #d4a574;
+            margin-bottom: 30px;
+        }
+        #overlay button {
+            padding: 15px 40px;
+            font-size: 22px;
+            background: linear-gradient(to bottom, #8B4513, #5c2d0e);
+            color: #fff;
+            border: 3px solid #d4a574;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        #overlay button:hover { transform: scale(1.05); }
+        #overlay.hidden { display: none; }
+        #instructions {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="game"></canvas>
+    <div id="ui">
+        <span id="score">🍫 0</span>
+        <span id="hiScore">Best: 0</span>
+    </div>
+    <div id="overlay">
+        <h1>🇧🇪 Belgium Chocolate Rush</h1>
+        <div class="subtitle">Collect Belgian chocolates, avoid the bees!</div>
+        <button id="startBtn">Start Game</button>
+        <div id="instructions">← → or A / D to move</div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+const scoreEl = document.getElementById('score');
+const hiScoreEl = document.getElementById('hiScore');
+
+canvas.width = 480;
+canvas.height = 640;
+
+// Game state
+let running = false;
+let score = 0;
+let hiScore = parseInt(localStorage.getItem('belgiumBest') || '0');
+let frame = 0;
+let speed = 3;
+
+// Atoms (decorative buildings in background)
+const atoms = [];
+for (let i = 0; i < 4; i++) {
+    atoms.push({
+        x: 80 + i * 120,
+        y: 150 + Math.sin(i) * 30,
+        size: 25 + i * 5,
+        angle: 0
+    });
+}
+
+// Clouds
+const clouds = [];
+for (let i = 0; i < 5; i++) {
+    clouds.push({
+        x: Math.random() * canvas.width,
+        y: 30 + Math.random() * 80,
+        w: 60 + Math.random() * 80,
+        speed: 0.3 + Math.random() * 0.3
+    });
+}
+
+// Road markings
+const markings = [];
+for (let i = 0; i < 6; i++) {
+    markings.push({ y: i * 120 });
+}
+
+// Player
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height - 140,
+    w: 50,
+    h: 50,
+    lane: 1,
+    targetX: canvas.width / 2,
+    tilt: 0
+};
+
+// Items
+let items = [];
+let particles = [];
+
+// Lanes
+const lanes = [canvas.width * 0.2, canvas.width * 0.5, canvas.width * 0.8];
+
+function spawnItem() {
+    const lane = Math.floor(Math.random() * 3);
+    const types = ['chocolate', 'chocolate', 'chocolate', 'truffle', 'waffle', 'bee'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    items.push({
+        x: lanes[lane],
+        y: -40,
+        type,
+        size: type === 'bee' ? 30 : 32,
+        angle: 0,
+        wing: 0
+    });
+}
+
+function spawnParticle(x, y, color, text) {
+    particles.push({ x, y, vy: -2, life: 40, color, text, size: 16 });
+}
+
+function drawCloud(c) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.w * 0.3, 0, Math.PI * 2);
+    ctx.arc(c.x + c.w * 0.25, c.y - c.w * 0.1, c.w * 0.28, 0, Math.PI * 2);
+    ctx.arc(c.x + c.w * 0.5, c.y, c.w * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function drawAtom(a) {
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.rotate(a.angle);
+    ctx.strokeStyle = 'rgba(100,100,120,0.4)';
+    ctx.lineWidth = 1.5;
+    // Sphere
+    ctx.beginPath();
+    ctx.arc(0, 0, a.size, 0, Math.PI * 2);
+    ctx.stroke();
+    // Rings
+    for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, a.size, a.size * 0.3, i * Math.PI / 3);
+        ctx.stroke();
+    }
+    // Core
+    ctx.fillStyle = 'rgba(150,150,180,0.3)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawChocolate(x, y, size, angle, isTruffle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    const s = size / 32;
+    if (isTruffle) {
+        // Round truffle
+        const grad = ctx.createRadialGradient(-3*s, -3*s, 0, 0, 0, 14*s);
+        grad.addColorStop(0, '#8B6914');
+        grad.addColorStop(0.6, '#5c3a00');
+        grad.addColorStop(1, '#3d1a00');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 14*s, 0, Math.PI * 2);
+        ctx.fill();
+        // Drizzle
+        ctx.strokeStyle = '#c8a060';
+        ctx.lineWidth = 1.5*s;
+        for (let i = 0; i < 4; i++) {
+            ctx.beginPath();
+            ctx.moveTo(-8*s + i*4*s, -12*s);
+            ctx.lineTo(-8*s + i*4*s + 2*s, 12*s);
+            ctx.stroke();
+        }
+        // Cocoa powder
+        ctx.fillStyle = 'rgba(60,30,0,0.5)';
+        ctx.beginPath();
+        ctx.arc(-3*s, -3*s, 6*s, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        // Bar chocolate
+        ctx.fillStyle = '#5c3010';
+        ctx.fillRect(-14*s, -9*s, 28*s, 18*s);
+        // Segments
+        ctx.fillStyle = '#7a4820';
+        for (let row = 0; row < 2; row++) {
+            for (let col = 0; col < 3; col++) {
+                ctx.fillRect((-13+col*9)*s, (-8+row*9)*s, 8*s, 8*s);
+            }
+        }
+        // Shine
+        ctx.fillStyle = 'rgba(255,220,180,0.2)';
+        ctx.fillRect(-14*s, -9*s, 28*s, 5*s);
+    }
+    ctx.restore();
+}
+
+function drawWaffle(x, y, size, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    const s = size / 32;
+    // Waffle square
+    ctx.fillStyle = '#e8c060';
+    ctx.fillRect(-14*s, -14*s, 28*s, 28*s);
+    // Grid pattern
+    ctx.strokeStyle = '#c8a040';
+    ctx.lineWidth = 1.5*s;
+    for (let i = -12; i <= 12; i += 8) {
+        ctx.beginPath();
+        ctx.moveTo(i*s, -14*s);
+        ctx.lineTo(i*s, 14*s);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-14*s, i*s);
+        ctx.lineTo(14*s, i*s);
+        ctx.stroke();
+    }
+    // Syrup drip
+    ctx.fillStyle = '#c07820';
+    ctx.beginPath();
+    ctx.ellipse(5*s, 5*s, 6*s, 4*s, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#d4882a';
+    ctx.beginPath();
+    ctx.ellipse(-4*s, -4*s, 4*s, 3*s, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Powder sugar
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.beginPath();
+    ctx.arc(-6*s, -8*s, 2*s, 0, Math.PI * 2);
+    ctx.arc(3*s, -6*s, 1.5*s, 0, Math.PI * 2);
+    ctx.arc(-2*s, -10*s, 1*s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawBee(x, y, size, wing) {
+    ctx.save();
+    ctx.translate(x, y);
+    const s = size / 30;
+    // Wings
+    ctx.fillStyle = 'rgba(200,230,255,0.6)';
+    ctx.beginPath();
+    ctx.ellipse(-8*s, -8*s + Math.sin(wing) * 3, 9*s, 5*s, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(8*s, -8*s + Math.sin(wing + 1) * 3, 9*s, 5*s, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    // Body
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10*s, 13*s, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Stripes
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-10*s, -4*s, 20*s, 4*s);
+    ctx.fillRect(-9*s, 4*s, 18*s, 3*s);
+    // Face
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(-4*s, -8*s, 2*s, 0, Math.PI * 2);
+    ctx.arc(4*s, -8*s, 2*s, 0, Math.PI * 2);
+    ctx.fill();
+    // Antennae
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.2*s;
+    ctx.beginPath();
+    ctx.moveTo(-3*s, -12*s);
+    ctx.lineTo(-6*s, -18*s);
+    ctx.moveTo(3*s, -12*s);
+    ctx.lineTo(6*s, -18*s);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.tilt * 0.1);
+    const s = 0.9;
+
+    // Cart
+    ctx.fillStyle = '#8B4513';
+    roundRect(ctx, -24*s, -15*s, 48*s, 35*s, 6*s);
+    ctx.fill();
+    // Cart rim
+    ctx.fillStyle = '#5c2d0e';
+    roundRect(ctx, -26*s, -17*s, 52*s, 8*s, 4*s);
+    ctx.fill();
+    // Cart shine
+    ctx.fillStyle = 'rgba(255,220,180,0.15)';
+    roundRect(ctx, -22*s, -14*s, 44*s, 10*s, 3*s);
+    ctx.fill();
+    // Wheels
+    ctx.fillStyle = '#3d1a00';
+    ctx.beginPath();
+    ctx.arc(-16*s, 22*s, 7*s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(16*s, 22*s, 7*s, 0, Math.PI * 2);
+    ctx.fill();
+    // Wheel spokes
+    ctx.strokeStyle = '#6a3a10';
+    ctx.lineWidth = 1.5*s;
+    for (let w of [-16, 16]) {
+        for (let a = 0; a < 4; a++) {
+            const ang = a * Math.PI / 2 + frame * 0.1;
+            ctx.beginPath();
+            ctx.moveTo(w*s, 22*s);
+            ctx.lineTo(w*s + Math.cos(ang)*5*s, 22*s + Math.sin(ang)*5*s);
+            ctx.stroke();
+        }
+    }
+
+    // Belgian flag on cart
+    ctx.fillStyle = '#000';
+    ctx.fillRect(-6*s, -5*s, 12*s, 12*s);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(-6*s, -5*s, 4*s, 12*s);
+    ctx.fillStyle = '#EF3340';
+    ctx.fillRect(2*s, -5*s, 4*s, 12*s);
+
+    ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+}
+
+function drawRoad() {
+    // Road
+    ctx.fillStyle = '#4a4a4a';
+    ctx.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
+    // Sidewalks
+    ctx.fillStyle = '#9a8a7a';
+    ctx.fillRect(0, canvas.height * 0.55, canvas.width, 12);
+    // Lane dividers
+    ctx.fillStyle = '#fff';
+    for (let m of markings) {
+        const y = (m.y + frame * speed * 0.8) % (canvas.height + 40) - 20;
+        ctx.fillRect(lanes[0] - 2, y, 4, 25);
+        ctx.fillRect(lanes[1] - 2, y, 4, 25);
+        ctx.fillRect(lanes[2] - 2, y, 4, 25);
+    }
+    // Road edges
+    ctx.fillStyle = '#d4a574';
+    ctx.fillRect(0, canvas.height * 0.55, canvas.width, 4);
+    ctx.fillRect(0, canvas.height - 4, canvas.width, 4);
+
+    // Belgian flag bunting along top
+    const bw = 30, bh = 20;
+    for (let i = 0; i < canvas.width / bw + 10; i++) {
+        const bx = (i * bw - (frame * speed * 0.5) % bw);
+        const yTop = canvas.height * 0.55 - 12;
+        ctx.fillStyle = i % 3 === 0 ? '#000' : i % 3 === 1 ? '#FFD700' : '#EF3340';
+        ctx.beginPath();
+        ctx.moveTo(bx, yTop);
+        ctx.lineTo(bx + bw, yTop);
+        ctx.lineTo(bx + bw, yTop + bh);
+        ctx.lineTo(bx + bw/2, yTop + bh + 5);
+        ctx.lineTo(bx, yTop + bh);
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.55);
+    sky.addColorStop(0, '#87CEEB');
+    sky.addColorStop(1, '#FFE4B5');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, canvas.width, canvas.height * 0.55);
+
+    // Clouds
+    for (let c of clouds) {
+        drawCloud(c);
+    }
+
+    // Atoms
+    for (let a of atoms) {
+        drawAtom(a);
+    }
+
+    // City silhouette
+    ctx.fillStyle = 'rgba(80,60,40,0.3)';
+    const bldgs = [
+        {x:0,w:60,h:80},{x:55,w:40,h:120},{x:90,w:70,h:90},
+        {x:155,w:50,h:140},{x:200,w:80,h:70},{x:275,w:45,h:110},
+        {x:315,w:65,h:85},{x:375,w:55,h:130},{x:425,w:60,h:75}
+    ];
+    for (let b of bldgs) {
+        ctx.fillRect(b.x, canvas.height*0.55 - b.h, b.w, b.h);
+    }
+
+    drawRoad();
+
+    // Items
+    for (let item of items) {
+        if (item.type === 'chocolate') drawChocolate(item.x, item.y, item.size, item.angle, false);
+        else if (item.type === 'truffle') drawChocolate(item.x, item.y, item.size, item.angle, true);
+        else if (item.type === 'waffle') drawWaffle(item.x, item.y, item.size, item.angle);
+        else if (item.type === 'bee') drawBee(item.x, item.y, item.size, item.wing);
+    }
+
+    // Player
+    drawPlayer();
+
+    // Particles
+    for (let p of particles) {
+        ctx.save();
+        ctx.globalAlpha = p.life / 40;
+        ctx.font = `bold ${p.size}px Georgia`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.restore();
+    }
+
+    // Belgium banner if score milestone
+    if (score > 0 && score % 50 === 0) {
+        ctx.save();
+        ctx.font = 'bold 28px Georgia';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFD700';
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 3;
+        const txt = '🇧🇪 Belgian Delight!';
+        ctx.strokeText(txt, canvas.width/2, canvas.height/2 - 80);
+        ctx.fillText(txt, canvas.width/2, canvas.height/2 - 80);
+        ctx.restore();
+    }
+}
+
+function update() {
+    frame++;
+    speed = 3 + Math.floor(score / 30) * 0.3;
+    if (speed > 8) speed = 8;
+
+    // Clouds
+    for (let c of clouds) {
+        c.x -= c.speed;
+        if (c.x + c.w < 0) c.x = canvas.width + c.w;
+    }
+
+    // Atoms
+    for (let a of atoms) a.angle += 0.005;
+
+    // Player smooth move
+    player.targetX = lanes[player.lane];
+    player.x += (player.targetX - player.x) * 0.2;
+    player.tilt = (player.targetX - player.x) * 0.1;
+
+    // Spawn items
+    if (frame % Math.max(20, 50 - Math.floor(score/20)) === 0) {
+        spawnItem();
+    }
+
+    // Update items
+    for (let i = items.length - 1; i >= 0; i--) {
+        let item = items[i];
+        item.y += speed;
+        item.angle += 0.05;
+        if (item.type === 'bee') item.wing += 0.3;
+
+        // Collision with player
+        const dx = Math.abs(item.x - player.x);
+        const dy = Math.abs(item.y - player.y);
+        if (dx < 28 && dy < 28) {
+            if (item.type === 'bee') {
+                // Game over
+                spawnParticle(player.x, player.y - 30, '#EF3340', '💥');
+                gameOver();
+                return;
+            } else {
+                // Collect!
+                let pts = 1, txt = '🍫';
+                if (item.type === 'truffle') { pts = 3; txt = '🟤'; }
+                if (item.type === 'waffle') { pts = 2; txt = '🧇'; }
+                score += pts;
+                scoreEl.textContent = `🍫 ${score}`;
+                spawnParticle(item.x, item.y, '#FFD700', txt);
+                items.splice(i, 1);
+                continue;
+            }
+        }
+
+        if (item.y > canvas.height + 50) {
+            items.splice(i, 1);
+        }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.y += p.vy;
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    draw();
+    if (running) requestAnimationFrame(update);
+}
+
+function gameOver() {
+    running = false;
+    if (score > hiScore) {
+        hiScore = score;
+        localStorage.setItem('belgiumBest', hiScore);
+        hiScoreEl.textContent = `Best: ${hiScore}`;
+    }
+    overlay.classList.remove('hidden');
+    overlay.querySelector('h1').textContent = '💥 Game Over!';
+    overlay.querySelector('.subtitle').textContent = `Score: ${score} chocolates collected`;
+    startBtn.textContent = 'Play Again';
+}
+
+function startGame() {
+    score = 0;
+    frame = 0;
+    speed = 3;
+    items = [];
+    particles = [];
+    player.x = canvas.width / 2;
+    player.lane = 1;
+    player.tilt = 0;
+    scoreEl.textContent = '🍫 0';
+    overlay.classList.add('hidden');
+    running = true;
+    update();
+}
+
+// Input
+document.addEventListener('keydown', e => {
+    if (!running) return;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        if (player.lane > 0) player.lane--;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        if (player.lane < 2) player.lane++;
+    }
+});
+
+// Touch
+let touchStartX = null;
+canvas.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+canvas.addEventListener('touchend', e => {
+    if (!running || touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (dx > 30 && player.lane < 2) player.lane++;
+    if (dx < -30 && player.lane > 0) player.lane--;
+    touchStartX = null;
+});
+
+startBtn.addEventListener('click', startGame);
+
+// Init
+hiScoreEl.textContent = `Best: ${hiScore}`;
+draw();
+</script>
+</body>
+</html>
