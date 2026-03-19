@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocean Coffee ☕🌊</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a3a5c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Georgia, serif;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            border: 4px solid #8B6914;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(135, 206, 235, 0.4);
+        }
+        canvas { display: block; }
+        #ui {
+            position: absolute;
+            top: 10px; left: 10px; right: 10px;
+            display: flex; justify-content: space-between;
+            color: #fff;
+            font-size: 18px; font-weight: bold;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+            pointer-events: none;
+        }
+        #overlay {
+            position: absolute; inset: 0;
+            background: rgba(0,30,60,0.8);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            color: #fff; border-radius: 8px;
+        }
+        #overlay h1 { font-size: 34px; margin-bottom: 8px; text-shadow: 2px 2px 4px #000; }
+        #overlay .sub { font-size: 15px; color: #b0d8f0; margin-bottom: 24px; }
+        #overlay button {
+            padding: 12px 36px; font-size: 20px;
+            background: linear-gradient(to bottom, #8B6914, #5c4510);
+            color: #fff; border: 3px solid #D4A84B;
+            border-radius: 28px; cursor: pointer;
+        }
+        #overlay button:hover { transform: scale(1.05); }
+        #overlay.hidden { display: none; }
+        #hint { margin-top: 16px; font-size: 13px; color: #8ab8d8; }
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="game" width="480" height="640"></canvas>
+    <div id="ui">
+        <span id="score">☕ 0</span>
+        <span id="hiScore">Best: 0</span>
+    </div>
+    <div id="overlay">
+        <h1>☕🌊 Ocean Coffee</h1>
+        <div class="sub">Sip coffee by the sea — collect orders, enjoy the breeze!</div>
+        <button id="startBtn">Relax & Play</button>
+        <div id="hint">← → or A / D to serve coffee</div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+const scoreEl = document.getElementById('score');
+const hiScoreEl = document.getElementById('hiScore');
+
+let running = false, score = 0, hiScore = parseInt(localStorage.getItem('oceanCoffeeBest')||'0'), frame = 0, speed = 2.5;
+const lanes = [canvas.width*0.2, canvas.width*0.5, canvas.width*0.8];
+const player = { x: canvas.width/2, lane: 1, targetX: canvas.width/2, tilt: 0, sip: 0 };
+let items = [], particles = [], bubbles = [];
+let wave = 0, wave2 = 0;
+
+// Stars
+const stars = [];
+for (let i = 0; i < 20; i++) {
+    stars.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.35,
+                 r: 0.5+Math.random()*1.5, phase: Math.random()*Math.PI*2 });
+}
+
+function spawnItem() {
+    const types = ['espresso','latte','cappuccino','croissant','seagull'];
+    const weights = ['espresso','espresso','latte','latte','cappuccino','cappuccino','croissant','croissant','seagull'];
+    const type = weights[Math.floor(Math.random()*weights.length)];
+    items.push({
+        x: lanes[Math.floor(Math.random()*3)],
+        y: -40,
+        type,
+        size: type==='seagull'?36:32,
+        rot: 0, wing: 0, bob: Math.random()*Math.PI*2
+    });
+}
+
+function spawnBubble(x, y) {
+    bubbles.push({ x, y, r: 3+Math.random()*5, speed: 0.5+Math.random()*1, alpha: 0.6 });
+}
+
+function spawnParticle(x, y, emoji) {
+    particles.push({ x, y, vy: -2, life: 35, emoji, size: 18 });
+}
+
+// --- DRAWING FUNCTIONS ---
+
+function drawWave(yBase, amp, freq, speed, color, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height);
+    for (let x = 0; x <= canvas.width; x += 5) {
+        const y = yBase + Math.sin(x * freq + wave * speed) * amp;
+        ctx.lineTo(x, y);
+    }
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawStar(s) {
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(s.phase + frame * 0.03);
+    ctx.fillStyle = '#fffde7';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawSeagull(x, y, size, wing) {
+    ctx.save();
+    ctx.translate(x, y);
+    const s = size/36;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3*s;
+    ctx.lineCap = 'round';
+    // Wings
+    ctx.beginPath();
+    ctx.moveTo(-18*s+Math.sin(wing)*4, -3*s);
+    ctx.quadraticCurveTo(-10*s, -15*s+Math.sin(wing)*5, 0, -3*s);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(18*s-Math.sin(wing)*4, -3*s);
+    ctx.quadraticCurveTo(10*s, -15*s+Math.sin(wing+1.5)*5, 0, -3*s);
+    ctx.stroke();
+    // Body
+    ctx.lineWidth = 2.5*s;
+    ctx.beginPath();
+    ctx.moveTo(-12*s, 2*s);
+    ctx.quadraticCurveTo(0, -5*s, 12*s, 2*s);
+    ctx.stroke();
+    // Head
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(15*s, 0, 5*s, 0, Math.PI*2);
+    ctx.fill();
+    // Beak
+    ctx.fillStyle = '#f0a030';
+    ctx.beginPath();
+    ctx.moveTo(19*s, 0);
+    ctx.lineTo(26*s, 1*s);
+    ctx.lineTo(19*s, 3*s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawEspresso(x, y, size, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    const s = size/32;
+    // Cup
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(-9*s, -8*s);
+    ctx.lineTo(-7*s, 10*s);
+    ctx.lineTo(7*s, 10*s);
+    ctx.lineTo(9*s, -8*s);
+    ctx.closePath();
+    ctx.fill();
+    // Coffee
+    ctx.fillStyle = '#3d1a00';
+    ctx.beginPath();
+    ctx.ellipse(0, -6*s, 8*s, 3*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Handle
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5*s;
+    ctx.beginPath();
+    ctx.arc(12*s, 0, 5*s, -Math.PI*0.5, Math.PI*0.5);
+    ctx.stroke();
+    // Saucer
+    ctx.fillStyle = '#e8d8c8';
+    ctx.beginPath();
+    ctx.ellipse(0, 12*s, 14*s, 4*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Crema
+    ctx.fillStyle = 'rgba(200,160,100,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(0, -6*s, 5*s, 2*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawLatte(x, y, size, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    const s = size/32;
+    // Cup
+    ctx.fillStyle = '#fff';
+    roundRect(ctx, -10*s, -8*s, 20*s, 22*s, 4*s);
+    ctx.fill();
+    // Latte art - heart
+    ctx.fillStyle = '#c07840';
+    ctx.beginPath();
+    ctx.ellipse(0, -5*s, 7*s, 2.5*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#d4a060';
+    ctx.beginPath();
+    ctx.arc(-3*s, -5*s, 3*s, 0, Math.PI*2);
+    ctx.arc(3*s, -5*s, 3*s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#e8c080';
+    ctx.beginPath();
+    ctx.moveTo(-5*s, -6*s);
+    ctx.lineTo(0, -2*s);
+    ctx.lineTo(5*s, -6*s);
+    ctx.closePath();
+    ctx.fill();
+    // Handle
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5*s;
+    ctx.beginPath();
+    ctx.arc(13*s, 2*s, 5*s, -Math.PI*0.5, Math.PI*0.5);
+    ctx.stroke();
+    // Saucer
+    ctx.fillStyle = '#e8d8c8';
+    ctx.beginPath();
+    ctx.ellipse(0, 14*s, 15*s, 4*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawCappuccino(x, y, size, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    const s = size/32;
+    // Cup - wider
+    ctx.fillStyle = '#fff';
+    roundRect(ctx, -11*s, -7*s, 22*s, 21*s, 5*s);
+    ctx.fill();
+    // Foam
+    ctx.fillStyle = '#f5e6d0';
+    ctx.beginPath();
+    ctx.ellipse(0, -5*s, 10*s, 3*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Cocoa spots
+    ctx.fillStyle = '#8B6914';
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.arc((-6+i*3)*s, (-5+Math.sin(i)*1.5)*s, 1.5*s, 0, Math.PI*2);
+        ctx.fill();
+    }
+    // Handle
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2.5*s;
+    ctx.beginPath();
+    ctx.arc(14*s, 3*s, 5*s, -Math.PI*0.5, Math.PI*0.5);
+    ctx.stroke();
+    // Saucer
+    ctx.fillStyle = '#e8d8c8';
+    ctx.beginPath();
+    ctx.ellipse(0, 14*s, 15*s, 4*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawCroissant(x, y, size, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    const s = size/32;
+    // Golden crescent
+    ctx.fillStyle = '#D4A017';
+    ctx.beginPath();
+    ctx.moveTo(-14*s, 6*s);
+    ctx.quadraticCurveTo(-8*s, -14*s, 0, -10*s);
+    ctx.quadraticCurveTo(8*s, -14*s, 14*s, 6*s);
+    ctx.quadraticCurveTo(6*s, 10*s, 0, 8*s);
+    ctx.quadraticCurveTo(-6*s, 10*s, -14*s, 6*s);
+    ctx.fill();
+    // Layers
+    ctx.strokeStyle = '#c08010';
+    ctx.lineWidth = 1*s;
+    for (let i = 0; i < 5; i++) {
+        const offset = i * 3 * s;
+        ctx.beginPath();
+        ctx.arc(0, 2*s, (12-i*2)*s, Math.PI*0.7+offset*0.1, Math.PI*1.3-offset*0.1);
+        ctx.stroke();
+    }
+    // Shine
+    ctx.fillStyle = 'rgba(255,240,180,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(-4*s, -6*s, 5*s, 3*s, -0.3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(player.tilt * 0.1);
+    const s = 1;
+
+    // Table
+    ctx.fillStyle = '#8B6914';
+    roundRect(ctx, -40*s, 20*s, 80*s, 12*s, 4*s);
+    ctx.fill();
+    // Table cloth stripe
+    ctx.fillStyle = '#D4A017';
+    for (let i = 0; i < 4; i++) {
+        ctx.fillRect(-40*s + i*20*s, 20*s, 10*s, 12*s);
+    }
+
+    // Coffee cup
+    ctx.fillStyle = '#fff';
+    roundRect(ctx, -10*s, -8*s, 20*s, 28*s, 4*s);
+    ctx.fill();
+    // Coffee
+    ctx.fillStyle = '#3d1a00';
+    ctx.beginPath();
+    ctx.ellipse(0, -4*s, 8*s, 3*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Steam
+    const sipOffset = Math.sin(player.sip) * 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1.5*s;
+    for (let i = 0; i < 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo((-4+i*8)*s, -10*s);
+        ctx.quadraticCurveTo((-4+i*8+Math.sin(frame*0.1+i))*3*s, -18*s, (-4+i*8)*s+2*sipOffset, -26*s);
+        ctx.stroke();
+    }
+    // Handle
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3*s;
+    ctx.beginPath();
+    ctx.arc(13*s, 5*s, 6*s, -Math.PI*0.5, Math.PI*0.5);
+    ctx.stroke();
+    // Latte art heart
+    ctx.fillStyle = '#c07840';
+    ctx.beginPath();
+    ctx.ellipse(0, -3*s, 5*s, 2*s, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#d4a060';
+    ctx.beginPath();
+    ctx.arc(-2*s, -3*s, 2*s, 0, Math.PI*2);
+    ctx.arc(2*s, -3*s, 2*s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#e8c080';
+    ctx.beginPath();
+    ctx.moveTo(-3*s, -4*s);
+    ctx.lineTo(0, -1*s);
+    ctx.lineTo(3*s, -4*s);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y);
+    ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r);
+    ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h);
+    ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r);
+    ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+}
+
+function drawPalm(x, h, flip) {
+    ctx.save();
+    ctx.translate(x, canvas.height*0.55 - 10);
+    ctx.scale(flip, 1);
+    const s = 1;
+    // Trunk
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 8*s;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(15*s, -h*0.5, 10*s, -h);
+    ctx.stroke();
+    // Trunk texture
+    ctx.strokeStyle = '#6B4910';
+    ctx.lineWidth = 1*s;
+    for (let i = 0; i < 6; i++) {
+        const ty = -i * h/8;
+        ctx.beginPath();
+        ctx.arc(12*s-i*0.5*s, ty, 4*s, 0, Math.PI*0.4);
+        ctx.stroke();
+    }
+    // Leaves
+    const leafColor = '#2d7a2d';
+    ctx.strokeStyle = leafColor;
+    ctx.lineWidth = 3*s;
+    const leafAngles = [-0.8, -0.3, 0.2, 0.7, -1.1, 1.1];
+    const leafLens = [35, 40, 38, 33, 30, 28];
+    for (let i = 0; i < 6; i++) {
+        const angle = leafAngles[i];
+        const len = leafLens[i];
+        ctx.beginPath();
+        ctx.moveTo(10*s, -h);
+        ctx.quadraticCurveTo(
+            10*s + Math.cos(angle)*len*0.5, -h + Math.sin(angle)*len*0.3,
+            10*s + Math.cos(angle)*len, -h + Math.sin(angle)*len + 5*s
+        );
+        ctx.stroke();
+        // Leaf fill
+        ctx.fillStyle = i%2===0 ? '#3a9a3a' : leafColor;
+        ctx.lineTo(10*s + Math.cos(angle)*len*0.5, -h + Math.sin(angle)*len*0.3 + 3*s);
+        ctx.lineTo(10*s + Math.cos(angle)*len, -h + Math.sin(angle)*len + 5*s);
+        ctx.closePath();
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function drawSun() {
+    const sx = canvas.width - 70, sy = 80;
+    ctx.save();
+    ctx.fillStyle = '#FFE87C';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 30, 0, Math.PI*2);
+    ctx.fill();
+    // Rays
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+        const ang = i * Math.PI / 4 + frame * 0.01;
+        ctx.beginPath();
+        ctx.moveTo(sx + Math.cos(ang)*35, sy + Math.sin(ang)*35);
+        ctx.lineTo(sx + Math.cos(ang)*48, sy + Math.sin(ang)*48);
+        ctx.stroke();
+    }
+    // Glow
+    const grad = ctx.createRadialGradient(sx, sy, 30, sx, sy, 60);
+    grad.addColorStop(0, 'rgba(255,232,124,0.3)');
+    grad.addColorStop(1, 'rgba(255,232,124,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 60, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawBoat(x, y, s) {
+    ctx.save();
+    ctx.translate(x, y);
+    // Hull
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.moveTo(-20*s, 0);
+    ctx.lineTo(-15*s, 10*s);
+    ctx.lineTo(15*s, 10*s);
+    ctx.lineTo(20*s, 0);
+    ctx.lineTo(15*s, -3*s);
+    ctx.lineTo(-15*s, -3*s);
+    ctx.closePath();
+    ctx.fill();
+    // Sail
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(0, -30*s);
+    ctx.lineTo(12*s, 0);
+    ctx.lineTo(0, -3*s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height*0.55);
+    sky.addColorStop(0, '#FF7043');    // sunset orange
+    sky.addColorStop(0.4, '#FF8A65');  // lighter orange
+    sky.addColorStop(0.7, '#87CEEB');  // sky blue
+    sky.addColorStop(1, '#b3e5fc');     // light blue
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Sun
+    drawSun();
+
+    // Stars (visible near top)
+    for (let s of stars) drawStar(s);
+
+    // Clouds
+    drawCloud(canvas.width*0.15, 70, 60);
+    drawCloud(canvas.width*0.6, 50, 70);
+    drawCloud(canvas.width*0.85, 90, 50);
+
+    // Distant ocean
+    drawWave(canvas.height*0.38, 6, 0.015, 0.4, '#4a90d9', 0.7);
+
+    // Far boats
+    drawBoat(canvas.width*0.2, canvas.height*0.42 + Math.sin(wave2)*3, 0.6);
+    drawBoat(canvas.width*0.75, canvas.height*0.40 + Math.sin(wave2+2)*3, 0.5);
+
+    // Palm trees
+    drawPalm(50, 120, 1);
+    drawPalm(canvas.width-50, 100, -1);
+
+    // Beach
+    const beachGrad = ctx.createLinearGradient(0, canvas.height*0.52, 0, canvas.height*0.55);
+    beachGrad.addColorStop(0, '#e8c87a');
+    beachGrad.addColorStop(1, '#c8a860');
+    ctx.fillStyle = beachGrad;
+    ctx.fillRect(0, canvas.height*0.52, canvas.width, canvas.height*0.03);
+
+    // Waves
+    drawWave(canvas.height*0.52, 8, 0.02, 0.6, '#1e88e5', 0.85);
+    drawWave(canvas.height*0.58, 6, 0.025, 0.8, '#1565c0', 1);
+
+    // Wet sand
+    ctx.fillStyle = 'rgba(180,150,90,0.5)';
+    ctx.fillRect(0, canvas.height*0.55, canvas.width, 15);
+
+    // Bubbles
+    for (let b of bubbles) {
+        ctx.save();
+        ctx.globalAlpha = b.alpha;
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+        ctx.stroke();
+        // Highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.beginPath();
+        ctx.arc(b.x-b.r*0.3, b.y-b.r*0.3, b.r*0.3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Items
+    for (let item of items) {
+        const bobY = item.y + Math.sin(item.bob) * 4;
+        if (item.type === 'espresso') drawEspresso(item.x, bobY, item.size, item.rot);
+        else if (item.type === 'latte') drawLatte(item.x, bobY, item.size, item.rot);
+        else if (item.type === 'cappuccino') drawCappuccino(item.x, bobY, item.size, item.rot);
+        else if (item.type === 'croissant') drawCroissant(item.x, bobY, item.size, item.rot);
+        else if (item.type === 'seagull') drawSeagull(item.x, bobY, item.size, item.wing);
+    }
+
+    // Player
+    drawPlayer();
+
+    // Particles
+    for (let p of particles) {
+        ctx.save();
+        ctx.globalAlpha = p.life / 35;
+        ctx.font = `bold ${p.size}px Georgia`;
+        ctx.textAlign = 'center';
+        ctx.fillText(p.emoji, p.x, p.y);
+        ctx.restore();
+    }
+
+    // Score milestone
+    if (score > 0 && score % 20 === 0) {
+        ctx.save();
+        ctx.font = 'bold 22px Georgia';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFE87C';
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 3;
+        const txt = '☕ Perfect Brew!';
+        ctx.strokeText(txt, canvas.width/2, canvas.height/2-80);
+        ctx.fillText(txt, canvas.width/2, canvas.height/2-80);
+        ctx.restore();
+    }
+}
+
+function drawCloud(x, y, w) {
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.arc(x, y, w*0.3, 0, Math.PI*2);
+    ctx.arc(x+w*0.3, y-w*0.15, w*0.28, 0, Math.PI*2);
+    ctx.arc(x+w*0.6, y, w*0.3, 0, Math.PI*2);
+    ctx.fill();
+}
+
+function update() {
+    frame++;
+    wave += 0.04;
+    wave2 += 0.02;
+    player.sip += 0.05;
+    speed = 2.5 + Math.floor(score/15)*0.2;
+    if (speed > 6) speed = 6;
+
+    player.targetX = lanes[player.lane];
+    player.x += (player.targetX - player.x) * 0.2;
+    player.tilt = (player.targetX - player.x) * 0.1;
+
+    // Bubbles
+    if (frame % 15 === 0 && Math.random() < 0.5) {
+        spawnBubble(player.x + (Math.random()-0.5)*40, player.y + 10);
+    }
+    for (let i = bubbles.length-1; i >= 0; i--) {
+        bubbles[i].y -= bubbles[i].speed;
+        bubbles[i].alpha -= 0.008;
+        if (bubbles[i].alpha <= 0) bubbles.splice(i,1);
+    }
+
+    if (frame % Math.max(20, 50-Math.floor(score/10)) === 0) spawnItem();
+
+    for (let i = items.length-1; i >= 0; i--) {
+        let it = items[i];
+        it.y += speed;
+        it.rot += 0.04;
+        if (it.type === 'seagull') it.wing += 0.2;
+
+        const dx = Math.abs(it.x - player.x), dy = Math.abs(it.y - player.y);
+        if (dx < 28 && dy < 35) {
+            if (it.type === 'seagull') {
+                spawnParticle(player.x, player.y-30, '💥');
+                gameOver(); return;
+            } else {
+                let pts = 1, txt = '☕';
+                if (it.type === 'latte') { pts = 2; txt = '🥛'; }
+                if (it.type === 'cappuccino') { pts = 2; txt = '🧁'; }
+                if (it.type === 'croissant') { pts = 3; txt = '🥐'; }
+                score += pts;
+                scoreEl.textContent = `☕ ${score}`;
+                spawnParticle(it.x, it.y, txt);
+                items.splice(i, 1);
+                continue;
+            }
+        }
+        if (it.y > canvas.height + 50) items.splice(i, 1);
+    }
+
+    for (let i = particles.length-1; i >= 0; i--) {
+        particles[i].y += particles[i].vy;
+        particles[i].life--;
+        if (particles[i].life <= 0) particles.splice(i,1);
+    }
+
+    draw();
+    if (running) requestAnimationFrame(update);
+}
+
+function gameOver() {
+    running = false;
+    if (score > hiScore) {
+        hiScore = score;
+        localStorage.setItem('oceanCoffeeBest', hiScore);
+        hiScoreEl.textContent = `Best: ${hiScore}`;
+    }
+    overlay.classList.remove('hidden');
+    overlay.querySelector('h1').textContent = '💥 Oops!';
+    overlay.querySelector('.sub').textContent = `You served ${score} drinks! ☕`;
+    startBtn.textContent = 'Relax Again';
+}
+
+function startGame() {
+    score = 0; frame = 0; speed = 2.5; items = []; particles = []; bubbles = [];
+    player.x = canvas.width/2; player.lane = 1; player.tilt = 0;
+    scoreEl.textContent = '☕ 0';
+    overlay.classList.add('hidden');
+    running = true;
+    update();
+}
+
+document.addEventListener('keydown', e => {
+    if (!running) return;
+    if (e.key==='ArrowLeft'||e.key==='a'||e.key==='A') { if(player.lane>0) player.lane--; }
+    if (e.key==='ArrowRight'||e.key==='d'||e.key==='D') { if(player.lane<2) player.lane++; }
+});
+
+let touchX = null;
+canvas.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+canvas.addEventListener('touchend', e => {
+    if (!running || touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (dx>25 && player.lane<2) player.lane++;
+    if (dx<-25 && player.lane>0) player.lane--;
+    touchX = null;
+});
+
+startBtn.addEventListener('click', startGame);
+hiScoreEl.textContent = `Best: ${hiScore}`;
+draw();
+</script>
+</body>
+</html>
