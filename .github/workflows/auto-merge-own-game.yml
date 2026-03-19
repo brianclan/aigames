@@ -11,5 +11,5 @@ jobs:
       - name: Test PAT with GitHub API
         run: |
           echo "🔍 Testing PAT validity..."
-          curl -v -H "Authorization: token ${{ secrets.PAT_TOKEN }}" \
+          curl -v -H "Authorization: token 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" \
             https://api.github.com/user
