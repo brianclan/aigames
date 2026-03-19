@@ -1,4 +1,4 @@
-name: Auto Merge Own Game (Final)
+name: Auto Merge Own Game
 on:
   pull_request:
     types: [opened, synchronize]
