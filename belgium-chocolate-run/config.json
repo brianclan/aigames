@@ -1,11 +1,4 @@
 {
   "name": "Belgium Chocolate Rush",
-  "description": "Collect Belgian chocolates, truffles and waffles, avoid the bees! 🍫",
-  "category": "runner",
-  "tags": ["belgium", "chocolate", "runner", "cute"],
-  "controls": {
-    "keyboard": ["←/→ or A/D to move"],
-    "touch": "swipe left/right"
-  },
-  "language": "en"
+  "wallet": "0xhgjdhdddbdb"
 }
