@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>禅意茶道 🍵</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a0f08;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Georgia', serif;
+    touch-action: none;
+  }
+  canvas {
+    border-radius: 16px;
+    box-shadow: 0 16px 60px rgba(0,0,0,0.7), 0 0 80px rgba(180,120,60,0.1);
+  }
+  #hud {
+    position: fixed;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 14px;
+    pointer-events: none; z-index: 10;
+  }
+  .pill {
+    background: rgba(20,10,5,0.55);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(200,160,100,0.25);
+    color: #e8d5b7;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+  }
+  #tip {
+    position: fixed;
+    bottom: 14px; left: 50%;
+    transform: translateX(-50%);
+    color: rgba(200,160,100,0.55);
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 10;
+    text-align: center;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="pill">🍵 <span id="cups">0</span> / 5 杯</div>
+  <div class="pill">🌡️ <span id="temp">--</span>°C</div>
+  <div class="pill">⏱️ <span id="timer">--</span>s</div>
+</div>
+<canvas id="c"></canvas>
+<div id="tip">按住热水键倒茶 · 松开停止 · 达到最佳注水时机即可完美 🍃</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const w = Math.min(window.innerWidth, 500);
+  const h = Math.min(window.innerHeight - 90, 680);
+  canvas.width = w;
+  canvas.height = h;
+}
+resize();
+window.addEventListener('resize', resize);
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// ─── Game State ─────────────────────────────────────
+let cups = 0;
+const GOAL = 5;
+let phase = 'idle'; // idle, pouring, steeping, drinking, done, failed
+let lastTime = 0;
+let pourTime = 0;
+let steepTime = 0;
+let drinkTimer = 0;
+let steamParticles = [];
+let score = 0;
+let totalScore = 0;
+let msg = '';
+let msgTimer = 0;
+let shakeTimer = 0;
+let bestPourDone = false;
+
+// Water temperature
+let temp = 20; // starts cold
+let targetTemp = 90; // ideal
+let heating = false;
+let overheat = false;
+
+// Cup
+const cup = {
+  x: 0, y: 0, fill: 0, maxFill: 100,
+  teaColor: [139, 90, 43], // brown
+  aroma: 0, quality: 0
+};
+cup.x = () => W() / 2;
+cup.y = () => H() * 0.68;
+
+// Kettle
+const kettle = {
+  x: 0, y: 0, angle: 0,
+  targetAngle: 0, waterDrop: null
+};
+kettle.x = () => W() * 0.5;
+kettle.y = () => H() * 0.18;
+
+function resetCup() {
+  cup.fill = 0;
+  cup.aroma = 0;
+  cup.quality = 0;
+  cup.teaColor = [139, 90, 43];
+  pourTime = 0;
+  temp = 20;
+  heating = false;
+  overheat = false;
+  bestPourDone = false;
+  phase = 'idle';
+  kettle.angle = 0;
+  kettle.waterDrop = null;
+  steamParticles.length = 0;
+  document.getElementById('temp').textContent = '--';
+  document.getElementById('timer').textContent = '--';
+}
+
+// ─── Input ───────────────────────────────────────────
+let pouring = false;
+let heatingKey = false;
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowDown') { e.preventDefault(); pouring = true; }
+  if (e.code === 'KeyW' || e.code === 'ArrowUp') heatingKey = true;
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space' || e.code === 'ArrowDown') pouring = false;
+  if (e.code === 'KeyW' || e.code === 'ArrowUp') heatingKey = false;
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  const cx = (t.clientX - rect.left) * (W() / rect.width);
+  const cy = (t.clientY - rect.top) * (H() / rect.height);
+  // Bottom half = pour, top half = heat
+  if (cy > H() / 2) { pouring = true; }
+  else { heatingKey = true; }
+}, { passive: false });
+canvas.addEventListener('touchend', e => { e.preventDefault(); pouring = false; heatingKey = false; }, { passive: false });
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cy = (e.clientY - rect.top) * (H() / rect.height);
+  if (cy > H() / 2) { pouring = true; }
+  else { heatingKey = true; }
+});
+canvas.addEventListener('mouseup', () => { pouring = false; heatingKey = false; });
+
+// ─── Background ─────────────────────────────────────
+function drawBackground(t) {
+  // Dark warm bg
+  const bg = ctx.createRadialGradient(W()/2, H()*0.3, 0, W()/2, H()*0.5, H());
+  bg.addColorStop(0, '#2d1a0e');
+  bg.addColorStop(0.5, '#1a0f08');
+  bg.addColorStop(1, '#0d0705');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W(), H());
+
+  // Warm ambient glow
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  const glow = ctx.createRadialGradient(W()/2, H()*0.5, 0, W()/2, H()*0.5, H()*0.8);
+  glow.addColorStop(0, '#c87941');
+  glow.addColorStop(1, 'transparent');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W(), H());
+  ctx.restore();
+
+  // Wood table
+  const tableTop = H() * 0.78;
+  const woodGrad = ctx.createLinearGradient(0, tableTop, 0, H());
+  woodGrad.addColorStop(0, '#5C3317');
+  woodGrad.addColorStop(0.1, '#4A2810');
+  woodGrad.addColorStop(1, '#2D1508');
+  ctx.fillStyle = woodGrad;
+  ctx.fillRect(0, tableTop, W(), H() - tableTop);
+
+  // Wood grain lines
+  ctx.save();
+  ctx.globalAlpha = 0.08;
+  ctx.strokeStyle = '#8B5A2B';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    const y = tableTop + 5 + i * 10;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= W(); x += 20) {
+      ctx.lineTo(x, y + Math.sin(x * 0.05 + i) * 2);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Table edge highlight
+  ctx.fillStyle = 'rgba(180,120,60,0.2)';
+  ctx.fillRect(0, tableTop, W(), 2);
+}
+
+// ─── Steam Particles ─────────────────────────────────
+function spawnSteam(x, y, count = 1) {
+  for (let i = 0; i < count; i++) {
+    steamParticles.push({
+      x: x + (Math.random() - 0.5) * 30,
+      y: y,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: -0.5 - Math.random() * 1.0,
+      r: 3 + Math.random() * 5,
+      alpha: 0.5 + Math.random() * 0.3,
+      life: 1
+    });
+  }
+}
+
+function drawSteam(t) {
+  steamParticles.forEach(s => {
+    s.x += s.vx + Math.sin(t * 0.002 + s.y * 0.05) * 0.3;
+    s.y += s.vy;
+    s.r *= 1.008;
+    s.life -= 0.006;
+    if (s.life <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = s.alpha * s.life * 0.6;
+    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r);
+    g.addColorStop(0, 'rgba(255,245,230,0.8)');
+    g.addColorStop(1, 'rgba(255,245,230,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ─── Kettle ─────────────────────────────────────────
+function drawKettle(t) {
+  const kx = kettle.x();
+  const ky = kettle.y();
+  const angle = kettle.angle;
+
+  ctx.save();
+  ctx.translate(kx, ky);
+
+  // Spout
+  ctx.save();
+  ctx.rotate(angle);
+  ctx.fillStyle = '#8B6914';
+  ctx.beginPath();
+  ctx.moveTo(20, -8);
+  ctx.quadraticCurveTo(55, -18, 65, -30);
+  ctx.quadraticCurveTo(68, -35, 63, -33);
+  ctx.quadraticCurveTo(52, -20, 18, -4);
+  ctx.fill();
+  // Spout opening
+  ctx.fillStyle = '#3d2a0a';
+  ctx.beginPath();
+  ctx.ellipse(64, -31, 4, 3, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Body
+  ctx.fillStyle = '#6B4F12';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 30, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body gradient
+  const kg = ctx.createRadialGradient(-8, -10, 0, 0, 0, 32);
+  kg.addColorStop(0, 'rgba(255,220,120,0.25)');
+  kg.addColorStop(1, 'transparent');
+  ctx.fillStyle = kg;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 30, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Handle
+  ctx.strokeStyle = '#5a4010';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(-28, 0, 14, -1.2, 1.2);
+  ctx.stroke();
+
+  // Lid
+  ctx.fillStyle = '#7a5a14';
+  ctx.beginPath();
+  ctx.ellipse(0, -22, 16, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Lid knob
+  ctx.fillStyle = '#9a7a24';
+  ctx.beginPath();
+  ctx.ellipse(0, -29, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Water inside (glows when hot)
+  if (temp > 40) {
+    ctx.save();
+    ctx.globalAlpha = (temp - 40) / 100 * 0.4;
+    ctx.fillStyle = `hsl(${Math.max(0, 30 - (temp - 90) * 0.5)}, 80%, 50%)`;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 22, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Highlight
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-8, -8, 8, 5, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+
+  // Water drops
+  if (kettle.waterDrop) {
+    const d = kettle.waterDrop;
+    d.x += d.vx;
+    d.y += d.vy;
+    d.vy += 0.15;
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = `rgba(180, ${Math.max(100, 200 - temp * 0.5)}, 220, 0.8)`;
+    ctx.beginPath();
+    ctx.ellipse(d.x, d.y, 3, 5, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    if (d.y > cup.y() - 30) {
+      kettle.waterDrop = null;
+    }
+  }
+}
+
+// ─── Teacup ──────────────────────────────────────────
+function drawCup(t) {
+  const cx = cup.x();
+  const cy = cup.y();
+  const fillH = (cup.fill / cup.maxFill) * 40;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Saucer
+  ctx.fillStyle = '#d4c4a8';
+  ctx.beginPath();
+  ctx.ellipse(0, 18, 42, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#c4b498';
+  ctx.beginPath();
+  ctx.ellipse(0, 16, 42, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cup body shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(2, 2, 30, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cup body
+  ctx.fillStyle = '#f5efe6';
+  ctx.beginPath();
+  ctx.moveTo(-28, -12);
+  ctx.quadraticCurveTo(-32, 14, -24, 16);
+  ctx.lineTo(24, 16);
+  ctx.quadraticCurveTo(32, 14, 28, -12);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cup inner rim
+  ctx.strokeStyle = '#e8dcc8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(0, -12, 28, 8, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Tea liquid
+  if (cup.fill > 0) {
+    const liquidTop = 16 - fillH;
+    const [r, g, b] = cup.teaColor;
+    const teaGrad = ctx.createLinearGradient(0, liquidTop, 0, 16);
+    teaGrad.addColorStop(0, `rgba(${r+40},${g+20},${b+10},0.9)`);
+    teaGrad.addColorStop(1, `rgba(${r},${g},${b},1)`);
+    ctx.fillStyle = teaGrad;
+    ctx.beginPath();
+    const clipId = 'cupClip';
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-27, -10);
+    ctx.quadraticCurveTo(-30, 14, -23, 15);
+    ctx.lineTo(23, 15);
+    ctx.quadraticCurveTo(30, 14, 27, -10);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillRect(-30, liquidTop - 5, 60, 40);
+    ctx.restore();
+
+    // Liquid surface shimmer
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 3; i++) {
+      const sx = -20 + i * 18 + Math.sin(t * 0.001 + i) * 3;
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(sx, liquidTop + 2, 10, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Steam from cup
+    if (cup.fill > 10 && phase !== 'done') {
+      if (Math.random() < 0.15) {
+        spawnSteam(cx, cy - 20, 1);
+      }
+    }
+  }
+
+  // Cup exterior decoration
+  ctx.strokeStyle = 'rgba(180,140,80,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-20, 2);
+  ctx.lineTo(-18, 14);
+  ctx.moveTo(20, 2);
+  ctx.lineTo(18, 14);
+  ctx.stroke();
+
+  // Cup highlight
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-12, -5, 8, 12, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ─── Steam from kettle ───────────────────────────────
+function drawKettleSteam(t) {
+  if (heatingKey && temp > 60) {
+    if (Math.random() < 0.2) {
+      const kx = kettle.x() + 65 * Math.cos(kettle.angle) - 31 * Math.sin(kettle.angle);
+      const ky = kettle.y() + 65 * Math.sin(kettle.angle) + 31 * Math.cos(kettle.angle);
+      spawnSteam(kx, ky - 5, 1);
+    }
+  }
+}
+
+// ─── Brewing indicator ──────────────────────────────
+function drawBrewIndicator(t) {
+  if (phase !== 'steeping') return;
+  const cx = cup.x();
+  const cy = cup.y();
+
+  const progress = Math.min(steepTime / 3000, 1);
+  const bx = cx - 40;
+  const by = cy + 40;
+
+  // Bar background
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, 80, 8, 4);
+  ctx.fill();
+
+  // Bar fill
+  const barColor = progress < 0.6 ? '#4CAF50' : progress < 0.85 ? '#FDD835' : '#E74C3C';
+  ctx.fillStyle = barColor;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, 80 * progress, 8, 4);
+  ctx.fill();
+
+  // Label
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = `${10}px Georgia`;
+  ctx.textAlign = 'center';
+  ctx.fillText(progress < 0.6 ? '浸泡中...' : progress < 0.85 ? '快好了!' : '太久了!', cx, by + 18);
+}
+
+// ─── Score popup ─────────────────────────────────────
+function drawMessage() {
+  if (msgTimer <= 0) return;
+  const alpha = Math.min(msgTimer / 500, 1);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'center';
+  ctx.font = `bold 22px Georgia`;
+  ctx.fillStyle = msg;
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(msg, W() / 2, H() * 0.4);
+  ctx.restore();
+}
+
+// ─── Overlay ─────────────────────────────────────────
+function drawOverlay() {
+  if (phase !== 'done') return;
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = '#1a0f08';
+  ctx.fillRect(0, 0, W(), H());
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+
+  ctx.shadowColor = '#c87941';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#e8c88b';
+  ctx.font = `bold ${W() * 0.09}px Georgia`;
+  ctx.fillText('🍵 茶道完成!', W() / 2, H() / 2 - 60);
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = `${W() * 0.045}px Georgia`;
+  ctx.fillText(`总分: ${totalScore} / ${GOAL * 100}`, W() / 2, H() / 2 - 15);
+
+  const stars = Math.round(totalScore / (GOAL * 100) * 3);
+  ctx.font = `${24}px serif`;
+  ctx.fillText('⭐'.repeat(stars) + '☆'.repeat(GOAL - stars), W() / 2, H() / 2 + 20);
+
+  ctx.fillStyle = 'rgba(200,160,100,0.6)';
+  ctx.font = `${W() * 0.038}px Georgia`;
+  ctx.fillText('点击重新开始', W() / 2, H() / 2 + 60);
+  ctx.restore();
+}
+
+// ─── Quality calculation ─────────────────────────────
+function calcQuality() {
+  // Ideal: temp 85-95, pour time 1.5-3s, steep 2-4s
+  let q = 0;
+  // Temperature score (max 40)
+  if (temp >= 85 && temp <= 95) q += 40;
+  else if (temp >= 75 && temp <= 100) q += 25;
+  else q += 5;
+
+  // Pour timing score (max 30) - based on how controlled the pour was
+  if (pourTime >= 1500 && pourTime <= 3500) q += 30;
+  else if (pourTime >= 1000 && pourTime <= 5000) q += 20;
+  else q += 5;
+
+  // Steeping (max 30) - 2-4 seconds ideal
+  if (steepTime >= 2000 && steepTime <= 4000) q += 30;
+  else if (steepTime >= 1000 && steepTime <= 6000) q += 18;
+  else q += 5;
+
+  return Math.min(100, q);
+}
+
+function showMsg(text, duration = 2000) {
+  msg = text;
+  msgTimer = duration;
+}
+
+// ─── Update ──────────────────────────────────────────
+function update(dt, t) {
+  if (phase === 'done') return;
+
+  // Heat water
+  if (heatingKey) {
+    temp += dt * 0.04;
+    if (temp > 100) { temp = 100; overheat = true; }
+  } else {
+    temp -= dt * 0.008;
+    if (temp < 20) temp = 20;
+  }
+
+  document.getElementById('temp').textContent = Math.round(temp);
+
+  // Pour
+  if (pouring && phase === 'idle' && cup.fill < cup.maxFill) {
+    phase = 'pouring';
+    // Animate kettle
+    kettle.targetAngle = -0.6;
+    // Spawn water drop
+    if (!kettle.waterDrop) {
+      const kx = kettle.x() + Math.cos(kettle.angle) * 60;
+      const ky = kettle.y() + Math.sin(kettle.angle) * 60;
+      kettle.waterDrop = { x: kx, y: ky, vx: 1.5, vy: 0.5 };
+    }
+    pourTime += dt;
+    // Fill cup
+    const fillRate = dt * 0.025;
+    cup.fill = Math.min(cup.maxFill, cup.fill + fillRate);
+
+    // Update tea color based on fill
+    const p = cup.fill / cup.maxFill;
+    cup.teaColor = [
+      Math.round(100 + p * 50),
+      Math.round(70 + p * 30),
+      Math.round(30 + p * 30)
+    ];
+
+    // Splash particles
+    if (Math.random() < 0.1) {
+      const sx = cup.x() + (Math.random() - 0.5) * 30;
+      const sy = cup.y() - 15 - cup.fill * 0.3;
+      for (let i = 0; i < 3; i++) {
+        steamParticles.push({
+          x: sx, y: sy,
+          vx: (Math.random() - 0.5) * 2,
+          vy: -1 - Math.random() * 2,
+          r: 2 + Math.random() * 3,
+          alpha: 0.6,
+          life: 0.8
+        });
+      }
+    }
+  } else if (!pouring && phase === 'pouring') {
+    kettle.targetAngle = 0;
+    if (cup.fill >= 30) {
+      phase = 'steeping';
+      steepTime = 0;
+    } else {
+      phase = 'idle';
+      cup.fill = 0;
+      showMsg('⚠️ 茶水太少，再来!', 1500);
+    }
+  }
+
+  // Animate kettle angle
+  kettle.angle += (kettle.targetAngle - kettle.angle) * 0.1;
+
+  // Steeping
+  if (phase === 'steeping') {
+    steepTime += dt;
+    document.getElementById('timer').textContent = (steepTime / 1000).toFixed(1);
+
+    if (steepTime >= 2000 && steepTime < 7000) {
+      // Ready to drink
+      if (cup.fill >= 50) {
+        phase = 'drinking';
+        drinkTimer = 0;
+        cup.quality = calcQuality();
+        totalScore += cup.quality;
+        score = totalScore;
+
+        // Rating
+        let rating = '';
+        if (cup.quality >= 90) { rating = '🍵 完美茶汤! +' + cup.quality; shakeTimer = 200; }
+        else if (cup.quality >= 70) { rating = '👍 好茶! +' + cup.quality; }
+        else if (cup.quality >= 50) { rating = '😐 一般 +' + cup.quality; }
+        else { rating = '😅 下次再练 +' + cup.quality; }
+        showMsg(rating, 2500);
+        document.getElementById('cups').textContent = cups + 1;
+
+        if (cups + 1 >= GOAL) {
+          setTimeout(() => { phase = 'done'; }, 1000);
+        } else {
+          setTimeout(() => {
+            cups++;
+            resetCup();
+          }, 2000);
+        }
+      }
+    }
+    if (steepTime >= 8000) {
+      // Over-steeped
+      showMsg('😵 茶太苦了!', 1500);
+      phase = 'drinking';
+      drinkTimer = 0;
+      setTimeout(() => {
+        cups++;
+        if (cups >= GOAL) { phase = 'done'; }
+        else resetCup();
+      }, 1500);
+    }
+  }
+
+  if (msgTimer > 0) msgTimer -= dt;
+  if (shakeTimer > 0) shakeTimer -= dt;
+
+  // Steam
+  if (cup.fill > 20) {
+    if (Math.random() < 0.08) spawnSteam(cup.x(), cup.y() - 20);
+  }
+
+  // Update steam
+  for (let i = steamParticles.length - 1; i >= 0; i--) {
+    const s = steamParticles[i];
+    s.x += s.vx;
+    s.y += s.vy;
+    s.life -= 0.005;
+    if (s.life <= 0) steamParticles.splice(i, 1);
+  }
+}
+
+// ─── Click to restart ───────────────────────────────
+canvas.addEventListener('click', () => {
+  if (phase === 'done') {
+    cups = 0; totalScore = 0; score = 0;
+    document.getElementById('cups').textContent = '0';
+    resetCup();
+  }
+});
+
+// ─── Main Loop ──────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+
+  ctx.save();
+  if (shakeTimer > 0) {
+    ctx.translate(
+      (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 4
+    );
+  }
+
+  ctx.clearRect(-5, -5, W() + 10, H() + 10);
+  drawBackground(ts);
+  drawKettleSteam(ts);
+  drawCup(ts);
+  drawKettle(ts);
+  drawSteam(ts);
+  drawBrewIndicator(ts);
+  drawMessage();
+
+  if (phase !== 'done') update(dt, ts);
+
+  drawOverlay();
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
