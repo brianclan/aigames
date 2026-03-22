@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>海边白鹭</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #87ceeb;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Georgia', serif;
+    touch-action: none;
+  }
+  #gameCanvas {
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    cursor: pointer;
+  }
+  #ui {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+    pointer-events: none;
+    z-index: 10;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  #hint {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.8);
+    font-size: 13px;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+    pointer-events: none;
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+<div id="ui">🍽️ 喂食白鹭
+ &nbsp;|&nbsp; 🐟 <span id="score">0</span> / 10</div>
+<canvas id="gameCanvas"></canvas>
+<div id="hint">点击水面放鱼食 · 喂满10条白鹭即可获胜</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const w = Math.min(window.innerWidth, 480);
+  const h = Math.min(window.innerHeight - 80, 700);
+  canvas.width = w;
+  canvas.height = h;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// ─── Sky gradient ─────────────────────────────────────
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, H() * 0.55);
+  g.addColorStop(0, '#5BA8D8');
+  g.addColorStop(1, '#A8D8F0');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W(), H() * 0.55);
+
+  // Sun
+  ctx.beginPath();
+  ctx.arc(W() * 0.82, H() * 0.1, 28, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFE066';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(W() * 0.82, H() * 0.1, 34, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,220,80,0.25)';
+  ctx.fill();
+}
+
+// ─── Clouds ──────────────────────────────────────────
+const clouds = [];
+for (let i = 0; i < 3; i++) {
+  clouds.push({
+    x: Math.random() * 1.5,
+    y: 0.04 + Math.random() * 0.12,
+    r: 18 + Math.random() * 14,
+    speed: 0.00004 + Math.random() * 0.00003
+  });
+}
+
+function drawClouds(dt) {
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  clouds.forEach(c => {
+    c.x += c.speed * dt;
+    if (c.x > 1.1) c.x = -0.15;
+    const cx = c.x * W();
+    ctx.beginPath();
+    ctx.arc(cx, c.y * H(), c.r, 0, Math.PI * 2);
+    ctx.arc(cx + c.r * 0.7, c.y * H() - c.r * 0.2, c.r * 0.7, 0, Math.PI * 2);
+    ctx.arc(cx - c.r * 0.6, c.y * H() + c.r * 0.1, c.r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// ─── Ocean ───────────────────────────────────────────
+function drawOcean(t) {
+  const oceanTop = H() * 0.52;
+
+  // Water base
+  const g = ctx.createLinearGradient(0, oceanTop, 0, H());
+  g.addColorStop(0, '#1E88C7');
+  g.addColorStop(0.4, '#1565A0');
+  g.addColorStop(1, '#0D3B6E');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, oceanTop, W(), H() - oceanTop);
+
+  // Animated waves
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, oceanTop + i * 18);
+    for (let x = 0; x <= W(); x += 6) {
+      const y = oceanTop + i * 18 + Math.sin((x * 0.02) + t * 0.0015 + i) * 4;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W(), H());
+    ctx.lineTo(0, H());
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Sparkles
+  for (let i = 0; i < 12; i++) {
+    const sx = (Math.sin(i * 73.1 + t * 0.0003) * 0.5 + 0.5) * W();
+    const sy = oceanTop + 10 + (Math.sin(i * 17.3 + t * 0.0005) * 0.5 + 0.5) * (H() - oceanTop - 20);
+    const alpha = Math.sin(t * 0.003 + i * 1.3) * 0.5 + 0.5;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.7;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Horizon shimmer
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  const shimmer = ctx.createLinearGradient(0, oceanTop, 0, oceanTop + 12);
+  shimmer.addColorStop(0, '#fff');
+  shimmer.addColorStop(1, 'transparent');
+  ctx.fillStyle = shimmer;
+  ctx.fillRect(0, oceanTop, W(), 12);
+  ctx.restore();
+}
+
+// ─── Sand / Shore ────────────────────────────────────
+function drawShore() {
+  const top = H() * 0.52;
+  ctx.fillStyle = '#C8A96E';
+  ctx.fillRect(0, H() - 28, W(), 28);
+  ctx.fillStyle = '#D9BC84';
+  ctx.fillRect(0, H() - 22, W(), 8);
+
+  // Foam edge
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  for (let x = 0; x < W(); x += 4) {
+    const wh = Math.sin(x * 0.05 + Date.now() * 0.002) * 3 + 4;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, top - 2, 4, wh);
+  }
+  ctx.restore();
+}
+
+// ─── Rocks ───────────────────────────────────────────
+function drawRocks() {
+  const shoreY = H() - 28;
+  // Big rock left
+  ctx.fillStyle = '#7A8A7A';
+  ctx.beginPath();
+  ctx.ellipse(W() * 0.12, shoreY, 28, 18, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#8A9A8A';
+  ctx.beginPath();
+  ctx.ellipse(W() * 0.12, shoreY - 2, 22, 12, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Small rocks
+  ctx.fillStyle = '#9AAA9A';
+  ctx.beginPath();
+  ctx.ellipse(W() * 0.25, shoreY + 4, 10, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#AABAA8';
+  ctx.beginPath();
+  ctx.ellipse(W() * 0.08, shoreY + 6, 6, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─── Egrets ──────────────────────────────────────────
+const egrets = [];
+const MAX_EGRETS = 4;
+
+class Egret {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.targetX = x;
+    this.targetY = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.state = 'idle'; // idle, walking, eating, flying
+    this.dir = Math.random() > 0.5 ? 1 : -1;
+    this.animFrame = 0;
+    this.animTimer = 0;
+    this.walkTimer = Math.random() * 4000;
+    this.neckAngle = 0;
+    this.neckDir = 1;
+    this.color = ['#F5F5F0', '#EEEEF0', '#FAFAFF'][Math.floor(Math.random() * 3)];
+    this.beakCol = ['#DAA520', '#F4C430'][Math.floor(Math.random() * 2)];
+    this.legCol = '#555';
+    this.fed = 0; // how many fish eaten
+    this.legAngle = 0;
+    this.legDir = 1;
+    this.satisfied = false;
+  }
+
+  update(dt) {
+    if (this.satisfied) {
+      // Gentle sway
+      this.neckAngle = Math.sin(Date.now() * 0.001) * 0.05;
+      this.y += Math.sin(Date.now() * 0.0008 + this.x) * 0.3;
+      return;
+    }
+
+    this.animTimer += dt;
+    if (this.animTimer > 120) {
+      this.animTimer = 0;
+      this.animFrame = (this.animFrame + 1) % 4;
+    }
+
+    this.neckAngle += this.neckDir * dt * 0.0008;
+    if (Math.abs(this.neckAngle) > 0.35) this.neckDir *= -1;
+
+    this.walkTimer -= dt;
+    if (this.walkTimer <= 0 && this.state === 'idle') {
+      this.state = 'walking';
+      this.targetX = this.x + (Math.random() - 0.5) * 180;
+      this.targetX = Math.max(40, Math.min(W() - 40, this.targetX));
+      this.dir = this.targetX > this.x ? 1 : -1;
+      this.walkTimer = 2000 + Math.random() * 4000;
+    }
+
+    if (this.state === 'walking') {
+      const dx = this.targetX - this.x;
+      if (Math.abs(dx) < 3) {
+        this.state = 'idle';
+        this.vx = 0;
+      } else {
+        this.vx = Math.sign(dx) * 0.8;
+        this.x += this.vx;
+        this.legAngle += this.legDir * dt * 0.012;
+        if (Math.abs(this.legAngle) > 0.4) this.legDir *= -1;
+      }
+    } else {
+      this.legAngle *= 0.9;
+    }
+
+    // Bob on water
+    this.y += Math.sin(Date.now() * 0.0015 + this.x * 0.01) * 0.2;
+  }
+
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(this.dir, 1);
+
+    const b = this.satisfied ? 0 : 0.2;
+    ctx.filter = `brightness(${1 + b})`;
+
+    // Legs
+    const legH = 22;
+    ctx.strokeStyle = this.legCol;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-3, 0);
+    ctx.lineTo(-5, legH);
+    ctx.moveTo(3, 0);
+    ctx.lineTo(5 + Math.sin(this.legAngle) * 4, legH);
+    ctx.stroke();
+
+    // Feet
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-5, legH);
+    ctx.lineTo(-9, legH + 3);
+    ctx.moveTo(-5, legH);
+    ctx.lineTo(-3, legH + 3);
+    ctx.moveTo(-5, legH);
+    ctx.lineTo(-6, legH + 3);
+    ctx.moveTo(5 + Math.sin(this.legAngle) * 4, legH);
+    ctx.lineTo(3, legH + 3);
+    ctx.moveTo(5 + Math.sin(this.legAngle) * 4, legH);
+    ctx.lineTo(7, legH + 3);
+    ctx.moveTo(5 + Math.sin(this.legAngle) * 4, legH);
+    ctx.lineTo(5, legH + 3);
+    ctx.stroke();
+
+    // Body
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.ellipse(0, -6, 16, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tail feathers
+    ctx.fillStyle = '#F0F0EC';
+    ctx.beginPath();
+    ctx.moveTo(-14, -4);
+    ctx.quadraticCurveTo(-24, -2, -26, 2);
+    ctx.quadraticCurveTo(-22, 4, -14, 2);
+    ctx.fill();
+
+    // Wing
+    ctx.fillStyle = this.satisfied ? '#E8E8E4' : '#EBEBE7';
+    ctx.beginPath();
+    ctx.ellipse(2, -7, 12, 7, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    // Wing lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-6 + i * 5, -12);
+      ctx.quadraticCurveTo(-2 + i * 5, -7, -6 + i * 5, -2);
+      ctx.stroke();
+    }
+
+    // Neck (S-curve)
+    ctx.save();
+    ctx.translate(10, -12);
+    ctx.rotate(this.neckAngle - 0.3);
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(4, -12, 2, -24);
+    ctx.stroke();
+
+    // Head
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.ellipse(2, -28, 7, 6, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Beak
+    ctx.fillStyle = this.beakCol;
+    ctx.beginPath();
+    ctx.moveTo(7, -29);
+    ctx.lineTo(20, -28);
+    ctx.lineTo(7, -26);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(4, -30, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(4.5, -30.5, 0.7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crest
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -33);
+    ctx.lineTo(-3, -38);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(2, -33);
+    ctx.lineTo(1, -39);
+    ctx.stroke();
+
+    ctx.restore(); // neck transform
+    ctx.restore(); // main transform
+  }
+
+  eatFish() {
+    if (this.satisfied) return;
+    this.fed++;
+    this.state = 'eating';
+    setTimeout(() => {
+      if (this.fed >= 3) {
+        this.satisfied = true;
+        totalFed++;
+        updateUI();
+      }
+      this.state = 'idle';
+    }, 800);
+  }
+}
+
+// ─── Fish (food) ─────────────────────────────────────
+const fishList = [];
+
+class Fish {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = (Math.random() - 0.5) * 0.4;
+    this.vy = -0.5 - Math.random() * 0.5;
+    this.alpha = 1;
+    this.age = 0;
+    this.dead = false;
+    this.eaten = false;
+    this.rotation = Math.random() * Math.PI * 2;
+  }
+
+  update(dt) {
+    this.age += dt;
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.008; // slight gravity
+    this.rotation += 0.02;
+
+    if (this.age > 6000) {
+      this.alpha -= 0.01;
+      if (this.alpha <= 0) this.dead = true;
+    }
+  }
+
+  draw() {
+    if (this.eaten) return;
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(Math.sin(this.rotation) * 0.3);
+
+    // Fish body
+    ctx.fillStyle = '#FF8C42';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tail
+    ctx.fillStyle = '#FF6B2B';
+    ctx.beginPath();
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(-14, -5);
+    ctx.lineTo(-14, 5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(4, -1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  remove() {
+    this.dead = true;
+    this.eaten = true;
+  }
+}
+
+// ─── Splash particles ────────────────────────────────
+const particles = [];
+
+class Particle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.5 + Math.random() * 2;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = -Math.abs(Math.sin(angle) * speed) - 1;
+    this.life = 1;
+    this.r = 2 + Math.random() * 3;
+  }
+
+  update(dt) {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.08;
+    this.life -= 0.025;
+  }
+
+  draw() {
+    if (this.life <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = this.life * 0.7;
+    ctx.fillStyle = 'rgba(180, 220, 255, 0.9)';
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * this.life, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ─── Shore fish (decorative) ────────────────────────
+const shoreFish = [];
+for (let i = 0; i < 5; i++) {
+  shoreFish.push({
+    x: 60 + Math.random() * (W() - 120),
+    y: H() - 20 - Math.random() * 8,
+    color: ['#7EB8DA', '#5A9EC0', '#89C4E1', '#A8D8EA'][Math.floor(Math.random() * 4)],
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.2 + Math.random() * 0.3,
+    dir: Math.random() > 0.5 ? 1 : -1,
+    r: 4 + Math.random() * 4
+  });
+}
+
+function drawShoreFish(t) {
+  shoreFish.forEach(f => {
+    f.x += f.speed * f.dir;
+    if (f.x < 30 || f.x > W() - 30) f.dir *= -1;
+    const by = f.y + Math.sin(t * 0.002 + f.phase) * 3;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.translate(f.x, by);
+    ctx.scale(f.dir, 1);
+    ctx.fillStyle = f.color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, f.r, f.r * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(f.r * 0.3, -f.r * 0.15, f.r * 0.3, f.r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ─── Seaweed ─────────────────────────────────────────
+const seaweeds = [];
+for (let i = 0; i < 4; i++) {
+  seaweeds.push({
+    x: 20 + Math.random() * (W() - 40),
+    phase: Math.random() * Math.PI * 2,
+    height: 30 + Math.random() * 40
+  });
+}
+
+function drawSeaweed(t) {
+  seaweeds.forEach(sw => {
+    ctx.save();
+    ctx.strokeStyle = '#2D7A4F';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    for (let j = 0; j < 2; j++) {
+      ctx.beginPath();
+      const sx = sw.x + j * 5;
+      ctx.moveTo(sx, H());
+      for (let y = 0; y < sw.height; y += 4) {
+        const bend = Math.sin((y * 0.05) + t * 0.002 + sw.phase + j) * (y * 0.08);
+        ctx.lineTo(sx + bend, H() - y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
+// ─── Reeds on left ───────────────────────────────────
+function drawReeds(t) {
+  ctx.save();
+  ctx.strokeStyle = '#8B7355';
+  ctx.lineWidth = 2;
+  const reedData = [
+    {x: W() * 0.04, h: 70}, {x: W() * 0.055, h: 85},
+    {x: W() * 0.07, h: 65}, {x: W() * 0.085, h: 90}
+  ];
+  reedData.forEach((r, i) => {
+    ctx.beginPath();
+    ctx.moveTo(r.x, H() - 28);
+    for (let y = 0; y < r.h; y += 3) {
+      const bend = Math.sin((y * 0.04) + t * 0.0015 + i) * (y * 0.06);
+      ctx.lineTo(r.x + bend, H() - 28 - y);
+    }
+    ctx.stroke();
+    // Top fluff
+    ctx.strokeStyle = '#A08060';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(r.x, H() - 28 - r.h);
+    ctx.quadraticCurveTo(
+      r.x + Math.sin(t * 0.001 + i) * 4, H() - 28 - r.h - 8,
+      r.x, H() - 28 - r.h - 5
+    );
+    ctx.stroke();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 2;
+  });
+  ctx.restore();
+}
+
+// ─── Game State ──────────────────────────────────────
+let totalFed = 0;
+const GOAL = 10;
+let gameWon = false;
+let lastTime = 0;
+const oceanTop = () => H() * 0.52;
+
+// Spawn egrets
+function spawnEgrets() {
+  egrets.length = 0;
+  for (let i = 0; i < 3; i++) {
+    egrets.push(new Egret(
+      W() * 0.2 + Math.random() * W() * 0.6,
+      H() * 0.54 + Math.random() * 20
+    ));
+  }
+}
+spawnEgrets();
+
+function updateUI() {
+  document.getElementById('score').textContent = totalFed;
+}
+
+canvas.addEventListener('click', (e) => {
+  if (gameWon) {
+    // Reset
+    totalFed = 0;
+    gameWon = false;
+    updateUI();
+    spawnEgrets();
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const clickX = (e.clientX - rect.left) * (W() / rect.width);
+  const clickY = (e.clientY - rect.top) * (H() / rect.height);
+
+  const oceanSurface = oceanTop() + 10;
+
+  // Only throw fish into water area
+  if (clickY > oceanSurface) {
+    const f = new Fish(clickX, clickY);
+    fishList.push(f);
+
+    // Splash
+    for (let i = 0; i < 6; i++) {
+      particles.push(new Particle(clickX, clickY));
+    }
+  }
+});
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const clickX = (touch.clientX - rect.left) * (W() / rect.width);
+  const clickY = (touch.clientY - rect.top) * (H() / rect.height);
+
+  if (gameWon) {
+    totalFed = 0;
+    gameWon = false;
+    updateUI();
+    spawnEgrets();
+    return;
+  }
+
+  const oceanSurface = oceanTop() + 10;
+  if (clickY > oceanSurface) {
+    const f = new Fish(clickX, clickY);
+    fishList.push(f);
+    for (let i = 0; i < 6; i++) {
+      particles.push(new Particle(clickX, clickY));
+    }
+  }
+}, {passive: false});
+
+// ─── Win overlay ─────────────────────────────────────
+function drawWin() {
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = '#1A1A2E';
+  ctx.fillRect(0, 0, W(), H());
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+
+  // Glow
+  ctx.shadowColor = '#FFD700';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#FFD700';
+  ctx.font = `bold ${Math.floor(W() * 0.1)}px Georgia`;
+  ctx.fillText('🎉', W() / 2, H() / 2 - 50);
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.floor(W() * 0.08)}px Georgia`;
+  ctx.fillText('白鹭吃饱啦！', W() / 2, H() / 2 + 10);
+
+  ctx.font = `${Math.floor(W() * 0.042)}px Georgia`;
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText('点击画面重新开始', W() / 2, H() / 2 + 55);
+  ctx.restore();
+}
+
+// ─── Main Loop ───────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+
+  ctx.clearRect(0, 0, W(), H());
+
+  drawSky();
+  drawClouds(dt);
+  drawOcean(ts);
+  drawShoreFish(ts);
+  drawSeaweed(ts);
+  drawShore();
+  drawRocks();
+  drawReeds(ts);
+
+  // Update & draw egrets
+  egrets.forEach(e => e.update(dt));
+
+  // Fish collision with egrets
+  fishList.forEach(f => {
+    if (f.eaten || f.dead) return;
+    f.update(dt);
+    egrets.forEach(e => {
+      if (e.satisfied) return;
+      const dist = Math.hypot(f.x - e.x, f.y - e.y);
+      if (dist < 30) {
+        f.remove();
+        e.eatFish();
+        for (let i = 0; i < 4; i++) {
+          particles.push(new Particle(f.x, f.y));
+        }
+      }
+    });
+  });
+
+  // Particles
+  particles.forEach(p => p.update(dt));
+
+  egrets.forEach(e => e.draw());
+  fishList.forEach(f => f.draw());
+  particles.forEach(p => p.draw());
+
+  // Clean up
+  for (let i = fishList.length - 1; i >= 0; i--) {
+    if (fishList[i].dead) fishList.splice(i, 1);
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+
+  // Check win
+  if (totalFed >= GOAL && !gameWon) {
+    gameWon = true;
+  }
+
+  if (gameWon) {
+    drawWin();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
