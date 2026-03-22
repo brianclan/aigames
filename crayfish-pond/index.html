@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Crayfish Pond 🦞</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a1628;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Georgia', serif;
+    touch-action: none;
+    user-select: none;
+  }
+  #c {
+    border-radius: 16px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+  }
+  #hud {
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 18px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .hud-item {
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.15);
+    letter-spacing: 0.5px;
+  }
+  #hint {
+    position: absolute;
+    bottom: 14px; left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 10;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="hud-item">🍖 <span id="score">0</span> / 20</div>
+  <div class="hud-item">⏱️ <span id="time">60</span>s</div>
+</div>
+<canvas id="c"></canvas>
+<div id="hint">方向键/WASD移动 · 空格蓄力跳跃 · 吃掉食物得分 🦞</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const w = Math.min(window.innerWidth, 520);
+  const h = Math.min(window.innerHeight - 80, 720);
+  canvas.width = w;
+  canvas.height = h;
+}
+resize();
+window.addEventListener('resize', resize);
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// ─── Game State ──────────────────────────────────────
+let score = 0;
+const GOAL = 20;
+let timeLeft = 60;
+let gameState = 'playing'; // playing, won, lost
+let lastTime = 0;
+let shakeTimer = 0;
+let shakeIntensity = 0;
+
+// ─── Input ────────────────────────────────────────────
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') { e.preventDefault(); player.jump(); }
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Touch joystick
+let touchStart = null, touchCurrent = null;
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  touchStart = { x: t.clientX, y: t.clientY };
+  touchCurrent = { x: t.clientX, y: t.clientY };
+  player.jump();
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!touchStart) return;
+  const t = e.touches[0];
+  touchCurrent = { x: t.clientX, y: t.clientY };
+}, { passive: false });
+canvas.addEventListener('touchend', e => { touchStart = null; touchCurrent = null; });
+
+// ─── Background ──────────────────────────────────────
+const bgRocks = [];
+for (let i = 0; i < 12; i++) {
+  bgRocks.push({
+    x: Math.random(), y: 0.55 + Math.random() * 0.38,
+    rx: 8 + Math.random() * 18, ry: 5 + Math.random() * 10,
+    shade: Math.floor(30 + Math.random() * 20)
+  });
+}
+
+const waterBlobs = [];
+for (let i = 0; i < 18; i++) {
+  waterBlobs.push({
+    x: Math.random(), y: Math.random(),
+    r: 3 + Math.random() * 6,
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.3 + Math.random() * 0.4
+  });
+}
+
+// ─── Food ───────────────────────────────────────────
+const foods = [];
+const FOOD_TYPES = [
+  { emoji: '🥬', color: '#4CAF50', points: 1, name: 'lettuce' },
+  { emoji: '🪱', color: '#8B6914', points: 1, name: 'worm' },
+  { emoji: '🦐', color: '#FF7043', points: 2, name: 'shrimp' },
+  { emoji: '🫐', color: '#5C6BC0', points: 3, name: 'berry' },
+  { emoji: '🌽', color: '#FDD835', points: 2, name: 'corn' },
+];
+
+function spawnFood() {
+  if (foods.length >= 8) return;
+  const type = FOOD_TYPES[Math.floor(Math.random() * FOOD_TYPES.length)];
+  foods.push({
+    x: 40 + Math.random() * (W() - 80),
+    y: 50 + Math.random() * (H() - 150),
+    vx: (Math.random() - 0.5) * 1.5,
+    vy: 0,
+    type,
+    bobPhase: Math.random() * Math.PI * 2,
+    wobble: Math.random() * Math.PI * 2,
+    wobbleSpeed: 1 + Math.random(),
+    rot: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.03,
+    scale: 1,
+    eaten: false,
+    age: 0
+  });
+}
+
+// Spawn initial food
+for (let i = 0; i < 5; i++) spawnFood();
+
+// ─── Bubbles ────────────────────────────────────────
+const bubbles = [];
+function spawnBubble(x, y) {
+  bubbles.push({
+    x, y,
+    r: 2 + Math.random() * 4,
+    vx: (Math.random() - 0.5) * 0.8,
+    vy: -0.8 - Math.random() * 1.2,
+    alpha: 0.6 + Math.random() * 0.4,
+    wobble: Math.random() * Math.PI * 2
+  });
+}
+
+// ─── Particles ───────────────────────────────────────
+const particles = [];
+function spawnParticles(x, y, color, count = 8) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 3;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: 2 + Math.random() * 4,
+      color,
+      life: 1,
+      decay: 0.02 + Math.random() * 0.02
+    });
+  }
+}
+
+// ─── Player Crayfish ────────────────────────────────
+const player = {
+  x: 0, y: 0,
+  vx: 0, vy: 0,
+  w: 36, h: 24,
+  facing: 1,
+  legPhase: 0,
+  tailPhase: 0,
+  clawPhase: 0,
+  grounded: false,
+  jumpPower: 0,
+  charging: false,
+  jumpCharge: 0,
+  invincible: 0,
+  color: '#E74C3C',
+  eyeWobble: 0,
+  eatAnim: 0,
+  draw(t) {
+    const self = this;
+    ctx.save();
+    ctx.translate(self.x, self.y);
+    ctx.scale(self.facing, 1);
+
+    const bounce = Math.abs(Math.sin(t * 0.004)) * (self.grounded ? 1 : 0);
+    const squish = self.jumpCharge > 0 ? 1 - self.jumpCharge * 0.3 : 1;
+    ctx.scale(1 + self.jumpCharge * 0.2, squish);
+
+    // Legs
+    ctx.strokeStyle = '#C0392B';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const lx = -8 + i * 8;
+      const swing = Math.sin(self.legPhase + i * 0.8) * (self.grounded ? 4 : 2);
+      ctx.beginPath();
+      ctx.moveTo(lx, 4);
+      ctx.lineTo(lx - 4, 12 + swing);
+      ctx.moveTo(lx, 4);
+      ctx.lineTo(lx + 4, 12 - swing);
+      ctx.stroke();
+    }
+
+    // Tail fan
+    const tailWag = Math.sin(self.tailPhase) * 0.2;
+    ctx.save();
+    ctx.translate(-22, 0);
+    ctx.rotate(tailWag);
+    ctx.fillStyle = '#C0392B';
+    ctx.beginPath();
+    ctx.ellipse(-4, 0, 8, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Fan lines
+    for (let i = -2; i <= 2; i++) {
+      ctx.strokeStyle = '#922B21';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(0, i * 3);
+      ctx.lineTo(-10, i * 4);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Body segments (abdomen)
+    const segColors = ['#E74C3C', '#EC7063', '#E74C3C'];
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = segColors[i];
+      ctx.beginPath();
+      ctx.ellipse(-6 - i * 6, 0, 8, 10 - i, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Shell highlights
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.ellipse(-12, -4, 5, 4, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Arms to claws
+    const clawAngle = Math.sin(self.clawPhase) * 0.15 + 0.3;
+    ctx.strokeStyle = '#C0392B';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    // Big claw arm
+    ctx.save();
+    ctx.translate(6, -4);
+    ctx.rotate(-clawAngle + 0.2);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(14, -6);
+    ctx.stroke();
+    // Claw pincer
+    ctx.translate(14, -6);
+    ctx.strokeStyle = '#C0392B';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(10, -3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(8, 3, 12, -2); ctx.stroke();
+    // Claw body
+    ctx.fillStyle = '#D64539';
+    ctx.beginPath(); ctx.ellipse(4, 0, 6, 5, 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // Second claw arm (smaller)
+    ctx.save();
+    ctx.translate(6, 4);
+    ctx.rotate(clawAngle - 0.2);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(12, 6);
+    ctx.stroke();
+    ctx.translate(12, 6);
+    ctx.strokeStyle = '#C0392B'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(8, 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(6, -3, 10, 2); ctx.stroke();
+    ctx.fillStyle = '#D64539';
+    ctx.beginPath(); ctx.ellipse(3, 0, 5, 4, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    // Head
+    ctx.fillStyle = '#E74C3C';
+    ctx.beginPath();
+    ctx.ellipse(16, 0, 10, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Antennae
+    ctx.strokeStyle = '#C0392B';
+    ctx.lineWidth = 1.5;
+    const antWave = Math.sin(t * 0.003) * 3;
+    ctx.beginPath();
+    ctx.moveTo(20, -5);
+    ctx.quadraticCurveTo(26 + antWave, -14, 30 + antWave * 1.5, -20);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(18, -5);
+    ctx.quadraticCurveTo(24 - antWave * 0.5, -12, 26 - antWave, -18);
+    ctx.stroke();
+
+    // Eye stalks
+    ctx.fillStyle = '#E74C3C';
+    ctx.beginPath(); ctx.ellipse(20, -6, 3, 4, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(14, -6, 3, 4, 0.2, 0, Math.PI * 2); ctx.fill();
+
+    // Eyes
+    const eyeW = Math.sin(self.eyeWobble) * 1;
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(21 + eyeW, -7, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(15 - eyeW, -7, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(21.5 + eyeW, -7.5, 0.9, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(15.5 - eyeW, -7.5, 0.9, 0, Math.PI * 2); ctx.fill();
+
+    // Smile
+    if (self.eatAnim > 0) {
+      ctx.strokeStyle = '#922B21';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(18, 4, 4, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
+
+    // Invincibility flash
+    if (self.invincible > 0 && Math.floor(t / 80) % 2 === 0) {
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 30, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  },
+  jump() {
+    if (this.grounded && this.jumpCharge === 0) {
+      this.charging = true;
+      this.jumpCharge = 0.01;
+    }
+  },
+  update(dt, t) {
+    // Charging
+    if (this.charging) {
+      this.jumpCharge += dt * 0.002;
+      if (this.jumpCharge >= 1) {
+        this.vy = -12 * 0.8;
+        this.grounded = false;
+        this.charging = false;
+        this.jumpPower = this.jumpCharge;
+        this.jumpCharge = 0;
+        for (let i = 0; i < 5; i++) spawnBubble(this.x - 10 + Math.random() * 20, this.y + 10);
+      }
+    }
+
+    // Movement
+    const speed = 3.5;
+    let moveX = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) moveX = -1;
+    if (keys['ArrowRight'] || keys['KeyD']) moveX = 1;
+
+    if (touchStart && touchCurrent) {
+      const dx = touchCurrent.x - touchStart.x;
+      if (Math.abs(dx) > 10) moveX = Math.sign(dx);
+    }
+
+    if (moveX !== 0) this.facing = moveX;
+    this.vx = moveX * speed;
+
+    // Physics
+    this.vy += 0.5; // gravity
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Bounds
+    if (this.x < 20) this.x = 20;
+    if (this.x > W() - 20) this.x = W() - 20;
+    if (this.y > H() - 30) {
+      this.y = H() - 30;
+      this.vy = 0;
+      this.grounded = true;
+    }
+    if (this.y < 30) { this.y = 30; this.vy = 1; }
+
+    // Anims
+    if (Math.abs(this.vx) > 0.1) {
+      this.legPhase += dt * 0.015 * Math.abs(this.vx);
+      this.tailPhase += dt * 0.008;
+    }
+    this.clawPhase += dt * 0.003;
+    this.eyeWobble += dt * 0.01;
+
+    if (this.eatAnim > 0) this.eatAnim -= dt * 0.003;
+    if (this.invincible > 0) this.invincible -= dt;
+
+    // Eat food
+    if (this.jumpPower <= 0) {
+      foods.forEach(f => {
+        if (f.eaten) return;
+        const d = Math.hypot(this.x - f.x, this.y - f.y);
+        if (d < 28) {
+          f.eaten = true;
+          score += f.type.points;
+          this.eatAnim = 1;
+          document.getElementById('score').textContent = score;
+          spawnParticles(f.x, f.y, f.type.color, 10);
+          shakeTimer = 100;
+          shakeIntensity = 2;
+          if (score >= GOAL) {
+            gameState = 'won';
+          }
+        }
+      });
+    } else {
+      this.jumpPower -= dt * 0.005;
+    }
+  }
+};
+player.x = W() / 2;
+player.y = H() / 2;
+
+// ─── Draw Background ────────────────────────────────
+function drawBG(t) {
+  // Deep pond gradient
+  const bg = ctx.createLinearGradient(0, 0, 0, H());
+  bg.addColorStop(0, '#0D2137');
+  bg.addColorStop(0.4, '#0A1B2E');
+  bg.addColorStop(1, '#061222');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W(), H());
+
+  // Subtle light rays from top
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  for (let i = 0; i < 5; i++) {
+    const rx = (i - 2) * W() * 0.25;
+    const rayGrad = ctx.createLinearGradient(rx, 0, rx + 60, H() * 0.7);
+    rayGrad.addColorStop(0, '#4FC3F7');
+    rayGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = rayGrad;
+    ctx.beginPath();
+    ctx.moveTo(rx, 0);
+    ctx.lineTo(rx + 80, H() * 0.7);
+    ctx.lineTo(rx + 20, H() * 0.7);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Water surface shimmer
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  for (let x = 0; x < W(); x += 3) {
+    const y = 40 + Math.sin(x * 0.03 + t * 0.002) * 8;
+    ctx.fillStyle = '#4FC3F7';
+    ctx.fillRect(x, y, 2, 3);
+  }
+  ctx.restore();
+
+  // Background rocks
+  bgRocks.forEach(r => {
+    ctx.fillStyle = `rgb(${r.shade},${r.shade + 5},${r.shade + 15})`;
+    ctx.beginPath();
+    ctx.ellipse(r.x * W(), r.y * H(), r.rx, r.ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,0.03)`;
+    ctx.beginPath();
+    ctx.ellipse(r.x * W() - r.rx * 0.2, r.y * H() - r.ry * 0.3, r.rx * 0.5, r.ry * 0.4, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Substrate
+  const sub = ctx.createLinearGradient(0, H() * 0.75, 0, H());
+  sub.addColorStop(0, '#1A3A1A');
+  sub.addColorStop(0.5, '#122212');
+  sub.addColorStop(1, '#0A160A');
+  ctx.fillStyle = sub;
+  ctx.fillRect(0, H() * 0.75, W(), H() * 0.25);
+
+  // Pebbles
+  for (let i = 0; i < 20; i++) {
+    const px = ((i * 97.3) % 1) * W();
+    const py = H() * 0.78 + ((i * 53.7) % 1) * H() * 0.2;
+    const pr = 2 + (i % 4);
+    ctx.fillStyle = `rgba(60,80,60,0.6)`;
+    ctx.beginPath();
+    ctx.ellipse(px, py, pr, pr * 0.6, (i * 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Aquatic plants (reeds on sides)
+  for (let side = 0; side < 2; side++) {
+    const sx = side === 0 ? 15 : W() - 15;
+    for (let j = 0; j < 3; j++) {
+      const bx = sx + (j - 1) * 8;
+      const bh = 40 + j * 15 + Math.sin(t * 0.001 + j) * 5;
+      ctx.strokeStyle = '#2E7D32';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(bx, H() * 0.75);
+      ctx.quadraticCurveTo(bx + Math.sin(t * 0.002 + j) * 6, H() * 0.75 - bh * 0.5, bx, H() * 0.75 - bh);
+      ctx.stroke();
+      // Leaf
+      ctx.fillStyle = '#388E3C';
+      ctx.beginPath();
+      ctx.ellipse(bx - 4, H() * 0.75 - bh * 0.6, 8, 3, -0.5 + Math.sin(t * 0.002 + j) * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Lily pads
+  for (let i = 0; i < 4; i++) {
+    const lx = (i * 0.23 + 0.1) * W();
+    const ly = H() * 0.12 + Math.sin(t * 0.0008 + i * 1.2) * 6;
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.rotate(Math.sin(t * 0.0005 + i) * 0.05);
+    ctx.fillStyle = '#2E7D32';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 18, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1B5E20';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-18, 0);
+    ctx.arc(0, 0, 18, Math.PI, 0);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ─── Draw Food ──────────────────────────────────────
+function drawFood(t) {
+  foods.forEach(f => {
+    if (f.eaten) return;
+    f.age += 16;
+    f.x += f.vx;
+    f.y += f.vy;
+    f.wobble += f.wobbleSpeed * 0.05;
+    f.rot += f.rotSpeed;
+
+    // Bounce off walls
+    if (f.x < 20 || f.x > W() - 20) f.vx *= -1;
+    if (f.y < 20) f.vy += 0.1;
+    if (f.y > H() - 60) f.vy -= 0.1;
+
+    const bob = Math.sin(f.bobPhase + t * 0.003) * 3;
+
+    ctx.save();
+    ctx.translate(f.x, f.y + bob);
+    ctx.rotate(Math.sin(f.wobble) * 0.1);
+
+    // Glow
+    ctx.shadowColor = f.type.color;
+    ctx.shadowBlur = 12;
+
+    ctx.font = `${20 * f.scale}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(f.type.emoji, 0, 0);
+
+    ctx.restore();
+  });
+}
+
+// ─── Draw Bubbles ───────────────────────────────────
+function drawBubbles(t) {
+  bubbles.forEach(b => {
+    b.x += b.vx + Math.sin(b.wobble + t * 0.005) * 0.3;
+    b.y += b.vy;
+    b.wobble += 0.05;
+    b.r *= 0.998;
+
+    ctx.save();
+    ctx.globalAlpha = b.alpha * 0.7;
+    ctx.strokeStyle = 'rgba(150,220,255,0.8)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.stroke();
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ─── Draw Particles ─────────────────────────────────
+function drawParticles() {
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.05;
+    p.life -= p.decay;
+    if (p.life <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ─── Overlay ─────────────────────────────────────────
+function drawOverlay() {
+  if (gameState === 'won') {
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = '#0D2137';
+    ctx.fillRect(0, 0, W(), H());
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#4FC3F7';
+    ctx.shadowBlur = 40;
+    ctx.fillStyle = '#4FC3F7';
+    ctx.font = `bold ${W() * 0.1}px Georgia`;
+    ctx.fillText('🦞', W() / 2, H() / 2 - 70);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${W() * 0.09}px Georgia`;
+    ctx.fillText('Crayfish Feast!', W() / 2, H() / 2 - 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = `${W() * 0.04}px Georgia`;
+    ctx.fillText('All 20 items eaten!', W() / 2, H() / 2 + 30);
+    ctx.fillText('点击重新开始', W() / 2, H() / 2 + 60);
+    ctx.restore();
+  } else if (gameState === 'lost') {
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#1a0000';
+    ctx.fillRect(0, 0, W(), H());
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#E74C3C';
+    ctx.font = `bold ${W() * 0.09}px Georgia`;
+    ctx.fillText("Time's Up!", W() / 2, H() / 2 - 20);
+    ctx.fillStyle = '#fff';
+    ctx.font = `${W() * 0.045}px Georgia`;
+    ctx.fillText(`得分: ${score} / ${GOAL}`, W() / 2, H() / 2 + 20);
+    ctx.fillText('点击重新开始', W() / 2, H() / 2 + 55);
+    ctx.restore();
+  }
+}
+
+// ─── Reset ──────────────────────────────────────────
+function resetGame() {
+  score = 0;
+  timeLeft = 60;
+  gameState = 'playing';
+  player.x = W() / 2;
+  player.y = H() / 2;
+  player.vx = 0;
+  player.vy = 0;
+  player.jumpCharge = 0;
+  player.charging = false;
+  player.jumpPower = 0;
+  player.grounded = false;
+  foods.length = 0;
+  bubbles.length = 0;
+  particles.length = 0;
+  for (let i = 0; i < 5; i++) spawnFood();
+  document.getElementById('score').textContent = '0';
+  document.getElementById('time').textContent = '60';
+}
+
+canvas.addEventListener('click', () => {
+  if (gameState !== 'playing') resetGame();
+});
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (gameState !== 'playing') { resetGame(); return; }
+  // Double tap to jump
+  player.jump();
+}, { passive: false });
+
+// ─── Timer ──────────────────────────────────────────
+let timerAccum = 0;
+
+// ─── Main Loop ──────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+
+  // Screen shake
+  ctx.save();
+  if (shakeTimer > 0) {
+    shakeTimer -= dt;
+    ctx.translate(
+      (Math.random() - 0.5) * shakeIntensity,
+      (Math.random() - 0.5) * shakeIntensity
+    );
+  }
+
+  ctx.clearRect(-10, -10, W() + 20, H() + 20);
+  drawBG(ts);
+
+  if (gameState === 'playing') {
+    player.update(dt, ts);
+
+    // Timer
+    timerAccum += dt;
+    if (timerAccum >= 1000) {
+      timerAccum -= 1000;
+      timeLeft--;
+      document.getElementById('time').textContent = timeLeft;
+      if (timeLeft <= 0) gameState = 'lost';
+    }
+
+    // Spawn food
+    if (Math.random() < 0.01) spawnFood();
+
+    // Bubble trail from player
+    if (Math.random() < 0.05) {
+      spawnBubble(player.x + (Math.random() - 0.5) * 20, player.y + 5);
+    }
+
+    drawFood(ts);
+    drawBubbles(ts);
+    drawParticles();
+    player.draw(ts);
+
+  } else {
+    // Still draw scene behind overlay
+    drawFood(ts);
+    drawBubbles(ts);
+    drawParticles();
+    player.draw(ts);
+    drawOverlay();
+  }
+
+  // Cleanup
+  for (let i = foods.length - 1; i >= 0; i--) {
+    if (foods[i].eaten || foods[i].age > 15000) foods.splice(i, 1);
+  }
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    if (bubbles[i].r < 0.5 || bubbles[i].y < -10) bubbles.splice(i, 1);
+  }
+  for (let i = particles.length - 1; i >= 0; i--) {
+    if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
