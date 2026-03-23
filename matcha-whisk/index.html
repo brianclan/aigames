@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Matcha Whisk 🍵</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f5f0e8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Georgia', serif;
+    touch-action: none;
+    overflow: hidden;
+  }
+  canvas {
+    border-radius: 20px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.25);
+  }
+  #hud {
+    display: flex; gap: 10px; margin-bottom: 10px;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .pill {
+    background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(0,0,0,0.12);
+    color: #3a2a1a;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.3px;
+  }
+  #tip {
+    color: rgba(80,60,40,0.5);
+    font-size: 12px;
+    margin-top: 8px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="pill">🍵 <span id="score">0</span></div>
+  <div class="pill">⏱️ <span id="round">1</span>/5</div>
+  <div class="pill" id="tempPill">🌡️ <span id="temp">20</span>°C</div>
+  <div class="pill" id="qualityPill">foam: <span id="foam">0</span>%</div>
+</div>
+<canvas id="c"></canvas>
+<div id="tip">Hold & shake to whisk! Keep water ~70°C for best matcha 🍃</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const w = Math.min(window.innerWidth - 24, 420);
+  const h = Math.min(window.innerHeight - 100, 600);
+  canvas.width = w;
+  canvas.height = h;
+}
+resize();
+window.addEventListener('resize', resize);
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// ─── Game State ─────────────────────────────────────
+let score = 0;
+let round = 1;
+const TOTAL_ROUNDS = 5;
+let phase = 'brewing'; // brewing, judging, next, gameover
+let lastTime = 0;
+let temp = 20;
+let targetTemp = 60 + Math.random() * 20; // 60-80 ideal for matcha
+let whisking = false;
+let foam = 0;       // 0-100
+let foamTarget = 0;
+let matchaColor = '#5a8a3a'; // deep green when perfect
+let whiskAngle = 0;
+let whiskX = 0;
+let whiskY = 0;
+let whiskStroke = 0;
+let bubbles = [];
+let judgmentTimer = 0;
+let roundScore = 0;
+let screenShake = 0;
+let glowPulse = 0;
+let showPerfect = false;
+let perfectTimer = 0;
+let bubbles2 = []; // matcha dust particles
+
+const bowl = {
+  x: () => W() / 2,
+  y: () => H() * 0.58,
+  rx: () => W() * 0.38,
+  ry: () => H() * 0.18
+};
+
+function startRound() {
+  phase = 'brewing';
+  temp = 20;
+  targetTemp = 60 + Math.random() * 20;
+  foam = 0;
+  foamTarget = 30 + Math.random() * 40;
+  whisking = false;
+  whiskAngle = 0;
+  whiskX = 0;
+  whiskY = 0;
+  whiskStroke = 0;
+  bubbles.length = 0;
+  bubbles2.length = 0;
+  judgmentTimer = 0;
+  roundScore = 0;
+  showPerfect = false;
+  updateHUD();
+}
+
+function calcScore() {
+  // Ideal temp: 65-80°C
+  let tempScore = 0;
+  if (temp >= 65 && temp <= 80) tempScore = 40;
+  else if (temp >= 55 && temp <= 90) tempScore = 20;
+  else tempScore = 5;
+
+  // Ideal foam: 60-85%
+  let foamScore = 0;
+  const diff = Math.abs(foam - foamTarget);
+  if (diff <= 10) foamScore = 60;
+  else if (diff <= 25) foamScore = 35;
+  else foamScore = 10;
+
+  return Math.min(100, tempScore + foamScore);
+}
+
+function updateHUD() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('round').textContent = round;
+  document.getElementById('temp').textContent = Math.round(temp);
+  document.getElementById('foam').textContent = Math.round(foam);
+
+  // Color temp pill based on range
+  const tempEl = document.getElementById('tempPill');
+  if (temp >= 65 && temp <= 80) tempEl.style.background = 'rgba(200,240,200,0.8)';
+  else if (temp > 90 || temp < 30) tempEl.style.background = 'rgba(255,180,180,0.8)';
+  else tempEl.style.background = 'rgba(255,255,200,0.8)';
+}
+
+function showMsg(text, color = '#3a2a1a') {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = `bold 20px Georgia`;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.9;
+  ctx.fillText(text, W() / 2, H() * 0.28);
+  ctx.restore();
+}
+
+// ─── Input ──────────────────────────────────────────
+let touchActive = false;
+let mouseDown = false;
+
+function startWhisk() {
+  if (phase !== 'brewing') return;
+  whisking = true;
+  whiskX = bowl.x();
+  whiskY = bowl.y() - 20;
+}
+
+function stopWhisk() {
+  whisking = false;
+  whiskStroke = 0;
+}
+
+canvas.addEventListener('mousedown', e => { mouseDown = true; startWhisk(); });
+canvas.addEventListener('mouseup', () => { mouseDown = false; stopWhisk(); });
+canvas.addEventListener('mousemove', e => {
+  if (mouseDown) {
+    const rect = canvas.getBoundingClientRect();
+    whiskX = (e.clientX - rect.left) * (W() / rect.width);
+    whiskY = (e.clientY - rect.top) * (H() / rect.height);
+  }
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  touchActive = true;
+  const rect = canvas.getBoundingClientRect();
+  whiskX = (e.touches[0].clientX - rect.left) * (W() / rect.width);
+  whiskY = (e.touches[0].clientY - rect.top) * (H() / rect.height);
+  startWhisk();
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  whiskX = (e.touches[0].clientX - rect.left) * (W() / rect.width);
+  whiskY = (e.touches[0].clientY - rect.top) * (H() / rect.height);
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  touchActive = false;
+  stopWhisk();
+}, { passive: false });
+
+// ─── Particles ──────────────────────────────────────
+function spawnBubble(x, y) {
+  bubbles.push({
+    x: x + (Math.random() - 0.5) * 40,
+    y: y + (Math.random() - 0.5) * 10,
+    r: 2 + Math.random() * 5,
+    vx: (Math.random() - 0.5) * 0.8,
+    vy: -0.5 - Math.random() * 1.0,
+    alpha: 0.6 + Math.random() * 0.3,
+    life: 1
+  });
+}
+
+function spawnMatchaDust() {
+  const bx = bowl.x(), by = bowl.y();
+  bubbles2.push({
+    x: bx + (Math.random() - 0.5) * bowl.rx() * 0.6,
+    y: by - bowl.ry() * 0.3,
+    vx: (Math.random() - 0.5) * 2,
+    vy: -1 - Math.random() * 2,
+    r: 1.5 + Math.random() * 3,
+    alpha: 0.8,
+    life: 1,
+    color: Math.random() > 0.5 ? '#5a8a3a' : '#7ab050'
+  });
+}
+
+// ─── Drawing ────────────────────────────────────────
+function drawBackground() {
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fillRect(0, 0, W(), H());
+
+  // Subtle table texture
+  ctx.save();
+  ctx.globalAlpha = 0.04;
+  for (let i = 0; i < 12; i++) {
+    ctx.fillStyle = '#8B7355';
+    ctx.fillRect(0, H() * 0.75 + i * 4, W(), 2);
+  }
+  ctx.restore();
+
+  // Table surface
+  const table = ctx.createLinearGradient(0, H() * 0.75, 0, H());
+  table.addColorStop(0, '#d4b896');
+  table.addColorStop(0.3, '#c4a882');
+  table.addColorStop(1, '#a08860');
+  ctx.fillStyle = table;
+  ctx.fillRect(0, H() * 0.75, W(), H() * 0.25);
+}
+
+function drawBowl(t) {
+  const bx = bowl.x(), by = bowl.y();
+  const brx = bowl.rx(), bry = bowl.ry();
+  const fillFrac = 0.5 + foam / 200; // visual fill
+
+  // Bowl shadow
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath();
+  ctx.ellipse(bx + 4, by + bry + 6, brx * 0.9, bry * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Bowl body (ceramic)
+  ctx.save();
+  ctx.translate(bx, by);
+
+  // Bowl outer shell
+  const bowlGrad = ctx.createRadialGradient(-brx * 0.2, -bry * 0.3, 0, 0, 0, brx);
+  bowlGrad.addColorStop(0, '#f0ebe0');
+  bowlGrad.addColorStop(0.5, '#e8e0d0');
+  bowlGrad.addColorStop(1, '#c8bfa8');
+  ctx.fillStyle = bowlGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, brx, bry, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Bowl inner rim (dark)
+  ctx.fillStyle = '#b8a888';
+  ctx.beginPath();
+  ctx.ellipse(0, -2, brx * 0.9, bry * 0.85, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Matcha liquid
+  const matchaTop = -bry * 0.7 + (1 - fillFrac) * bry * 1.4;
+  const matchaBrightness = temp > 85 ? 0.3 : 0;
+
+  // Determine matcha color based on foam and temp
+  let mc = matchaColor;
+  if (foam < 20) mc = '#3a6a2a'; // dark, not whisked
+  else if (foam > 80) mc = '#8ac050'; // too frothy, lighter
+  else if (temp > 85) mc = '#6a9040'; // too hot, duller
+  else mc = '#5a8a3a'; // perfect deep green
+
+  const liqGrad = ctx.createRadialGradient(0, matchaTop * 0.5, 0, 0, matchaTop * 0.5, brx * 0.8);
+  liqGrad.addColorStop(0, mc);
+  liqGrad.addColorStop(1, shadeColor(mc, -30));
+
+  ctx.fillStyle = liqGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, brx * 0.88, bry * 0.82, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Foam layer on top
+  if (foam > 10) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(foam / 100, 0.9);
+    const foamGrad = ctx.createRadialGradient(0, matchaTop - 2, 0, 0, matchaTop, brx * 0.7);
+    foamGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
+    foamGrad.addColorStop(0.5, 'rgba(240,248,230,0.8)');
+    foamGrad.addColorStop(1, 'rgba(220,240,210,0.4)');
+    ctx.fillStyle = foamGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, matchaTop, brx * 0.85, bry * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Foam texture (bubbles on surface)
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    for (let i = 0; i < foam * 0.3; i++) {
+      const fx = ((i * 53.7) % 1 - 0.5) * brx * 1.5;
+      const fy = matchaTop + ((i * 29.1) % 1 - 0.5) * bry * 0.4;
+      const fr = 2 + (i % 5);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(fx, fy, fr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Liquid surface shimmer
+  ctx.save();
+  ctx.globalAlpha = 0.15 + Math.sin(t * 0.003) * 0.05;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-brx * 0.2, matchaTop + 3, brx * 0.25, bry * 0.12, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Bowl highlight
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-brx * 0.35, -bry * 0.45, brx * 0.22, bry * 0.14, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Bowl rim
+  ctx.strokeStyle = '#d4c8b0';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(0, -2, brx, bry, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function shadeColor(color, amount) {
+  const num = parseInt(color.replace('#',''), 16);
+  const r = Math.max(0, Math.min(255, (num >> 16) + amount));
+  const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
+  const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawWhisk(t) {
+  if (!whisking && whiskStroke < 0.01) return;
+
+  ctx.save();
+  ctx.translate(whiskX, whiskY);
+
+  if (whisking) {
+    whiskAngle += 0.25;
+    whiskStroke = Math.min(whiskStroke + 0.05, 1);
+  } else {
+    whiskStroke *= 0.9;
+  }
+
+  const wobble = whisking ? Math.sin(whiskAngle * 2) * 5 : 0;
+  ctx.rotate(Math.sin(whiskAngle) * 0.15);
+
+  // Handle
+  ctx.strokeStyle = '#8B6914';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -50);
+  ctx.lineTo(0, 0);
+  ctx.stroke();
+
+  // Whisk head
+  ctx.strokeStyle = '#C0A040';
+  ctx.lineWidth = 2.5;
+  ctx.globalAlpha = whiskStroke;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + whiskAngle;
+    const x1 = Math.cos(angle) * 3;
+    const y1 = 2;
+    const x2 = Math.cos(angle) * 22 + wobble;
+    const y2 = 22 + Math.sin(angle) * 5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(
+      (x1 + x2) / 2 + Math.sin(whiskAngle + i) * 4,
+      (y1 + y2) / 2,
+      x2, y2
+    );
+    ctx.stroke();
+  }
+
+  // Whisk tip trail (when active)
+  if (whisking) {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = 'rgba(150,200,100,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const trail = Math.sin(whiskAngle - i * 0.5) * 5;
+      const tx = Math.cos(whiskAngle - i * 0.5) * 20 + trail;
+      const ty = 20 + i * 3;
+      if (i === 0) ctx.moveTo(tx, ty);
+      else ctx.lineTo(tx, ty);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawBubbles(t) {
+  bubbles.forEach(b => {
+    b.x += b.vx;
+    b.y += b.vy;
+    b.vy -= 0.01;
+    b.life -= 0.01;
+    if (b.life <= 0 || b.y < 0) return;
+    ctx.save();
+    ctx.globalAlpha = b.alpha * b.life;
+    ctx.fillStyle = 'rgba(200,230,255,0.7)';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawDust() {
+  bubbles2.forEach(b => {
+    b.x += b.vx + Math.random() * 0.5;
+    b.y += b.vy;
+    b.vy += 0.02;
+    b.life -= 0.015;
+    if (b.life <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = b.alpha * b.life;
+    ctx.fillStyle = b.color;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawHUD_Bowl() {
+  // Temp arc indicator
+  const bx = bowl.x(), by = bowl.y();
+  const arcR = bowl.rx() * 1.3;
+
+  // Background arc
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(bx, by - bowl.ry() * 0.5, arcR * 0.3, Math.PI, 0);
+  ctx.stroke();
+
+  // Ideal zone highlight
+  const idealStart = Math.PI + (65 / 100) * Math.PI;
+  const idealEnd = Math.PI + (80 / 100) * Math.PI;
+  ctx.globalAlpha = 0.25;
+  ctx.strokeStyle = '#4CAF50';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(bx, by - bowl.ry() * 0.5, arcR * 0.3, idealStart, idealEnd);
+  ctx.stroke();
+
+  // Current temp indicator
+  const tempFrac = Math.min(temp / 100, 1);
+  const tempAngle = Math.PI + tempFrac * Math.PI;
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = temp >= 65 && temp <= 80 ? '#4CAF50' : '#E74C3C';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(bx, by - bowl.ry() * 0.5, arcR * 0.3, Math.PI, tempAngle);
+  ctx.stroke();
+
+  // Bubble on arc
+  const bx2 = bx + Math.cos(tempAngle) * arcR * 0.3;
+  const by2 = (by - bowl.ry() * 0.5) + Math.sin(tempAngle) * arcR * 0.3;
+  ctx.fillStyle = temp >= 65 && temp <= 80 ? '#4CAF50' : '#E74C3C';
+  ctx.beginPath();
+  ctx.arc(bx2, by2, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Target foam indicator
+  const targetFrac = foamTarget / 100;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = `11px Georgia`;
+  ctx.fillStyle = 'rgba(80,60,40,0.5)';
+  ctx.fillText(`target foam: ${Math.round(foamTarget)}%`, bx, by + bowl.ry() + 28);
+  ctx.restore();
+}
+
+function drawPhaseOverlay() {
+  if (phase !== 'judging') return;
+
+  ctx.save();
+  ctx.globalAlpha = Math.min(judgmentTimer / 500, 0.7);
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fillRect(0, 0, W(), H());
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+
+  let label = '', color = '#3a2a1a';
+  if (roundScore >= 90) { label = '🍵 Perfect Matcha! +' + roundScore; color = '#2E7D32'; }
+  else if (roundScore >= 70) { label = '👍 Great! +' + roundScore; color = '#558B2F'; }
+  else if (roundScore >= 50) { label = '😐 Decent. +' + roundScore; color = '#8D6E63'; }
+  else { label = '😅 Try again: +' + roundScore; color = '#A1887F'; }
+
+  ctx.font = `bold 22px Georgia`;
+  ctx.fillStyle = color;
+  ctx.fillText(label, W() / 2, H() / 2);
+
+  ctx.font = `14px Georgia`;
+  ctx.fillStyle = 'rgba(80,60,40,0.6)';
+  ctx.fillText(`Temp: ${Math.round(temp)}°C  |  Foam: ${Math.round(foam)}%`, W() / 2, H() / 2 + 30);
+  ctx.restore();
+}
+
+function drawGameOver() {
+  if (phase !== 'gameover') return;
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fillRect(0, 0, W(), H());
+  ctx.restore();
+
+  ctx.save();
+  ctx.textAlign = 'center';
+
+  ctx.shadowColor = '#5a8a3a';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#3a5a20';
+  ctx.font = `bold ${W() * 0.1}px Georgia`;
+  ctx.fillText('🍵', W() / 2, H() * 0.3);
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#3a2a1a';
+  ctx.font = `bold ${W() * 0.09}px Georgia`;
+  ctx.fillText('Matcha Complete!', W() / 2, H() * 0.45);
+
+  ctx.font = `${W() * 0.055}px Georgia`;
+  ctx.fillStyle = 'rgba(80,60,40,0.7)';
+  ctx.fillText(`Total Score: ${score} / ${TOTAL_ROUNDS * 100}`, W() / 2, H() * 0.57);
+
+  const stars = Math.round(score / (TOTAL_ROUNDS * 100) * 3);
+  ctx.font = `28px serif`;
+  ctx.fillText('⭐'.repeat(stars) + '☆'.repeat(TOTAL_ROUNDS - stars), W() / 2, H() * 0.66);
+
+  ctx.font = `${W() * 0.04}px Georgia`;
+  ctx.fillStyle = 'rgba(80,60,40,0.5)';
+  ctx.fillText('Tap to play again', W() / 2, H() * 0.76);
+  ctx.restore();
+}
+
+// ─── Update ──────────────────────────────────────────
+function update(dt, t) {
+  // Temp: natural cooling / heating with whisk
+  if (whisking) {
+    temp += dt * 0.015; // friction heats slightly
+    if (temp > 95) temp = 95;
+  } else {
+    temp -= dt * 0.008; // slowly cools
+    if (temp < 20) temp = 20;
+  }
+
+  // Foam: increases when whisking, decreases when idle
+  if (whisking) {
+    foam += dt * 0.04;
+    if (foam > 100) foam = 100;
+    if (Math.random() < 0.15) spawnBubble(whiskX, whiskY + 10);
+    if (Math.random() < 0.1) spawnMatchaDust();
+
+    // Check perfect zone
+    if (temp >= 65 && temp <= 80 && foam >= foamTarget - 10 && foam <= foamTarget + 10) {
+      if (!showPerfect) { showPerfect = true; perfectTimer = 0; }
+    }
+  } else {
+    foam -= dt * 0.003;
+    if (foam < 0) foam = 0;
+  }
+
+  if (showPerfect) {
+    perfectTimer += dt;
+    glowPulse = Math.sin(perfectTimer * 0.01) * 0.5 + 0.5;
+    if (perfectTimer > 2000) showPerfect = false;
+  }
+
+  // Bubbles
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    if (bubbles[i].life <= 0) bubbles.splice(i, 1);
+  }
+  for (let i = bubbles2.length - 1; i >= 0; i--) {
+    if (bubbles2[i].life <= 0) bubbles2.splice(i, 1);
+  }
+
+  // Shake
+  if (screenShake > 0) screenShake -= dt * 0.005;
+
+  // Judgment timer
+  if (phase === 'brewing' && foam >= foamTarget - 5 && foam <= foamTarget + 15) {
+    judgmentTimer += dt;
+    if (judgmentTimer >= 2000) {
+      phase = 'judging';
+      roundScore = calcScore();
+      score += roundScore;
+      updateHUD();
+      setTimeout(() => {
+        if (round >= TOTAL_ROUNDS) {
+          phase = 'gameover';
+        } else {
+          round++;
+          startRound();
+        }
+      }, 2500);
+    }
+  } else {
+    judgmentTimer = Math.max(0, judgmentTimer - dt * 0.5);
+  }
+
+  updateHUD();
+}
+
+// Click to restart
+canvas.addEventListener('click', () => {
+  if (phase === 'gameover') {
+    score = 0; round = 1;
+    startRound();
+  }
+});
+
+// ─── Main Loop ─────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+
+  ctx.save();
+  if (screenShake > 0) {
+    ctx.translate(
+      (Math.random() - 0.5) * screenShake,
+      (Math.random() - 0.5) * screenShake
+    );
+  }
+
+  ctx.clearRect(-5, -5, W() + 10, H() + 10);
+  drawBackground();
+  drawBowl(ts);
+  drawBubbles(ts);
+  drawDust();
+  drawWhisk(ts);
+  drawHUD_Bowl();
+
+  // Perfect glow
+  if (showPerfect && glowPulse > 0) {
+    ctx.save();
+    ctx.globalAlpha = glowPulse * 0.15;
+    ctx.fillStyle = '#aaffaa';
+    ctx.beginPath();
+    ctx.ellipse(bowl.x(), bowl.y(), bowl.rx() * 1.5, bowl.ry() * 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = glowPulse * 0.9;
+    ctx.textAlign = 'center';
+    ctx.font = `bold 18px Georgia`;
+    ctx.fillStyle = '#2E7D32';
+    ctx.fillText('✨ Perfect Zone! ✨', bowl.x(), bowl.y() - bowl.ry() - 10);
+    ctx.restore();
+  }
+
+  if (phase !== 'gameover') update(dt, ts);
+
+  drawPhaseOverlay();
+  drawGameOver();
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+
+startRound();
+requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
