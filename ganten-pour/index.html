@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ganten Pour 🫗</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #2c1810;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Georgia', serif;
+    touch-action: none;
+    overflow: hidden;
+  }
+  canvas {
+    border-radius: 16px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+  }
+  #hud {
+    display: flex; gap: 10px; margin-bottom: 10px;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .pill {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #e8d5b0;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  #tip {
+    color: rgba(200,160,100,0.5);
+    font-size: 12px;
+    margin-top: 8px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="pill">💯 <span id="score">0</span></div>
+  <div class="pill">🎯 Level <span id="level">1</span>/5</div>
+  <div class="pill" id="comboPill">⚡ Combo x<span id="combo">0</span></div>
+</div>
+<canvas id="c"></canvas>
+<div id="tip">Hold & drag to tilt bottle · Release to pour · Fill each cup to the mark! 🫗</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const w = Math.min(window.innerWidth - 24, 460);
+  const h = Math.min(window.innerHeight - 100, 640);
+  canvas.width = w;
+  canvas.height = h;
+}
+resize();
+window.addEventListener('resize', resize);
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// ─── Game State ─────────────────────────────────────
+let score = 0;
+let level = 1;
+const TOTAL_LEVELS = 5;
+let phase = 'playing'; // playing, levelComplete, gameOver
+let lastTime = 0;
+let tilt = 0;          // -1 to 1
+let pouring = false;
+let waterStream = [];
+let cups = [];
+let bottleWater = 100;
+let combo = 0;
+let totalPoured = 0;
+let levelScore = 0;
+let perfectCups = 0;
+let shakeTimer = 0;
+let flashMsg = '';
+let flashTimer = 0;
+let drops = [];
+
+// ─── Bottle ─────────────────────────────────────────
+const bottle = {
+  x: () => W() * 0.35,
+  y: () => H() * 0.18,
+  w: 38, h: 90,
+  angle: 0,
+  waterLevel: 1,  // 0-1
+  capColor: '#2980B9',
+  capTop: '#1A5276',
+  bodyColor: 'rgba(200,230,255,0.75)',
+  labelColor: '#2980C0',
+  neckW: 14, neckH: 14,
+  get streamX() { return this.x() + Math.cos(this.angle) * (this.w * 0.5 + 5); },
+  get streamY() { return this.y() + Math.sin(this.angle) * (this.w * 0.5 + 5) + this.h * 0.5; },
+};
+
+// ─── Level Data ─────────────────────────────────────
+function makeLevel(n) {
+  const configs = [
+    [{target: 60, x: 0.5, color: '#8BC34A', name: 'Cup A'}],
+    [{target: 40, x: 0.3, color: '#4FC3F7', name: 'Cup A'}, {target: 60, x: 0.7, color: '#8BC34A', name: 'Cup B'}],
+    [{target: 50, x: 0.25, color: '#4FC3F7', name: 'Cup A'}, {target: 50, x: 0.5, color: '#FFA726', name: 'Cup B'}, {target: 50, x: 0.75, color: '#8BC34A', name: 'Cup C'}],
+    [{target: 70, x: 0.2, color: '#4FC3F7', name: 'Cup A'}, {target: 50, x: 0.55, color: '#FFA726', name: 'Cup B'}, {target: 40, x: 0.8, color: '#CE93D8', name: 'Cup C'}],
+    [{target: 45, x: 0.18, color: '#4FC3F7', name: 'Cup A'}, {target: 65, x: 0.38, color: '#8BC34A', name: 'Cup B'}, {target: 55, x: 0.6, color: '#FFA726', name: 'Cup C'}, {target: 35, x: 0.8, color: '#CE93D8', name: 'Cup D'}],
+  ];
+  return configs[n - 1] || configs[0];
+}
+
+function initLevel() {
+  cups = makeLevel(level).map(c => ({
+    x: c.x * W(),
+    y: H() * 0.72,
+    w: Math.min(58, W() * 0.13),
+    h: Math.min(70, H() * 0.11),
+    fill: 0,
+    target: c.target,
+    color: c.color,
+    name: c.name,
+    done: false,
+    ripplePhase: 0,
+  }));
+  bottle.waterLevel = 1;
+  waterStream = [];
+  drops = [];
+  pouring = false;
+  tilt = 0;
+  totalPoured = 0;
+  levelScore = 0;
+  perfectCups = 0;
+  phase = 'playing';
+  updateHUD();
+}
+
+function updateHUD() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('level').textContent = level;
+  document.getElementById('combo').textContent = combo;
+  const pill = document.getElementById('comboPill');
+  if (combo >= 3) pill.style.background = 'rgba(255,200,0,0.25)';
+  else pill.style.background = 'rgba(255,255,255,0.08)';
+}
+
+function showFlash(text, color = '#fff') {
+  flashMsg = text;
+  flashTimer = 1800;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = `bold 22px Georgia`;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.95;
+  ctx.fillText(text, W() / 2, H() * 0.38);
+  ctx.restore();
+}
+
+// ─── Input ─────────────────────────────────────────
+let touchStart = null;
+let touchCurrent = null;
+
+function getTiltFromInput() {
+  if (touchStart && touchCurrent) {
+    const dx = touchCurrent.x - touchStart.x;
+    return Math.max(-1, Math.min(1, dx / 120));
+  }
+  return 0;
+}
+
+canvas.addEventListener('mousedown', e => {
+  touchStart = { x: e.clientX, y: e.clientY };
+  touchCurrent = { x: e.clientX, y: e.clientY };
+  pouring = true;
+});
+canvas.addEventListener('mousemove', e => {
+  touchCurrent = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('mouseup', () => {
+  touchStart = null; touchCurrent = null;
+  pouring = false;
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  touchCurrent = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  pouring = true;
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  touchCurrent = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  touchStart = null; touchCurrent = null;
+  pouring = false;
+}, { passive: false });
+
+// ─── Physics ────────────────────────────────────────
+function update(dt, t) {
+  if (phase !== 'playing') return;
+
+  tilt = getTiltFromInput();
+  bottle.angle = tilt * 0.8;
+
+  // Pour water
+  if (pouring && tilt > 0.1 && bottle.waterLevel > 0) {
+    const streamX = bottle.streamX;
+    const streamY = bottle.streamY;
+    const pourRate = tilt * 0.06;
+
+    waterStream.push({
+      x: streamX, y: streamY,
+      vx: tilt * 2,
+      vy: 0,
+      life: 1, age: 0
+    });
+
+    bottle.waterLevel -= pourRate * dt * 0.001;
+    if (bottle.waterLevel < 0) bottle.waterLevel = 0;
+
+    // Fill cups
+    cups.forEach(cup => {
+      if (cup.done) return;
+      if (streamX > cup.x - cup.w / 2 && streamX < cup.x + cup.w / 2 && streamY > cup.y - cup.h && streamY < cup.y + cup.h) {
+        const fillRate = tilt * 0.08;
+        cup.fill += fillRate * dt * 0.06;
+        totalPoured += fillRate * dt * 0.06;
+        cup.ripplePhase += dt * 0.008;
+
+        if (cup.fill >= cup.target) {
+          const diff = Math.abs(cup.fill - cup.target);
+          if (diff <= 5) {
+            // Perfect!
+            const bonus = combo >= 2 ? 150 : 100;
+            score += bonus;
+            combo++;
+            shakeTimer = 80;
+            showFlash(`✨ Perfect ${cup.name}! +${bonus}`, '#FFD700');
+          } else if (diff <= 15) {
+            score += 80;
+            showFlash(`👍 ${cup.name} OK! +80`, '#8BC34A');
+            combo = Math.max(0, combo - 1);
+          } else {
+            score += 40;
+            showFlash(`😐 ${cup.name}: +40`, '#aaa');
+            combo = 0;
+          }
+          cup.done = true;
+          cup.fill = Math.min(cup.fill, cup.target + 5);
+          updateHUD();
+        }
+      }
+    });
+  }
+
+  // Water stream physics
+  waterStream.forEach(w => {
+    w.x += w.vx;
+    w.y += w.vy;
+    w.vy += 0.15; // gravity
+    w.age += dt;
+    w.life -= dt * 0.002;
+  });
+
+  // Splash drops
+  if (pouring && tilt > 0.3 && Math.random() < 0.1) {
+    const sx = bottle.streamX, sy = bottle.streamY;
+    for (let i = 0; i < 2; i++) {
+      drops.push({
+        x: sx + (Math.random() - 0.5) * 10,
+        y: sy,
+        vx: (Math.random() - 0.5) * 3,
+        vy: -1 - Math.random() * 2,
+        r: 1.5 + Math.random() * 2,
+        alpha: 0.8,
+        life: 1
+      });
+    }
+  }
+
+  drops.forEach(d => {
+    d.x += d.vx;
+    d.y += d.vy;
+    d.vy += 0.2;
+    d.life -= 0.02;
+  });
+
+  // Check level complete
+  if (cups.every(c => c.done) || (bottle.waterLevel <= 0 && waterStream.length === 0)) {
+    // Level done
+    if (cups.every(c => c.done)) {
+      // All cups filled - great!
+    }
+    setTimeout(() => {
+      if (level >= TOTAL_LEVELS) {
+        phase = 'gameOver';
+      } else {
+        phase = 'levelComplete';
+        setTimeout(() => {
+          level++;
+          initLevel();
+        }, 2000);
+      }
+    }, 800);
+  }
+
+  if (flashTimer > 0) flashTimer -= dt;
+  if (shakeTimer > 0) shakeTimer -= dt;
+
+  // Clean up
+  waterStream = waterStream.filter(w => w.life > 0 && w.y < H());
+  drops = drops.filter(d => d.life > 0);
+}
+
+// ─── Drawing ────────────────────────────────────────
+function drawBackground() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H());
+  bg.addColorStop(0, '#2c1810');
+  bg.addColorStop(1, '#1a0d08');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W(), H());
+
+  // Wooden tray surface
+  const trayTop = H() * 0.65;
+  const trayH = H() * 0.35;
+
+  const wood = ctx.createLinearGradient(0, trayTop, 0, trayTop + trayH);
+  wood.addColorStop(0, '#8B4513');
+  wood.addColorStop(0.15, '#7A3C0E');
+  wood.addColorStop(0.5, '#6B3310');
+  wood.addColorStop(1, '#4A2208');
+  ctx.fillStyle = wood;
+  ctx.fillRect(0, trayTop, W(), trayH);
+
+  // Tray grooves
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 12; i++) {
+    const gx = W() * 0.1 + i * (W() * 0.8 / 11);
+    ctx.beginPath();
+    ctx.moveTo(gx, trayTop + 6);
+    ctx.lineTo(gx, trayTop + trayH - 6);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Tray rim
+  ctx.fillStyle = 'rgba(255,200,100,0.08)';
+  ctx.fillRect(0, trayTop, W(), 4);
+  ctx.fillRect(0, trayTop + trayH - 4, W(), 4);
+
+  // Water drops on tray (decorative)
+  ctx.save();
+  ctx.globalAlpha = 0.12;
+  for (let i = 0; i < 8; i++) {
+    const dx = ((i * 137.5) % W());
+    const dy = trayTop + 20 + ((i * 83.1) % (trayH - 40));
+    ctx.fillStyle = '#8BC3F7';
+    ctx.beginPath();
+    ctx.ellipse(dx, dy, 2, 1.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBottle(t) {
+  const bx = bottle.x();
+  const by = bottle.y();
+  const bw = bottle.w;
+  const bh = bottle.h;
+
+  ctx.save();
+  ctx.translate(bx, by);
+  ctx.rotate(bottle.angle);
+
+  // Shadow
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(4, bh * 0.5 + 8, bw * 0.8, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Body
+  ctx.fillStyle = bottle.bodyColor;
+  ctx.beginPath();
+  ctx.roundRect(-bw / 2, -bh / 2 + bottle.neckH, bw, bh - bottle.neckH, 8);
+  ctx.fill();
+
+  // Water inside bottle
+  const waterH = (bh - bottle.neckH - 6) * bottle.waterLevel;
+  const waterY = bh / 2 - waterH - 3;
+  if (bottle.waterLevel > 0) {
+    const waterGrad = ctx.createLinearGradient(0, waterY, 0, bh / 2);
+    waterGrad.addColorStop(0, 'rgba(100,180,255,0.85)');
+    waterGrad.addColorStop(1, 'rgba(60,140,230,0.9)');
+    ctx.fillStyle = waterGrad;
+    ctx.beginPath();
+    ctx.roundRect(-bw / 2 + 3, waterY, bw - 6, waterH, 5);
+    ctx.fill();
+
+    // Water surface wave
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = 'rgba(180,220,255,0.6)';
+    ctx.beginPath();
+    for (let x = -bw / 2 + 3; x < bw / 2 - 3; x += 3) {
+      const wy = waterY + Math.sin((x + t * 0.005) * 0.2) * 2;
+      if (x === -bw / 2 + 3) ctx.moveTo(x, wy);
+      else ctx.lineTo(x, wy);
+    }
+    ctx.lineTo(bw / 2 - 3, waterY + 4);
+    ctx.lineTo(-bw / 2 + 3, waterY + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Plastic ridges
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 6; i++) {
+    const ry = -bh / 2 + bottle.neckH + 10 + i * 12;
+    ctx.beginPath();
+    ctx.moveTo(-bw / 2 + 4, ry);
+    ctx.lineTo(bw / 2 - 4, ry);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Label
+  const labelH = bh * 0.35;
+  const labelY = -5;
+  ctx.fillStyle = 'rgba(41,128,185,0.85)';
+  ctx.beginPath();
+  ctx.roundRect(-bw / 2 + 4, labelY - labelH / 2, bw - 8, labelH, 3);
+  ctx.fill();
+
+  ctx.save();
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.max(8, bw * 0.22)}px Georgia`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('GANTEN', 0, labelY - 2);
+  ctx.font = `${Math.max(5, bw * 0.12)}px Georgia`;
+  ctx.globalAlpha = 0.8;
+  ctx.fillText('PURIFIED', 0, labelY + 8);
+  ctx.restore();
+
+  // Body outline
+  ctx.strokeStyle = 'rgba(180,220,255,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(-bw / 2, -bh / 2 + bottle.neckH, bw, bh - bottle.neckH, 8);
+  ctx.stroke();
+
+  // Neck
+  ctx.fillStyle = 'rgba(200,230,255,0.8)';
+  ctx.beginPath();
+  ctx.roundRect(-bottle.neckW / 2, -bh / 2, bottle.neckW, bottle.neckH + 6, [6, 6, 0, 0]);
+  ctx.fill();
+
+  // Shoulder transition
+  ctx.fillStyle = 'rgba(200,230,255,0.75)';
+  ctx.beginPath();
+  ctx.moveTo(-bw / 2, -bh / 2 + bottle.neckH);
+  ctx.quadraticCurveTo(-bottle.neckW / 2, -bh / 2 + bottle.neckH + 4, -bottle.neckW / 2, -bh / 2 + 6);
+  ctx.lineTo(bottle.neckW / 2, -bh / 2 + 6);
+  ctx.quadraticCurveTo(bottle.neckW / 2, -bh / 2 + bottle.neckH + 4, bw / 2, -bh / 2 + bottle.neckH);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cap
+  const capH = 14;
+  const capW = bottle.neckW + 6;
+  const capGrad = ctx.createLinearGradient(-capW / 2, 0, capW / 2, 0);
+  capGrad.addColorStop(0, bottle.capTop);
+  capGrad.addColorStop(0.3, bottle.capColor);
+  capGrad.addColorStop(0.7, bottle.capColor);
+  capGrad.addColorStop(1, bottle.capTop);
+  ctx.fillStyle = capGrad;
+  ctx.beginPath();
+  ctx.roundRect(-capW / 2, -bh / 2 - capH, capW, capH, [5, 5, 0, 0]);
+  ctx.fill();
+
+  // Cap ridges
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const cy = -bh / 2 - capH + 4 + i * 3;
+    ctx.beginPath();
+    ctx.moveTo(-capW / 2 + 2, cy);
+    ctx.lineTo(capW / 2 - 2, cy);
+    ctx.stroke();
+  }
+
+  // Cap swirl logo
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(0, -bh / 2 - capH / 2, 3, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Bottle highlight
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-bw * 0.2, -bh * 0.2, bw * 0.15, bh * 0.25, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawWaterStream(t) {
+  waterStream.forEach(w => {
+    ctx.save();
+    ctx.globalAlpha = w.life * 0.8;
+    const grad = ctx.createRadialGradient(w.x, w.y, 0, w.x, w.y, 4);
+    grad.addColorStop(0, 'rgba(100,180,255,0.9)');
+    grad.addColorStop(1, 'rgba(60,140,230,0.4)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(w.x, w.y, 4 * w.life, 6 * w.life, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawDrops() {
+  drops.forEach(d => {
+    if (d.life <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = d.alpha * d.life;
+    ctx.fillStyle = '#8BC4F7';
+    ctx.beginPath();
+    ctx.ellipse(d.x, d.y, d.r, d.r * 1.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawCups(t) {
+  cups.forEach(cup => {
+    const cx = cup.x;
+    const cy = cup.y;
+    const cw = cup.w;
+    const ch = cup.h;
+    const fillFrac = cup.fill / cup.target;
+    const overflow = cup.fill > cup.target;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // Cup shadow
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(3, ch * 0.5 + 5, cw * 0.9, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    // Cup body (ceramic, slightly tapered)
+    const topW = cw, botW = cw * 0.7;
+    ctx.fillStyle = '#f5f0e6';
+    ctx.beginPath();
+    ctx.moveTo(-topW / 2, 0);
+    ctx.lineTo(-botW / 2, ch);
+    ctx.lineTo(botW / 2, ch);
+    ctx.lineTo(topW / 2, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cup inner shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(-topW / 2 + 4, 2);
+    ctx.lineTo(-botW / 2 + 3, ch - 2);
+    ctx.lineTo(botW / 2 - 3, ch - 2);
+    ctx.lineTo(topW / 2 - 4, 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Water fill
+    if (cup.fill > 0) {
+      const waterH = ch * Math.min(fillFrac, 1.05);
+      const waterTop = ch - waterH;
+
+      const waterGrad = ctx.createLinearGradient(0, waterTop, 0, ch);
+      waterGrad.addColorStop(0, cup.color);
+      waterGrad.addColorStop(1, shadeColor(cup.color, -30));
+
+      ctx.fillStyle = waterGrad;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-topW / 2 + 3, ch);
+      ctx.lineTo(-botW / 2 + 3, ch);
+      ctx.lineTo(botW / 2 - 3, ch);
+      ctx.lineTo(topW / 2 - 3, ch);
+      ctx.clip();
+
+      // Water with wave top
+      const waveY = waterTop;
+      ctx.beginPath();
+      ctx.moveTo(-topW / 2 + 3, ch);
+      ctx.lineTo(-topW / 2 + 3, waveY);
+      for (let wx = -topW / 2 + 3; wx <= topW / 2 - 3; wx += 3) {
+        const wy = waveY + Math.sin((wx + cup.ripplePhase * 50) * 0.15) * (fillFrac > 0.8 ? 3 : 1.5);
+        ctx.lineTo(wx, wy);
+      }
+      ctx.lineTo(topW / 2 - 3, ch);
+      ctx.closePath();
+      ctx.fill();
+
+      // Overflow indicator
+      if (overflow) {
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = '#E74C3C';
+        ctx.fillRect(-topW / 2 + 3, 0, topW - 6, 6);
+      }
+      ctx.restore();
+    }
+
+    // Target line
+    const targetY = ch - (ch * cup.target / 100);
+    ctx.save();
+    ctx.strokeStyle = cup.done ? '#4CAF50' : 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = cup.done ? 2 : 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(-topW / 2 + 2, targetY);
+    ctx.lineTo(topW / 2 - 2, targetY);
+    ctx.stroke();
+    ctx.restore();
+
+    // Cup outline
+    ctx.strokeStyle = cup.done ? '#4CAF50' : 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-topW / 2, 0);
+    ctx.lineTo(-botW / 2, ch);
+    ctx.lineTo(botW / 2, ch);
+    ctx.lineTo(topW / 2, 0);
+    ctx.stroke();
+
+    // Cup highlight
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(-topW * 0.2, ch * 0.3, topW * 0.1, ch * 0.2, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Label above cup
+    ctx.textAlign = 'center';
+    ctx.font = `${Math.max(9, cw * 0.15)}px Georgia`;
+    ctx.fillStyle = cup.done ? '#4CAF50' : 'rgba(200,160,80,0.6)';
+    ctx.fillText(cup.done ? '✅' : `🎯 ${cup.target}%`, 0, -8);
+
+    // Done checkmark
+    if (cup.done) {
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.font = `${cw * 0.5}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✓', 0, ch * 0.5);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  });
+}
+
+function shadeColor(color, amt) {
+  const num = parseInt(color.replace('#',''), 16);
+  const r = Math.max(0, Math.min(255, (num >> 16) + amt));
+  const g = Math.max(0, Math.min(255, ((num >> 8) & 0xFF) + amt));
+  const b = Math.max(0, Math.min(255, (num & 0xFF) + amt));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawOverlay() {
+  if (phase === 'levelComplete') {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#1a3a10';
+    ctx.fillRect(0, 0, W(), H());
+    ctx.restore();
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#4CAF50';
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = '#8BC34A';
+    ctx.font = `bold ${W() * 0.09}px Georgia`;
+    ctx.fillText(`Level ${level} Done! 🎉`, W() / 2, H() / 2);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = `${W() * 0.04}px Georgia`;
+    ctx.fillText(`Next: Level ${level + 1}`, W() / 2, H() / 2 + 40);
+    ctx.restore();
+  }
+
+  if (phase === 'gameOver') {
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#0d1a0d';
+    ctx.fillRect(0, 0, W(), H());
+    ctx.restore();
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 40;
+    ctx.fillStyle = '#FFD700';
+    ctx.font = `bold ${W() * 0.1}px Georgia`;
+    ctx.fillText('🏆', W() / 2, H() * 0.3);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${W() * 0.09}px Georgia`;
+    ctx.fillText('All Levels Done!', W() / 2, H() * 0.45);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = `${W() * 0.05}px Georgia`;
+    ctx.fillText(`Final Score: ${score}`, W() / 2, H() * 0.56);
+    const stars = Math.min(3, Math.floor(score / (TOTAL_LEVELS * 100)));
+    ctx.font = `28px serif`;
+    ctx.fillText('⭐'.repeat(stars) + '☆'.repeat(TOTAL_LEVELS - stars), W() / 2, H() * 0.66);
+    ctx.font = `${W() * 0.04}px Georgia`;
+    ctx.fillStyle = 'rgba(200,160,100,0.6)';
+    ctx.fillText('Tap to play again', W() / 2, H() * 0.76);
+    ctx.restore();
+  }
+}
+
+function drawFlash() {
+  if (flashTimer <= 0) return;
+  const alpha = Math.min(flashTimer / 600, 1);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'center';
+  ctx.font = `bold 20px Georgia`;
+  ctx.fillStyle = '#FFD700';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(flashMsg, W() / 2, H() * 0.38);
+  ctx.restore();
+}
+
+// ─── Main Loop ─────────────────────────────────────
+function loop(ts) {
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+
+  ctx.save();
+  if (shakeTimer > 0) {
+    ctx.translate((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4);
+  }
+
+  ctx.clearRect(-5, -5, W() + 10, H() + 10);
+  drawBackground();
+  drawCups(ts);
+  drawWaterStream(ts);
+  drawDrops();
+  drawBottle(ts);
+  drawFlash();
+
+  if (phase !== 'gameOver') update(dt, ts);
+
+  drawOverlay();
+  ctx.restore();
+  requestAnimationFrame(loop);
+}
+
+initLevel();
+requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+</script>
+</body>
+</html>
