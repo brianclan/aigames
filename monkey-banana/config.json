@@ -1,0 +1,8 @@
+{
+  "name": "Monkey Banana",
+  "description": "A fun HTML5 game where you control a monkey to catch falling bananas",
+  "category": "game",
+  "wallet": "0xtest",
+  "tags": ["game", "html5", "monkey", "banana", "arcade"],
+  "chain": "all"
+}
