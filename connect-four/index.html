@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Connect Four</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Georgia', serif;
+    touch-action: none;
+    user-select: none;
+    overflow: hidden;
+  }
+  canvas {
+    border-radius: 16px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+    cursor: pointer;
+  }
+  #hud {
+    display: flex; gap: 16px; margin-bottom: 14px;
+    align-items: center;
+  }
+  .status {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #e0e0f0;
+    padding: 8px 20px;
+    border-radius: 24px;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    min-width: 160px;
+    text-align: center;
+  }
+  .dot {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  #hint {
+    color: rgba(200,200,220,0.45);
+    font-size: 12px;
+    margin-top: 10px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="status" id="status"><span class="dot" id="dot" style="background:#E74C3C"></span>Red's Turn</div>
+</div>
+<canvas id="c"></canvas>
+<div id="hint">Tap column to drop piece · First to connect 4 wins</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const size = Math.min(window.innerWidth - 24, 420);
+  canvas.width = size;
+  canvas.height = size + 70;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+const ROWS = 6, COLS = 7;
+const CELL = () => W() / (COLS + 1);
+const BOARD_X = () => CELL() * 0.5;
+const BOARD_Y = () => 50;
+const RADIUS = () => CELL() * 0.36;
+
+let board = [];
+let turn = 0; // 0 = Red, 1 = Yellow
+let gameOver = false;
+let winLine = null;
+let lastTS = 0;
+let hoverCol = -1;
+let animCol = -1;
+let animRow = -1;
+let animProgress = 0;
+let animating = false;
+let winFlash = 0;
+let scores = [0, 0];
+
+function init() {
+  board = Array.from({length: ROWS}, () => Array(COLS).fill(-1));
+  turn = 0;
+  gameOver = false;
+  winLine = null;
+  animCol = -1; animRow = -1;
+  animating = false;
+  animProgress = 0;
+  updateStatus();
+}
+init();
+
+function updateStatus() {
+  const el = document.getElementById('status');
+  const dot = document.getElementById('dot');
+  if (gameOver) {
+    if (winLine) {
+      const w = turn === 0 ? 1 : 0;
+      el.innerHTML = `🎉 ${w === 0 ? 'Red' : 'Yellow'} Wins!`;
+      dot.style.background = w === 0 ? '#E74C3C' : '#F1C40F';
+    } else {
+      el.innerHTML = "🤝 Draw!";
+      dot.style.background = '#aaa';
+    }
+  } else {
+    const color = turn === 0 ? '#E74C3C' : '#F1C40F';
+    dot.style.background = color;
+    el.innerHTML = `<span class="dot" style="background:${color}"></span>${turn === 0 ? "Red" : "Yellow"}'s Turn`;
+  }
+}
+
+function getDropRow(col) {
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r][col] === -1) return r;
+  }
+  return -1;
+}
+
+function checkWin(r, c, player) {
+  const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let count = 1;
+    let cells = [[r, c]];
+    for (const s of [1, -1]) {
+      let nr = r + dr * s, nc = c + dc * s;
+      while (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc] === player) {
+        count++; cells.push([nr, nc]);
+        nr += dr * s; nc += dc * s;
+      }
+    }
+    if (count >= 4) { winLine = cells; return true; }
+  }
+  return false;
+}
+
+function isDraw() {
+  return board[0].every(v => v !== -1);
+}
+
+function dropPiece(col) {
+  if (gameOver || animating) return;
+  const row = getDropRow(col);
+  if (row === -1) return;
+  animCol = col; animRow = row;
+  animating = true;
+  animProgress = 0;
+}
+
+function finishDrop() {
+  const row = animRow, col = animCol;
+  board[row][col] = turn;
+  if (checkWin(row, col, turn)) {
+    gameOver = true;
+    winFlash = 1;
+    scores[turn]++;
+    updateStatus();
+  } else if (isDraw()) {
+    gameOver = true;
+    updateStatus();
+  } else {
+    turn = 1 - turn;
+    updateStatus();
+  }
+  animating = false;
+  animCol = -1; animRow = -1;
+  animProgress = 0;
+}
+
+// Input
+function getCol(clientX) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * (W() / rect.width);
+  return Math.floor((x - BOARD_X()) / CELL());
+}
+
+canvas.addEventListener('click', e => {
+  if (gameOver) { init(); return; }
+  const col = getCol(e.clientX);
+  if (col >= 0 && col < COLS) dropPiece(col);
+});
+
+canvas.addEventListener('mousemove', e => {
+  hoverCol = getCol(e.clientX);
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (gameOver) { init(); return; }
+  const col = getCol(e.touches[0].clientX);
+  if (col >= 0 && col < COLS) dropPiece(col);
+}, { passive: false });
+
+// ─── Drawing ───────────────────────────────────────
+function cellX(c) { return BOARD_X() + c * CELL() + CELL() / 2; }
+function cellY(r) { return BOARD_Y() + r * CELL() + CELL() / 2; }
+
+function drawBoard(t) {
+  const cell = CELL();
+  const bx = BOARD_X(), by = BOARD_Y();
+
+  // Board background
+  ctx.fillStyle = '#16213E';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, cell * COLS, cell * ROWS, 14);
+  ctx.fill();
+
+  // Board cells
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cx = bx + c * cell + cell / 2;
+      const cy = by + r * cell + cell / 2;
+
+      // Slot background
+      ctx.fillStyle = '#0a0f1e';
+      ctx.beginPath();
+      ctx.arc(cx, cy, RADIUS(), 0, Math.PI * 2);
+      ctx.fill();
+
+      // Piece
+      const v = board[r][c];
+      if (v !== -1) {
+        const isWin = winLine && winLine.some(([wr, wc]) => wr === r && wc === c);
+        drawPiece(cx, cy, v, isWin ? winFlash : 0, t);
+      }
+    }
+  }
+
+  // Drop preview piece at hover column
+  if (!gameOver && !animating && hoverCol >= 0 && hoverCol < COLS) {
+    const previewRow = getDropRow(hoverCol);
+    if (previewRow !== -1) {
+      const pcx = bx + hoverCol * cell + cell / 2;
+      const pcy = by - cell * 0.3;
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      drawPiece(pcx, pcy, turn, 0, t, true);
+      ctx.restore();
+    }
+  }
+}
+
+function drawPiece(x, y, player, flash, t, isPreview = false) {
+  const color = player === 0 ? '#E74C3C' : '#F1C40F';
+  const r = RADIUS();
+
+  // Shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+
+  // Gradient fill
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.05, x, y, r);
+  if (player === 0) {
+    g.addColorStop(0, '#FF6B6B');
+    g.addColorStop(0.6, '#E74C3C');
+    g.addColorStop(1, '#922B21');
+  } else {
+    g.addColorStop(0, '#FFF176');
+    g.addColorStop(0.6, '#F1C40F');
+    g.addColorStop(1, '#B7950B');
+  }
+
+  // Flash effect
+  let fillStyle = g;
+  if (flash > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.3 + flash * 0.7;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x, y, r * (1 + flash * 0.2), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.fillStyle = fillStyle;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Highlight
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(x - r * 0.25, y - r * 0.3, r * 0.28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Subtle ring
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, r - 1, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawFallingPiece(t) {
+  if (!animating) return;
+  const cell = CELL();
+  const bx = BOARD_X(), by = BOARD_Y();
+  const targetY = by + animRow * cell + cell / 2;
+  const startY = by - cell * 0.3;
+
+  // Ease-out bounce
+  const p = Math.min(animProgress, 1);
+  const eased = 1 - Math.pow(1 - p, 3);
+  const posY = startY + (targetY - startY) * eased;
+
+  // Bounce at end
+  const bounceY = posY + (p > 0.85 ? Math.sin((p - 0.85) / 0.15 * Math.PI) * 6 * (1 - p) : 0);
+
+  const pcx = bx + animCol * cell + cell / 2;
+  drawPiece(pcx, bounceY, turn, 0, t, true);
+}
+
+function drawTopBar() {
+  // Column numbers / indicators
+  const cell = CELL();
+  const bx = BOARD_X();
+
+  for (let c = 0; c < COLS; c++) {
+    const cx = bx + c * cell + cell / 2;
+    const hovered = hoverCol === c && !gameOver && !animating;
+
+    ctx.save();
+    ctx.globalAlpha = hovered ? 0.9 : 0.3;
+    ctx.fillStyle = turn === 0 ? '#E74C3C' : '#F1C40F';
+    ctx.beginPath();
+    ctx.arc(cx, 24, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Arrow if column is playable
+    const dropRow = getDropRow(c);
+    if (dropRow !== -1 && !gameOver && !animating) {
+      ctx.save();
+      ctx.globalAlpha = hovered ? 0.8 : 0.2;
+      ctx.fillStyle = '#fff';
+      ctx.font = `${14}px serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('▼', cx, 16);
+      ctx.restore();
+    }
+  }
+}
+
+function drawScores() {
+  ctx.save();
+  ctx.font = `bold 13px Georgia`;
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#E74C3C';
+  ctx.fillText(`Red ${scores[0]}`, W() - 12, 20);
+  ctx.fillStyle = '#F1C40F';
+  ctx.fillText(`Yellow ${scores[1]}`, W() - 12, 36);
+  ctx.restore();
+}
+
+function drawGameOverOverlay() {
+  if (!gameOver) return;
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W(), H());
+  ctx.restore();
+}
+
+// ─── Main Loop ─────────────────────────────────────
+function loop(ts) {
+  const dt = ts - lastTS;
+  lastTS = ts;
+
+  ctx.clearRect(0, 0, W(), H());
+
+  // Background
+  const bg = ctx.createRadialGradient(W()/2, H()*0.4, 0, W()/2, H()*0.5, H());
+  bg.addColorStop(0, '#1a1a2e');
+  bg.addColorStop(1, '#0f0f1e');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W(), H());
+
+  drawTopBar();
+  drawBoard(ts);
+  drawFallingPiece(ts);
+  drawScores();
+  drawGameOverOverlay();
+
+  // Animate falling piece
+  if (animating) {
+    animProgress += dt * 0.003;
+    if (animProgress >= 1) finishDrop();
+  }
+
+  // Win flash
+  if (winFlash > 0) {
+    winFlash -= dt * 0.002;
+    if (winFlash < 0) winFlash = 0;
+  }
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
