@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Texas Hold'em</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Helvetica Neue',Arial,sans-serif;background:#1a4d2e;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+#table{width:100%;max-width:480px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px}
+
+/* Header */
+#header{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 4px;color:#c8e6c9;font-size:14px}
+#header .pot{font-size:18px;font-weight:700;color:#ffd700;text-align:center;flex:1}
+#header .label{font-size:11px;color:#a5d6a7;text-transform:uppercase;letter-spacing:1px}
+
+/* Community Cards */
+#community-area{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px}
+#community-label{color:#a5d6a7;font-size:12px;text-transform:uppercase;letter-spacing:2px}
+#community-cards{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+
+/* Card */
+.card{width:52px;height:72px;border-radius:6px;position:relative;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0;overflow:hidden}
+.card.red{color:#e53935}
+.card.black{color:#1a1a2e}
+.card .corner{position:absolute;font-size:11px;line-height:1;display:flex;flex-direction:column;align-items:center}
+.card .corner.tl{top:3px;left:4px}
+.card .corner.br{bottom:3px;right:4px;transform:rotate(180deg)}
+.card .suit-big{font-size:28px}
+.card-back{background:linear-gradient(135deg,#c62828,#b71c1c);border:2px solid #fff;}
+.card-back::after{content:'♠♥♦♣';position:absolute;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:-1px}
+.card-back::before{content:'';position:absolute;inset:4px;border:1px solid rgba(255,255,255,0.3);border-radius:3px}
+.card.hidden{background:#2e7d32}
+
+/* Hands */
+#player-area,#ai-area{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px}
+#ai-label{color:#a5d6a7;font-size:12px;text-transform:uppercase;letter-spacing:2px}
+.hand{display:flex;gap:8px;justify-content:center}
+
+/* Status Message */
+#status-box{width:100%;text-align:center;padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;color:#fff;font-size:15px;min-height:44px;display:flex;align-items:center;justify-content:center;line-height:1.4}
+#status-box.win{color:#ffd700}
+#status-box.lose{color:#ef9a9a}
+#status-box.push{color:#a5d6a7}
+
+/* Controls */
+#controls{display:flex;gap:8px;width:100%;max-width:400px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.btn{padding:12px 16px;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;flex:1;min-width:80px;transition:transform 0.1s,opacity 0.1s;active:transform:scale(0.96)}
+.btn:active{transform:scale(0.96)}
+.btn-fold{background:#c62828;color:#fff}
+.btn-check{background:#2e7d32;color:#fff}
+.btn-call{background:#1565c0;color:#fff}
+.btn-raise{background:#e65100;color:#fff}
+.btn:disabled{opacity:0.35;cursor:not-allowed}
+
+/* Chip Stack */
+#stacks{display:flex;justify-content:space-between;width:100%;max-width:440px;padding:0 8px;color:#c8e6c9;font-size:13px}
+#stacks .stack{display:flex;flex-direction:column;align-items:center;gap:2px}
+#stacks .amount{font-size:16px;font-weight:700;color:#ffd700}
+
+/* Win line */
+#win-line{color:#ffd700;font-size:13px;text-align:center;min-height:18px}
+
+/* New game button */
+#new-game-btn{display:none;margin-top:10px;padding:14px 32px;background:#2e7d32;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+
+/* Pot animation */
+@keyframes potPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.pulse{animation:potPulse 0.3s ease}
+
+/* Deal animation */
+@keyframes dealIn{from{transform:translateY(-60px) rotateY(90deg);opacity:0}to{transform:translateY(0) rotateY(0);opacity:1}}
+.dealing{animation:dealIn 0.35s ease forwards}
+</style>
+</head>
+<body>
+<div id="table">
+
+  <!-- Header -->
+  <div id="header">
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <span class="label">AI</span>
+      <span class="amount" id="ai-stack">$1000</span>
+    </div>
+    <div>
+      <div id="header-center">
+        <div class="label">底池</div>
+        <div class="pot" id="pot-display">$0</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <span class="label">你</span>
+      <span class="amount" id="player-stack">$1000</span>
+    </div>
+  </div>
+
+  <!-- AI Cards -->
+  <div id="ai-area">
+    <div id="ai-label">AI Dealer</div>
+    <div class="hand" id="ai-hand"></div>
+    <div id="win-line"></div>
+  </div>
+
+  <!-- Community Cards -->
+  <div id="community-area">
+    <div id="community-label">公共牌</div>
+    <div id="community-cards"></div>
+  </div>
+
+  <!-- Player Cards -->
+  <div id="player-area">
+    <div id="player-label" style="color:#a5d6a7;font-size:12px;text-transform:uppercase;letter-spacing:2px">你的手牌</div>
+    <div class="hand" id="player-hand"></div>
+  </div>
+
+  <!-- Status -->
+  <div id="status-box">点击 开始游戏</div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <button class="btn btn-fold" id="btn-fold" onclick="playerAction('fold')" disabled>弃牌</button>
+    <button class="btn btn-check" id="btn-check" onclick="playerAction('check')" disabled>过牌</button>
+    <button class="btn btn-call" id="btn-call" onclick="playerAction('call')" disabled>跟注</button>
+    <button class="btn btn-raise" id="btn-raise" onclick="playerAction('raise')" disabled>加注</button>
+  </div>
+
+  <button id="new-game-btn" onclick="newGame()">下一局</button>
+</div>
+
+<script>
+// ===== CONSTANTS =====
+const RANKS = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+const SUITS = ['♠','♥','♦','♣'];
+const RANK_DISPLAY = {T:'10',J:'J',Q:'Q',K:'K',A:'A'};
+
+// ===== STATE =====
+let deck = [];
+let playerHand = [], aiHand = [], community = [];
+let playerChips = 1000, aiChips = 1000;
+let pot = 0, currentBet = 0, playerBet = 0, aiBet = 0;
+let phase = 'idle'; // idle, preflop, flop, turn, river, showdown, end
+let playerCanAct = false;
+let raiseAmount = 0; // current raise size (not bet-to-match)
+let lastWinner = '';
+
+// ===== DECK =====
+function createDeck(){
+  let d = [];
+  for(let s of SUITS) for(let r of RANKS) d.push({rank:r,suit:s});
+  // Fisher-Yates shuffle
+  for(let i=d.length-1;i>0;i--){
+    let j=Math.floor(Math.random()*(i+1));
+    [d[i],d[j]]=[d[j],d[i]];
+  }
+  return d;
+}
+
+function draw(n){return deck.splice(0,n);}
+
+// ===== HAND RANKING =====
+function rankToVal(r){return RANKS.indexOf(r)} // 0-12
+
+function getSortedRanks(hand){
+  return hand.map(c=>rankToVal(c.rank)).sort((a,b)=>a-b);
+}
+
+function countRanks(hand){
+  let cnt={};
+  for(let c of hand) cnt[c.rank]=(cnt[c.rank]||0)+1;
+  return cnt;
+}
+
+function isFlush(cards){
+  let s=cards[0].suit;
+  return cards.every(c=>c.suit===s);
+}
+
+function isStraight(sortedRanks){
+  // A-5 low straight
+  let s=[...new Set(sortedRanks)];
+  if(s.length!==5)return false;
+  if(s[4]-s[0]===4)return s[0];
+  // wheel A-2-3-4-5
+  if(s[0]===0&&s[1]===1&&s[2]===2&&s[3]===3&&s[4]===12)return 1; // A-low = 1
+  return null;
+}
+
+function handRank(hand){
+  // Returns [priority, tieBreaker...] higher = better
+  let all7 = hand;
+  let cnt = countRanks(all7);
+  let vals = Object.values(cnt).sort((a,b)=>b-a);
+  let sortedRanks = getSortedRanks(all7);
+  let hasFlush = isFlush(all7);
+  let straightHigh = isStraight(sortedRanks);
+  let isStrFlush = hasFlush && straightHigh!==null;
+
+  if(isStrFlush){
+    // Royal or straight flush
+    let high = straightHigh===1 ? 5 : sortedRanks[sortedRanks.length-1];
+    let isRoyal = high===12; // A-high
+    return [9+high/100, high]; // priority 9 (royal=9.12, straight=9.low)
+  }
+  if(vals[0]===4)return [8, ...Object.keys(cnt).map(r=>rankToVal(r)).sort((a,b)=>cnt[RANKS[a]]<cnt[RANKS[b]]?1:-1)];
+  if(vals[0]===3&&vals[1]===2)return [7, ...Object.keys(cnt).filter(r=>cnt[r]===3).map(r=>rankToVal(r)), ...Object.keys(cnt).filter(r=>cnt[r]===2).map(r=>rankToVal(r))];
+  if(hasFlush){
+    let flushCards = all7.slice().sort((a,b)=>rankToVal(b.rank)-rankToVal(a.rank));
+    return [6, ...flushCards.map(c=>rankToVal(c.rank))];
+  }
+  if(straightHigh!==null){
+    let high = straightHigh===1 ? sortedRanks.includes(12)?12:1 : sortedRanks[sortedRanks.length-1];
+    return [5, high];
+  }
+  if(vals[0]===3)return [4, ...Object.keys(cnt).filter(r=>cnt[r]===3).map(r=>rankToVal(r))];
+  if(vals[0]===2&&vals[1]===2){
+    let pairs = Object.keys(cnt).filter(r=>cnt[r]===2).map(r=>rankToVal(r)).sort((a,b)=>b-a);
+    let kickers = Object.keys(cnt).filter(r=>cnt[r]===1).map(r=>rankToVal(r)).sort((a,b)=>b-a);
+    return [3, ...pairs, ...kickers];
+  }
+  if(vals[0]===2){
+    let pair = Object.keys(cnt).filter(r=>cnt[r]===2).map(r=>rankToVal(r))[0];
+    let kickers = Object.keys(cnt).filter(r=>cnt[r]===1).map(r=>rankToVal(r)).sort((a,b)=>b-a);
+    return [2, pair, ...kickers];
+  }
+  // High card
+  return [1, ...sortedRanks.reverse()];
+}
+
+function compareHands(h1,h2){
+  let r1=handRank(h1), r2=handRank(h2);
+  for(let i=0;i<Math.max(r1.length,r2.length);i++){
+    let v1=r1[i]||0, v2=r2[i]||0;
+    if(v1>v2)return 1;
+    if(v1<v2)return -1;
+  }
+  return 0;
+}
+
+function handName(hand){
+  if(!hand||hand.length<5)return '';
+  let all7=hand;
+  let cnt=countRanks(all7);
+  let vals=Object.values(cnt).sort((a,b)=>b-a);
+  let sortedRanks=getSortedRanks(all7);
+  let hasFlush=isFlush(all7);
+  let straightHigh=isStraight(sortedRanks);
+  let isStrFlush=hasFlush&&straightHigh!==null;
+  if(isStrFlush){
+    if(sortedRanks.includes(12)||(straightHigh===1&&sortedRanks.includes(12)))return '皇家同花顺';
+    return '同花顺';
+  }
+  if(vals[0]===4)return '四条';
+  if(vals[0]===3&&vals[1]===2)return '葫芦';
+  if(hasFlush)return '同花';
+  if(straightHigh!==null)return '顺子';
+  if(vals[0]===3)return '三条';
+  if(vals[0]===2&&vals[1]===2)return '两对';
+  if(vals[0]===2)return '一对';
+  return '高牌';
+}
+
+// ===== RENDERING =====
+function cardHTML(card, hidden, delay){
+  if(!card)return '';
+  let cls = (card.suit==='♥'||card.suit==='♦')?'red':'black';
+  let rankDisp = RANK_DISPLAY[card.rank]||card.rank;
+  if(hidden){
+    return `<div class="card card-back" style="animation-delay:${delay}ms"></div>`;
+  }
+  return `<div class="card ${cls} dealing" style="animation-delay:${delay}ms">
+    <div class="corner tl">${rankDisp}<span style="font-size:14px">${card.suit}</span></div>
+    <div class="suit-big">${card.suit}</div>
+    <div class="corner br">${rankDisp}<span style="font-size:14px">${card.suit}</span></div>
+  </div>`;
+}
+
+function render(){
+  // AI hand
+  let aiEl=document.getElementById('ai-hand');
+  if(aiHand.length===0) aiEl.innerHTML='';
+  else {
+    let shown = (phase==='showdown'||phase==='end') ? false : true; // hide until showdown
+    aiEl.innerHTML = aiHand.map((c,i)=>cardHTML(c, shown, i*150)).join('');
+  }
+
+  // Player hand
+  let pEl=document.getElementById('player-hand');
+  pEl.innerHTML = playerHand.map((c,i)=>cardHTML(c,false,i*150+300)).join('');
+
+  // Community
+  let commEl=document.getElementById('community-cards');
+  let showCount = {preflop:0, flop:3, turn:4, river:5, showdown:5, end:5}[phase]||0;
+  commEl.innerHTML = community.slice(0,showCount).map((c,i)=>cardHTML(c,false,i*100+200)).join('');
+
+  // Pot & stacks
+  document.getElementById('pot-display').textContent='$'+pot;
+  document.getElementById('player-stack').textContent='$'+playerChips;
+  document.getElementById('ai-stack').textContent='$'+aiChips;
+
+  // Buttons
+  updateButtons();
+}
+
+function updateButtons(){
+  let fold=document.getElementById('btn-fold');
+  let check=document.getElementById('btn-check');
+  let call=document.getElementById('btn-call');
+  let raise=document.getElementById('btn-raise');
+  if(!playerCanAct||phase==='idle'||phase==='showdown'||phase==='end'){
+    [fold,check,call,raise].forEach(b=>{b.disabled=true;b.style.display=''});
+    return;
+  }
+  [fold,check,call,raise].forEach(b=>{b.disabled=false;b.style.display=''});
+  let toCall = currentBet - playerBet;
+  let canCheck = toCall===0;
+  check.style.display = canCheck?'':'none';
+  fold.textContent = '弃牌';
+
+  if(canCheck){
+    call.style.display='none';
+    raise.textContent = '加注 $'+Math.min(50, playerChips);
+    raise.disabled = playerChips < 50;
+  } else {
+    call.style.display='';
+    call.textContent = '跟注 $'+Math.min(toCall, playerChips);
+    call.disabled = playerChips < toCall;
+    raise.textContent = '加注 $'+Math.min(50, playerChips);
+    raise.disabled = playerChips < 50;
+  }
+  if(playerChips <= 0){
+    [fold,check,call,raise].forEach(b=>b.disabled=true);
+  }
+}
+
+// ===== GAME LOGIC =====
+function setStatus(msg,cls){
+  let el=document.getElementById('status-box');
+  el.textContent=msg;
+  el.className=cls||'';
+  document.getElementById('win-line').textContent='';
+}
+
+function newGame(){
+  deck=createDeck();
+  playerHand=draw(2);
+  aiHand=draw(2);
+  community=[];
+  pot=0; currentBet=0; playerBet=0; aiBet=0;
+  phase='preflop';
+  playerCanAct=false;
+
+  document.getElementById('new-game-btn').style.display='none';
+  document.getElementById('win-line').textContent='';
+
+  // Blinds
+  let sb=Math.min(10,playerChips);
+  let bb=Math.min(20,aiChips);
+  playerChips-=sb; aiChips-=bb;
+  pot+=sb+bb;
+  playerBet=sb; aiBet=bb;
+  currentBet=bb;
+
+  render();
+  setStatus('你的回合 — 决定跟注还是加注');
+  playerCanAct=true;
+  updateButtons();
+
+  // AI auto-acts after short delay if player is big blind already all-in etc
+  setTimeout(()=>{
+    // auto small blind check
+    render();
+  },100);
+}
+
+function playerAction(type){
+  if(!playerCanAct)return;
+  playerCanAct=false;
+
+  if(type==='fold'){
+    setStatus('你弃牌了！AI获胜','lose');
+    aiChips+=pot; pot=0;
+    phase='end';
+    revealAI();
+    render();
+    showEndButtons();
+    return;
+  }
+
+  let toCall = currentBet - playerBet;
+
+  if(type==='check'){
+    // nothing to add
+  } else if(type==='call'){
+    let callAmt = Math.min(toCall, playerChips);
+    playerChips-=callAmt;
+    playerBet+=callAmt;
+    pot+=callAmt;
+    // if all-in, adjust current bet
+    if(playerChips===0 && toCall>0){
+      // all-in, proceed
+    }
+  } else if(type==='raise'){
+    let raiseAmt = Math.min(50, playerChips);
+    let totalPut = playerBet + raiseAmt;
+    playerChips-=raiseAmt;
+    playerBet+=raiseAmt;
+    pot+=raiseAmt;
+    currentBet+=raiseAmt;
+    toCall = currentBet - playerBet;
+  }
+
+  render();
+
+  // AI's turn
+  setStatus('AI思考中...');
+  setTimeout(()=>aiAction(toCall),800);
+}
+
+function aiAction(toCall){
+  if(phase==='end')return;
+  // Simple AI: fold if very weak, call if decent, raise occasionally
+  let rank=handRank([...aiHand,...community.slice(0,3)]); // evaluate pre-flop/river with what we have
+  let handStrength=rank[0];
+  // Add some randomness
+  let rand=Math.random();
+
+  // AI has seen the community cards
+  let aiBest = handRank([...aiHand,...community]);
+  let aiStrength=aiBest[0];
+
+  let willFold=false;
+  let willRaise=false;
+
+  if(community.length===0){
+    // Pre-flop: only 2 cards
+    let cnt=countRanks(aiHand);
+    let vals=Object.values(cnt).sort((a,b)=>b-a);
+    let pair=vals[0]>=2;
+    let suited=aiHand[0].suit===aiHand[1].suit;
+    let hiCard=Math.max(rankToVal(aiHand[0].rank),rankToVal(aiHand[1].rank));
+    let strength = pair?(2+vals[0]/10):(suited?hiCard/30:hiCard/50);
+
+    if(strength<0.3 && rand<0.7) willFold=true;
+    else if(strength>0.7 && rand<0.3) willRaise=true;
+    else if(strength>0.5 && rand<0.15) willRaise=true;
+  } else {
+    // Post-flop: evaluate full hand
+    if(aiStrength<1 && rand<0.6) willFold=true;
+    else if(aiStrength>=5 && rand<0.2) willRaise=true;
+    else if(aiStrength>=4 && rand<0.1) willRaise=true;
+  }
+
+  let aiCallAmt=0;
+  if(!willFold){
+    aiCallAmt=Math.min(toCall, aiChips);
+    if(aiCallAmt<toCall && toCall>0){
+      // AI goes all-in
+    }
+  }
+
+  // Execute AI actions
+  if(willFold && toCall>0){
+    setStatus('AI弃牌！你获胜','win');
+    playerChips+=pot; pot=0;
+    phase='end';
+    render();
+    showEndButtons();
+    return;
+  }
+
+  // AI calls
+  if(aiCallAmt>0){
+    aiChips-=aiCallAmt;
+    aiBet+=aiCallAmt;
+    pot+=aiCallAmt;
+  } else if(toCall===0){
+    // AI checks
+  }
+
+  if(willRaise && aiChips>50 && toCall<aiChips){
+    let raiseAmt=Math.min(50, aiChips);
+    aiChips-=raiseAmt;
+    aiBet+=raiseAmt;
+    pot+=raiseAmt;
+    currentBet+=raiseAmt;
+    // Player must respond
+    setStatus('AI加注 $'+raiseAmt+'！你的回合');
+    playerBet=0; // reset for player (will recompute toCall)
+    toCall=currentBet-0; // player's current bet is 0
+    render();
+    playerCanAct=true;
+    updateButtons();
+    return;
+  }
+
+  // Advance phase
+  advancePhase();
+}
+
+function advancePhase(){
+  playerBet=0; aiBet=0; currentBet=0;
+
+  if(phase==='preflop'){
+    community=draw(3);
+    phase='flop';
+  } else if(phase==='flop'){
+    community.push(...draw(1));
+    phase='turn';
+  } else if(phase==='turn'){
+    community.push(...draw(1));
+    phase='river';
+  } else if(phase==='river'){
+    phase='showdown';
+    revealAI();
+    determineWinner();
+    return;
+  }
+
+  render();
+  setStatus('你的回合');
+  playerCanAct=true;
+  updateButtons();
+}
+
+function revealAI(){
+  let aiEl=document.getElementById('ai-hand');
+  aiEl.innerHTML=aiHand.map((c,i)=>cardHTML(c,false,i*150)).join('');
+}
+
+function determineWinner(){
+  phase='end';
+  let playerBest=[...playerHand,...community];
+  let aiBest=[...aiHand,...community];
+  let cmp=compareHands(playerBest,aiBest);
+
+  let playerName=handName(playerBest);
+  let aiName=handName(aiBest);
+
+  if(cmp>0){
+    setStatus(`你获胜！${playerName} 胜过 ${aiName}！`,'win');
+    document.getElementById('win-line').textContent=`你的: ${playerName}`;
+    playerChips+=pot;
+  } else if(cmp<0){
+    setStatus(`AI获胜！${aiName} 胜过 ${playerName}`,'lose');
+    document.getElementById('win-line').textContent=`AI: ${aiName}`;
+    aiChips+=pot;
+  } else {
+    setStatus(`平局！双方都是${playerName}`,'push');
+    let half=Math.floor(pot/2);
+    playerChips+=half;
+    aiChips+=pot-half;
+  }
+  pot=0;
+  render();
+  showEndButtons();
+}
+
+function showEndButtons(){
+  let ng=document.getElementById('new-game-btn');
+  ng.style.display='';
+  if(playerChips<=0){
+    ng.textContent='游戏结束 — 再来一局';
+    playerChips=1000; aiChips=1000;
+  } else if(aiChips<=0){
+    ng.textContent='AI破产！你获胜 — 再来一局';
+    playerChips=1000; aiChips=1000;
+  } else {
+    ng.textContent='下一局';
+  }
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded',()=>{
+  render();
+  setStatus('点击 开始游戏 开始');
+  // Auto-start on load
+  setTimeout(newGame,300);
+});
+</script>
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.inland-security-footer {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  right: 0;
+  width: fit-content;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tooltip-container {
+  position: relative;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.minimax-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 300;
+  color: #adadad;
+  text-decoration: none;
+}
+
+.minimax-link:visited {
+  color: #adadad;
+}
+
+.minimax-link:hover {
+  color: #666666;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: 16px; /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+  font-size: 12px;
+  line-height: 17px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #171717;
+}
+
+/* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+.tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: flex;
+}
+
+.info-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.beian-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #171717;
+}
+
+.beian-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.underline-text {
+  color: #171717;
+  text-decoration: underline;
+}
+
+.underline-text:hover {
+  color: #000000;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .trigger-content {
+    background-color: transparent;
+  }
+
+  .minimax-link,
+  .minimax-link:visited {
+    color: #666666;
+  }
+
+  .minimax-link:hover {
+    color: #adadad;
+  }
+
+  .tooltip-content {
+    background-color: #262626;
+    color: #ededed;
+  }
+
+  .beian-link,
+  .underline-text {
+    color: #ededed;
+  }
+
+  .underline-text:hover {
+    color: #ffffff;
+  }
+}
+
+</style>
+<div class="inland-security-footer">
+  <div class="tooltip-container">
+    <div class="trigger-content">
+      <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+        <span>© 2026 MiniMax</span>
+      </a>
+    </div>
+    <div class="tooltip-content">
+      <section class="info-section">
+        <span>上海稀宇科技有限公司</span>
+      </section>
+
+      <section class="info-section">
+        <a class="beian-link" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179" target="_blank" rel="noreferrer">
+          <img alt="hailuo-beian-icon" src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png" class="beian-icon">
+          <span class="underline-text">沪公网安备31010402010179号</span>
+        </a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+          沪ICP备2023003282号-38
+        </a>
+      </section>
+
+      <section class="info-section">
+        <span>模型名称：MiniMax</span>
+        <span>备案号：Shanghai-MiniMax-202505230046</span>
+      </section>
+
+      <section class="info-section">
+        <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer" class="underline-text">
+          用户协议
+        </a>
+        <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer" class="underline-text">
+          隐私政策
+        </a>
+      </section>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/**
+ * Iframe 元素高亮注入脚本
+ * 需要在目标网站中引入此脚本来支持跨域 iframe 高亮功能
+ *
+ * 使用方法：
+ * 1. 将此脚本添加到目标网站的 HTML 中
+ * 2. 或通过浏览器扩展、用户脚本等方式注入
+ */
+
+(function () {
+  "use strict";
+
+  // 检查是否在 iframe 中
+  if (window.self === window.top) {
+    return; // 不在 iframe 中，不执行
+  }
+
+  // 检查是否已经初始化过
+  if (window.__iframeHighlightInitialized) {
+    return;
+  }
+  window.__iframeHighlightInitialized = true;
+  console.log("Iframe 高亮脚本已加载");
+
+  // 创建高亮覆盖层
+  var overlay = document.createElement("div");
+  overlay.id = "iframe-highlight-overlay";
+  overlay.style.cssText = "\n    position: fixed;\n    top: 0;\n    left: 0;\n    width: 100vw;\n    height: 100vh;\n    pointer-events: none;\n    z-index: 999999;\n    overflow: hidden;\n  ";
+
+  // 创建悬停高亮框（虚线边框）
+  var highlightBox = document.createElement("div");
+  highlightBox.id = "iframe-highlight-box";
+  highlightBox.style.cssText = "\n    position: absolute;\n    border: 2px dashed #007AFF;\n    background: rgba(0, 122, 255, 0.08);\n    pointer-events: none;\n    display: none;\n    transition: all 0.1s ease;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);\n    border-radius: 2px;\n  ";
+
+  // 创建选中节点的常驻高亮框（实线边框）
+  var selectedBox = document.createElement("div");
+  selectedBox.id = "iframe-selected-box";
+  selectedBox.style.cssText = "\n    position: absolute;\n    border: 2px solid #007AFF;\n    pointer-events: none;\n    display: none;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 8px rgba(255, 107, 53, 0.4);\n    border-radius: 2px;\n    z-index: 1000000;\n  ";
+
+  // 创建悬停标签显示
+  var tagLabel = document.createElement("div");
+  tagLabel.id = "iframe-tag-label";
+  tagLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 2px 6px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 2px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000001;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);\n    font-weight: 500;\n  ";
+
+  // 创建选中节点标签
+  var selectedLabel = document.createElement("div");
+  selectedLabel.id = "iframe-selected-label";
+  selectedLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 3px 8px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 3px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000002;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);\n    font-weight: 600;\n  ";
+  overlay.appendChild(highlightBox);
+  overlay.appendChild(selectedBox);
+  overlay.appendChild(tagLabel);
+  overlay.appendChild(selectedLabel);
+  document.body.appendChild(overlay);
+
+  // 存储当前选中的元素
+  var selectedElement = null;
+  var highlightEnabled = false;
+
+  // 更新选中元素的高亮显示
+  function updateSelectedHighlight(element) {
+    console.log("updateSelectedHighlight called with:", element);
+    if (!element) {
+      selectedBox.style.display = "none";
+      selectedLabel.style.display = "none";
+      selectedElement = null;
+      console.log("Cleared selected highlight");
+      return;
+    }
+    selectedElement = element;
+    var rect = element.getBoundingClientRect();
+    console.log("Selected element rect:", rect);
+
+    // 更新选中高亮框位置
+    selectedBox.style.display = "block";
+    selectedBox.style.left = "".concat(rect.left - 2, "px");
+    selectedBox.style.top = "".concat(rect.top - 2, "px");
+    selectedBox.style.width = "".concat(rect.width + 4, "px");
+    selectedBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新选中标签位置和内容
+    selectedLabel.style.display = "block";
+    selectedLabel.textContent = "\u2713 <".concat(element.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 28;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 5) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    var labelWidth = selectedLabel.offsetWidth || 100; // 预估宽度
+    if (labelLeft + labelWidth > window.innerWidth - 10) {
+      labelLeft = window.innerWidth - labelWidth - 10;
+    }
+    selectedLabel.style.left = "".concat(Math.max(5, labelLeft), "px");
+    selectedLabel.style.top = "".concat(labelTop, "px");
+    console.log("Selected highlight positioned at:", {
+      left: selectedBox.style.left,
+      top: selectedBox.style.top,
+      width: selectedBox.style.width,
+      height: selectedBox.style.height
+    });
+  }
+  function getElementSelector(element) {
+    if (!(element instanceof Element)) throw new Error('Argument must be a DOM element');
+    var segments = [];
+    var current = element;
+    while (current !== document.documentElement) {
+      var selector = '';
+      // 优先检查唯一ID
+      if (current.id && document.querySelectorAll("#".concat(current.id)).length === 1) {
+        segments.unshift("#".concat(current.id));
+        break; // ID唯一，无需继续向上
+      }
+
+      // 生成类名选择器（取第一个有效类名）
+      var classes = Array.from(current.classList).filter(function (c) {
+        return !c.startsWith('js-');
+      });
+      var className = classes.length > 0 ? ".".concat(classes[0]) : '';
+
+      // 生成位置索引（nth-child）
+      var tag = current.tagName.toLowerCase();
+      if (!className) {
+        var siblings = Array.from(current.parentNode.children);
+        var index = siblings.findIndex(function (el) {
+          return el === current;
+        }) + 1;
+        selector = "".concat(tag, ":nth-child(").concat(index, ")");
+      } else {
+        selector = className;
+      }
+      segments.unshift(selector);
+      current = current.parentElement;
+    }
+
+    // 处理根元素
+    if (current === document.documentElement) {
+      segments.unshift('html');
+    }
+    return segments.join(' > ');
+  }
+
+  // 获取元素文本内容
+  function getElementText(element) {
+    var _element$textContent;
+    if (element.tagName === "INPUT") {
+      return element.value || element.placeholder || "";
+    }
+    if (element.tagName === "TEXTAREA") {
+      return element.value || element.placeholder || "";
+    }
+    var text = ((_element$textContent = element.textContent) === null || _element$textContent === void 0 ? void 0 : _element$textContent.trim()) || "";
+    return text.length > 50 ? text.substring(0, 50) + "..." : text;
+  }
+
+  // 获取元素属性信息
+  function getElementAttributes(element) {
+    var attrs = {};
+    for (var i = 0; i < element.attributes.length; i++) {
+      var attr = element.attributes[i];
+      attrs[attr.name] = attr.value;
+    }
+    return attrs;
+  }
+
+  // 鼠标悬停事件处理
+  function handleMouseOver(e) {
+    if (!highlightEnabled) return;
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免高亮 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 如果是已选中的元素，不显示悬停高亮
+    if (target === selectedElement) {
+      highlightBox.style.display = "none";
+      tagLabel.style.display = "none";
+      return;
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+
+    // 更新悬停高亮框位置
+    highlightBox.style.display = "block";
+    highlightBox.style.left = "".concat(rect.left - 2, "px");
+    highlightBox.style.top = "".concat(rect.top - 2, "px");
+    highlightBox.style.width = "".concat(rect.width + 4, "px");
+    highlightBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新标签位置和内容
+    tagLabel.style.display = "block";
+    tagLabel.textContent = "<".concat(target.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 22;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 0) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    if (labelLeft + tagLabel.offsetWidth > window.innerWidth) {
+      labelLeft = window.innerWidth - tagLabel.offsetWidth - 5;
+    }
+    tagLabel.style.left = "".concat(Math.max(0, labelLeft), "px");
+    tagLabel.style.top = "".concat(labelTop, "px");
+
+    // 发送消息到父窗口
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 鼠标离开事件处理
+  function handleMouseOut(e) {
+    if (!highlightEnabled) return;
+    var relatedTarget = e.relatedTarget;
+
+    // 如果鼠标移动到高亮相关元素上，不隐藏高亮
+    if (relatedTarget && (relatedTarget === highlightBox || relatedTarget === tagLabel || relatedTarget === overlay || relatedTarget === selectedBox || relatedTarget === selectedLabel)) {
+      return;
+    }
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: null,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 点击事件处理
+  function handleClick(e) {
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免处理 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 检查是否是交互元素，这些元素需要保留默认行为
+    var isInteractiveElement = ['input', 'textarea', 'select', 'button', 'a'].includes(target.tagName.toLowerCase());
+
+    // 如果高亮功能启用，对于非交互元素阻止默认行为和事件传播
+    if (highlightEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+    console.log("Element clicked:", {
+      tagName: target.tagName,
+      selector: selector,
+      rect: rect
+    });
+
+    // 立即更新选中高亮
+    updateSelectedHighlight(target);
+
+    // 隐藏悬停高亮，因为现在是选中状态
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-click",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 监听来自父窗口的消息
+  function handleParentMessage(event) {
+    console.log("Received message from parent:", event.data);
+    if (event.data.type === "iframe-highlight-toggle") {
+      var enabled = event.data.enabled;
+      console.log("Highlight toggle:", enabled);
+      if (enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "enable-iframe-highlight") {
+      console.log("Enable iframe highlight");
+      enableHighlight();
+    } else if (event.data.type === "disable-iframe-highlight") {
+      console.log("Disable iframe highlight");
+      disableHighlight();
+    } else if (event.data.type === "toggle-iframe-highlight") {
+      var _enabled = event.data.enabled !== undefined ? event.data.enabled : !highlightEnabled;
+      console.log("Toggle iframe highlight to:", _enabled);
+      if (_enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "update-selected-element") {
+      var selector = event.data.selector;
+      console.log("Update selected element with selector:", selector);
+      if (selector) {
+        try {
+          var element = document.querySelector(selector);
+          console.log("Found element by selector:", element);
+          updateSelectedHighlight(element);
+        } catch (error) {
+          console.warn("Failed to select element:", error);
+          updateSelectedHighlight(null);
+        }
+      } else {
+        updateSelectedHighlight(null);
+      }
+    } else if (event.data.type === "clear-selected-element") {
+      console.log("Clear selected element");
+      updateSelectedHighlight(null);
+    }
+  }
+
+  // 启用高亮功能
+  function enableHighlight() {
+    console.log("Enabling highlight");
+    document.addEventListener("mouseover", handleMouseOver, true);
+    document.addEventListener("mouseout", handleMouseOut, true);
+    document.addEventListener("click", handleClick, true);
+    highlightEnabled = true;
+    overlay.style.display = "block";
+  }
+
+  // 禁用高亮功能
+  function disableHighlight() {
+    console.log("Disabling highlight");
+    highlightEnabled = false;
+    // 保持事件监听器，但通过 highlightEnabled 变量控制行为
+    // 这样可以保留选中状态的显示
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    // 不隐藏 selectedBox 和 selectedLabel，保留选中状态
+  }
+
+  // 完全禁用高亮功能（移除所有监听器）
+  function fullyDisableHighlight() {
+    console.log("Fully disabling highlight");
+    highlightEnabled = false;
+    document.removeEventListener("mouseover", handleMouseOver, true);
+    document.removeEventListener("mouseout", handleMouseOut, true);
+    document.removeEventListener("click", handleClick, true);
+    overlay.style.display = "none";
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    selectedBox.style.display = "none";
+    selectedLabel.style.display = "none";
+  }
+
+  // 添加事件监听
+  enableHighlight();
+  window.addEventListener("message", handleParentMessage);
+
+  // 暴露全局函数供外部调用
+  window.__iframeHighlightControl = {
+    enable: enableHighlight,
+    disable: disableHighlight,
+    fullyDisable: fullyDisableHighlight,
+    isEnabled: function isEnabled() {
+      return highlightEnabled;
+    },
+    getSelectedElement: function getSelectedElement() {
+      return selectedElement;
+    },
+    updateSelected: updateSelectedHighlight,
+    // 通过消息发送开关控制
+    sendToggleMessage: function sendToggleMessage(enabled) {
+      window.parent.postMessage({
+        type: 'iframe-highlight-status',
+        enabled: enabled || highlightEnabled,
+        source: 'iframe-highlight-injector'
+      }, '*');
+    }
+  };
+
+  // 通知父窗口脚本已加载
+  try {
+    window.parent.postMessage({
+      type: "iframe-highlight-ready",
+      data: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now()
+      },
+      source: "iframe-highlight-injector"
+    }, "*");
+  } catch (error) {
+    console.warn("无法发送就绪消息到父窗口:", error);
+  }
+
+  // 清理函数
+  window.__iframeHighlightCleanup = function () {
+    fullyDisableHighlight();
+    window.removeEventListener("message", handleParentMessage);
+    if (overlay.parentElement) {
+      overlay.parentElement.removeChild(overlay);
+    }
+    delete window.__iframeHighlightInitialized;
+    delete window.__iframeHighlightCleanup;
+  };
+})();
+
+</script>
+</body>
+</html>
