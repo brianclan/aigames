@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>农场分拣大作战</title>
+  <style>
+    :root {
+      --sky: #d8efff;
+      --grass: #88c070;
+      --soil: #b68d62;
+      --wood: #7a5135;
+      --ink: #2c2a27;
+      --good: #1d9d53;
+      --warn: #d96f2f;
+      --bad: #c53a3a;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(180deg, var(--sky) 0%, #e9f8ff 36%, #b9dea7 36%, #95c97d 100%);
+    }
+
+    .wrap {
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      padding: 14px;
+    }
+
+    .game {
+      width: min(980px, 96vw);
+      background: rgba(255,255,255,.75);
+      border: 2px solid rgba(60,60,60,.15);
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: 0 16px 35px rgba(35,60,31,.18);
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .stat {
+      background: #fff;
+      border: 1px solid rgba(0,0,0,.1);
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .stat b { font-size: 18px; }
+
+    .yard {
+      position: relative;
+      width: 100%;
+      height: min(58vh, 520px);
+      border-radius: 16px;
+      border: 2px solid rgba(79,101,63,.38);
+      overflow: hidden;
+      background:
+        radial-gradient(620px 180px at 78% -8%, rgba(255,255,255,.45), transparent 60%),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.08), rgba(255,255,255,.08) 2px, transparent 2px, transparent 26px),
+        linear-gradient(180deg, #bee7ff 0%, #c9f0ff 18%, #8dc875 18%, #7ab65e 100%);
+    }
+
+    .animal {
+      position: absolute;
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 2px solid rgba(0,0,0,.12);
+      background: rgba(255,255,255,.9);
+      cursor: pointer;
+      transition: transform .08s ease;
+      user-select: none;
+      touch-action: manipulation;
+      font-size: 27px;
+    }
+
+    .animal:hover { transform: scale(1.06); }
+    .animal.selected {
+      outline: 3px solid #ffd44f;
+      box-shadow: 0 0 0 4px rgba(255,212,79,.35);
+      transform: scale(1.08);
+    }
+
+    .rooms {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .room {
+      border: 2px solid rgba(0,0,0,.18);
+      border-radius: 14px;
+      padding: 10px 8px;
+      text-align: center;
+      background: linear-gradient(180deg, #fff8ef, #ead7c3);
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .room b { display: block; font-size: 16px; }
+    .room small { opacity: .75; }
+
+    .room.good { border-color: rgba(29,157,83,.55); box-shadow: inset 0 0 0 2px rgba(29,157,83,.18); }
+    .room.bad { border-color: rgba(197,58,58,.55); box-shadow: inset 0 0 0 2px rgba(197,58,58,.15); }
+
+    .bottom {
+      margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+
+    .btn {
+      border: 1px solid rgba(0,0,0,.18);
+      border-radius: 10px;
+      background: #fff;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    .message { min-height: 20px; font-weight: 600; }
+    .message.good { color: var(--good); }
+    .message.warn { color: var(--warn); }
+    .message.bad { color: var(--bad); }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(31,34,26,.52);
+      color: #fff;
+      text-align: center;
+      padding: 16px;
+      z-index: 20;
+    }
+
+    .overlay.show { display: flex; }
+    .card {
+      width: min(420px, 92vw);
+      border-radius: 14px;
+      background: rgba(16,18,14,.9);
+      border: 1px solid rgba(255,255,255,.2);
+      padding: 16px;
+    }
+
+    .card h2 { margin: 0 0 10px; }
+    .card p { margin: 6px 0; opacity: .92; }
+
+    @media (max-width: 740px) {
+      .top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .rooms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .yard { height: min(54vh, 460px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="game">
+      <div class="top">
+        <div class="stat">坚持时间<br><b id="timer">0.0s</b></div>
+        <div class="stat">已安置<br><b id="saved">0</b></div>
+        <div class="stat">场上动物<br><b id="alive">0</b></div>
+        <div class="stat">错误次数<br><b id="mistakes">0</b></div>
+        <div class="stat">最佳记录<br><b id="best">0.0s</b></div>
+      </div>
+
+      <div id="yard" class="yard" aria-label="farm yard">
+        <div id="overlay" class="overlay show">
+          <div class="card">
+            <h2>农场分拣大作战</h2>
+            <p>规则：点击小动物，再点击对应房间。</p>
+            <p>动物会越来越多，场上堆满就失败。</p>
+            <p>你能坚持多少秒？</p>
+            <button id="startBtn" class="btn">开始游戏</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="rooms" class="rooms"></div>
+
+      <div class="bottom">
+        <div id="msg" class="message">提示：先点动物，再点房间。</div>
+        <button id="restartBtn" class="btn">重新开始</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const ANIMALS = [
+      { type: 'cow', emoji: '🐮', room: 'barn', roomName: '牛棚' },
+      { type: 'pig', emoji: '🐷', room: 'sty', roomName: '猪圈' },
+      { type: 'chicken', emoji: '🐔', room: 'coop', roomName: '鸡舍' },
+      { type: 'sheep', emoji: '🐑', room: 'fold', roomName: '羊圈' },
+    ];
+
+    const ROOMS = [
+      { id: 'barn', title: '牛棚', icon: '🏠🐮' },
+      { id: 'sty', title: '猪圈', icon: '🧱🐷' },
+      { id: 'coop', title: '鸡舍', icon: '🪺🐔' },
+      { id: 'fold', title: '羊圈', icon: '🌾🐑' },
+    ];
+
+    const LIMIT_ON_FIELD = 28;
+
+    const yard = document.getElementById('yard');
+    const roomsEl = document.getElementById('rooms');
+    const msgEl = document.getElementById('msg');
+    const overlay = document.getElementById('overlay');
+    const timerEl = document.getElementById('timer');
+    const savedEl = document.getElementById('saved');
+    const aliveEl = document.getElementById('alive');
+    const mistakesEl = document.getElementById('mistakes');
+    const bestEl = document.getElementById('best');
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+
+    const bestKey = 'farm_room_rush_best_seconds';
+    let best = Number(localStorage.getItem(bestKey) || 0);
+    bestEl.textContent = best.toFixed(1) + 's';
+
+    let animals = [];
+    let selected = null;
+    let playing = false;
+    let startTs = 0;
+    let lastTick = 0;
+    let spawnAcc = 0;
+    let saved = 0;
+    let mistakes = 0;
+
+    function setMessage(text, cls = '') {
+      msgEl.className = 'message ' + cls;
+      msgEl.textContent = text;
+    }
+
+    function makeRoomUI() {
+      roomsEl.innerHTML = '';
+      for (const room of ROOMS) {
+        const el = document.createElement('button');
+        el.className = 'room';
+        el.type = 'button';
+        el.dataset.room = room.id;
+        el.innerHTML = `<b>${room.icon} ${room.title}</b><small>点击放入对应动物</small>`;
+        el.addEventListener('click', () => placeSelected(room.id, el));
+        roomsEl.appendChild(el);
+      }
+    }
+
+    function spawnAnimal() {
+      const model = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+      const bounds = yard.getBoundingClientRect();
+      const pad = 58;
+      const x = Math.random() * (bounds.width - pad);
+      const y = Math.random() * (bounds.height - 120) + 40;
+      const vx = (Math.random() * 0.7 + 0.35) * (Math.random() < 0.5 ? -1 : 1);
+      const vy = (Math.random() * 0.7 + 0.35) * (Math.random() < 0.5 ? -1 : 1);
+
+      const el = document.createElement('button');
+      el.className = 'animal';
+      el.type = 'button';
+      el.textContent = model.emoji;
+      el.title = model.roomName;
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.addEventListener('click', () => selectAnimal(animal));
+
+      const animal = {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        type: model.type,
+        room: model.room,
+        emoji: model.emoji,
+        x, y, vx, vy,
+        el,
+      };
+
+      animals.push(animal);
+      yard.appendChild(el);
+      updateStats();
+    }
+
+    function selectAnimal(animal) {
+      if (!playing) return;
+      if (selected && selected.el) selected.el.classList.remove('selected');
+      selected = animal;
+      animal.el.classList.add('selected');
+      setMessage(`已选中 ${animal.emoji}，请点击对应房间。`, 'warn');
+    }
+
+    function pulseRoom(roomBtn, ok) {
+      roomBtn.classList.remove('good', 'bad');
+      roomBtn.classList.add(ok ? 'good' : 'bad');
+      setTimeout(() => roomBtn.classList.remove('good', 'bad'), 260);
+    }
+
+    function removeAnimal(animal) {
+      const idx = animals.findIndex(a => a.id === animal.id);
+      if (idx !== -1) animals.splice(idx, 1);
+      animal.el.remove();
+      if (selected && selected.id === animal.id) selected = null;
+    }
+
+    function placeSelected(roomId, roomBtn) {
+      if (!playing) return;
+      if (!selected) {
+        setMessage('请先点一个小动物。', 'warn');
+        return;
+      }
+
+      const ok = selected.room === roomId;
+      pulseRoom(roomBtn, ok);
+
+      if (ok) {
+        setMessage(`正确！${selected.emoji} 已回到${ROOMS.find(r => r.id === roomId).title}。`, 'good');
+        removeAnimal(selected);
+        saved += 1;
+      } else {
+        mistakes += 1;
+        setMessage('放错房间了！动作快一点！', 'bad');
+      }
+      updateStats();
+    }
+
+    function updateStats() {
+      aliveEl.textContent = String(animals.length);
+      savedEl.textContent = String(saved);
+      mistakesEl.textContent = String(mistakes);
+    }
+
+    function gameOver() {
+      playing = false;
+      if (selected && selected.el) selected.el.classList.remove('selected');
+      selected = null;
+
+      const survived = (performance.now() - startTs) / 1000;
+      timerEl.textContent = survived.toFixed(1) + 's';
+
+      if (survived > best) {
+        best = survived;
+        localStorage.setItem(bestKey, String(best));
+        bestEl.textContent = best.toFixed(1) + 's';
+      }
+
+      overlay.classList.add('show');
+      overlay.innerHTML = `
+        <div class="card">
+          <h2>农场挤爆了！</h2>
+          <p>你坚持了 <b>${survived.toFixed(1)} 秒</b></p>
+          <p>已安置：${saved} ｜ 错误：${mistakes}</p>
+          <p>场上动物太多（≥ ${LIMIT_ON_FIELD}）导致失败。</p>
+          <button id="againBtn" class="btn">再来一局</button>
+        </div>`;
+      document.getElementById('againBtn').addEventListener('click', startGame);
+    }
+
+    function clearAnimals() {
+      for (const a of animals) a.el.remove();
+      animals = [];
+      selected = null;
+    }
+
+    function startGame() {
+      clearAnimals();
+      playing = true;
+      startTs = performance.now();
+      lastTick = startTs;
+      spawnAcc = 0;
+      saved = 0;
+      mistakes = 0;
+      timerEl.textContent = '0.0s';
+      updateStats();
+      overlay.classList.remove('show');
+      setMessage('开始！点击动物，再点击对应房间。', 'good');
+
+      spawnAnimal();
+      spawnAnimal();
+    }
+
+    function loop(ts) {
+      const dt = Math.min(33, ts - lastTick || 16);
+      lastTick = ts;
+
+      if (playing) {
+        const elapsed = (ts - startTs) / 1000;
+        timerEl.textContent = elapsed.toFixed(1) + 's';
+
+        // 越来越快：生成间隔逐渐缩短
+        const spawnInterval = Math.max(220, 1250 - elapsed * 34);
+        spawnAcc += dt;
+        while (spawnAcc >= spawnInterval) {
+          spawnAcc -= spawnInterval;
+          spawnAnimal();
+          // 后期偶发连刷，形成“越来越多”压力
+          if (elapsed > 25 && Math.random() < 0.22) spawnAnimal();
+        }
+
+        const rect = yard.getBoundingClientRect();
+        const maxX = rect.width - 56;
+        const maxY = rect.height - 56;
+
+        for (const a of animals) {
+          a.x += a.vx * (dt / 16);
+          a.y += a.vy * (dt / 16);
+
+          if (a.x < 0) { a.x = 0; a.vx *= -1; }
+          if (a.y < 0) { a.y = 0; a.vy *= -1; }
+          if (a.x > maxX) { a.x = maxX; a.vx *= -1; }
+          if (a.y > maxY) { a.y = maxY; a.vy *= -1; }
+
+          a.el.style.left = a.x + 'px';
+          a.el.style.top = a.y + 'px';
+        }
+
+        if (animals.length >= LIMIT_ON_FIELD) gameOver();
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    makeRoomUI();
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
