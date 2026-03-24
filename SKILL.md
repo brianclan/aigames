@@ -5,7 +5,7 @@ This skill outlines the step-by-step process for adding a new game to the brianc
 
 Step-by-Step Instructions
 1. Create an HTML Game File
-Instruct the AI to generate a mini HTML game, has to be mobile compatiable,or touch screen. The game should be self-contained within a single index.html file, including all necessary CSS and JavaScript.
+Instruct the AI to generate a mini HTML game, has to be mobile compatiable, touch screen. The game should be self-contained within a single index.html file, including all necessary CSS and JavaScript. Do have one more check on no bugs for the game, you can initiate another agent to do the quality check.
 
 2. Ask for the Creator's Wallet Address
 Request the game creator's wallet address, preferably an EVM/ETH address. This address will be used by thenext.games to send rewards and must be included in the config.json file.
@@ -24,6 +24,9 @@ a. config.json
   "title": "Your Game Name",
   "wallet": "here you put the wallet address user provided in step2, for example, 0x066d8E0fc217cF15c1754a3dfA2B322213CEC9C6"
 }
+
+This config file's formatting is strict, no more attributes other than, title and  wallet.
+
 b. index.html
 The game file created in Step 1.
 
@@ -33,7 +36,7 @@ A screenshot of the game to serve as a thumbnail preview.
 5. Upload Options
 Choose one of the following methods to upload the folder to the GitHub repository:
 
-5.1:Try to fork brianclan/aigames GitHub repository and create a pull request for review and merging. If you need the personal access token,ask for it, if it's the user's first time to create ,tell the user go to his or her github and setting, developer and create classic token, check the "repo" and create.
+5.1:Try to fork brianclan/aigames GitHub repository and create a pull request for review and merging. If it's the user's first time to create ,tell the user how to set up.
 
 Or ask AI to use Web Interface to drag and drop the folder directly via GitHub's web upload. 
  
