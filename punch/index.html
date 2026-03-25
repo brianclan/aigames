@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Punch - 办公室吃苹果</title>
+<link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#1a1a2e;
+  display:flex; justify-content:center; align-items:center;
+  width:100vw; height:100vh; overflow:hidden;
+  font-family:'ZCOOL KuaiLe', cursive;
+  touch-action:none; user-select:none;
+}
+#c { display:block; border-radius:12px; box-shadow:0 0 50px rgba(255,100,50,0.25); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ═══════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const maxW = window.innerWidth * 0.96;
+  const maxH = window.innerHeight * 0.96;
+  const ratio = 9/16;
+  let w = maxW;
+  let h = w / ratio;
+  if (h > maxH) { h = maxH; w = h * ratio; }
+  canvas.width = Math.min(450, Math.floor(w));
+  canvas.height = canvas.width / ratio;
+}
+resize();
+
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// ═══════════════════════════════════════
+//  AUDIO
+// ═══════════════════════════════════════
+let AC = null;
+function ac() { if (!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); return AC; }
+function tone(f, d, type='sine', vol=0.14, delay=0) {
+  try {
+    const a=ac(), o=a.createOscillator(), g=a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type=type; o.frequency.value=f;
+    const t=a.currentTime+delay;
+    g.gain.setValueAtTime(vol,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+d);
+    o.start(t); o.stop(t+d);
+  } catch(e){}
+}
+const sfx = {
+  nom:    () => { tone(600,0.08); tone(900,0.08,'',0.1,0.06); tone(1200,0.06,'',0.08,0.12); },
+  nomBig: () => { tone(400,0.1,'triangle'); tone(800,0.15,'',0.12,0.08); },
+  hit:    () => tone(200,0.3,'sawtooth',0.2),
+  die:    () => [0,1,2,3].forEach(i=>tone(300-i*50,0.2,'square',0.15,i*0.15)),
+  start:  () => { tone(523,0.1); tone(659,0.1,'',0.1,0.1); tone(784,0.15,'',0.1,0.2); },
+  combo:  () => { tone(880,0.1); tone(1100,0.1,'',0.1,0.08); tone(1320,0.12,'',0.1,0.16); },
+};
+
+// ═══════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════
+const S = { MENU:0, PLAY:1, OVER:2 };
+let state = S.MENU;
+let score = 0, highScore = parseInt(localStorage.getItem('punchHS')||'0');
+let combo = 0, comboTimer = 0;
+let lives = 3, time = 0, speed = 2;
+let menuPulse = 0;
+
+// ═══════════════════════════════════════
+//  PERSON (always visible)
+// ═══════════════════════════════════════
+const person = {
+  x: 0, y: 0, w: 0, h: 0,
+  targetX: 0, tilt: 0,
+  mouthOpen: 0,  // for nom animation
+  init() {
+    this.w = W()*0.22;
+    this.h = this.w * 1.6;
+    this.x = W()/2;
+    this.y = H()*0.78;
+    this.targetX = this.x;
+    this.tilt = 0;
+    this.mouthOpen = 0;
+  }
+};
+person.init(); // always init at startup
+
+// ═══════════════════════════════════════
+//  OFFICE BACKGROUND
+// ═══════════════════════════════════════
+let bgOff = 0;
+const desks = [];
+for (let i=0;i<5;i++) {
+  desks.push({
+    x: (i/5)*W() + W()*0.1,
+    y: H()*0.15 + i*H()*0.13,
+    w: W()*0.25,
+    h: H()*0.08
+  });
+}
+
+// ═══════════════════════════════════════
+//  ITEMS & HAZARDS
+// ═══════════════════════════════════════
+let APPLES=[], HAZARDS=[], PARTS=[], POPPINGS=[];
+
+const APPLE_TYPES = [
+  {t:'apple',     e:'🍎', p:10,  sz:0.09},
+  {t:'greenapple',e:'🍏', p:15,  sz:0.085},
+  {t:'golden',    e:'🍑', p:30,  sz:0.075},
+  {t:'bomb',      e:'💣', p:-20, sz:0.09, hazard:true},
+  {t:'coffee',    e:'☕', p:0,   sz:0.07, hazard:true},
+  {t:'stapler',   e:'🖇️', p:0,   sz:0.065, hazard:true},
+];
+
+function spawnApple() {
+  const T = APPLE_TYPES[Math.floor(Math.random()*APPLE_TYPES.length)];
+  const sz = W()*T.sz;
+  const x = sz/2 + Math.random()*(W()-sz);
+  const spd = speed * (0.7 + Math.random()*0.6);
+  APPLES.push({x, y:-sz, sz, T, rot:0, spd,
+    sway: Math.random()*Math.PI*2, swayAmp: 0.3+Math.random()*0.5});
+}
+
+function spawnWave() {
+  // every 8-15 apples, a wave of many apples
+  const count = 3 + Math.floor(Math.random()*4);
+  for (let i=0;i<count;i++) {
+    setTimeout(()=>{
+      if(state===S.PLAY) spawnApple();
+    }, i*120);
+  }
+}
+
+let waveT=0;
+function updateSpawns(dt) {
+  waveT += dt;
+  const interval = Math.max(0.4, 1.2 - speed*0.08);
+  if (waveT > interval) {
+    waveT = 0;
+    if (Math.random() < 0.3) {
+      spawnWave();
+    } else {
+      spawnApple();
+    }
+  }
+}
+
+// ═══════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════
+let dragging=false, dragX=0;
+
+function px(e) {
+  const r=canvas.getBoundingClientRect();
+  const cx=e.touches?e.touches[0].clientX:e.clientX;
+  return (cx-r.left)*(canvas.width/r.width);
+}
+canvas.addEventListener('mousedown',e=>{ dragging=true; dragX=px(e);
+  if(state===S.MENU){state=S.PLAY;sfx.start();resetGame();}
+  else if(state===S.OVER){state=S.MENU;}
+});
+canvas.addEventListener('mousemove',e=>{
+  if(!dragging)return;
+  const nx=px(e);
+  person.targetX += (nx-dragX)*1.8;
+  person.targetX = Math.max(person.w/2, Math.min(W()-person.w/2, person.targetX));
+  dragX=nx;
+});
+canvas.addEventListener('mouseup',()=>{dragging=false;});
+canvas.addEventListener('touchstart',e=>{e.preventDefault();dragging=true;dragX=px(e);
+  if(state===S.MENU){state=S.PLAY;sfx.start();resetGame();}
+  else if(state===S.OVER){state=S.MENU;}
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();
+  if(!dragging)return;
+  const nx=px(e);
+  person.targetX += (nx-dragX)*1.8;
+  person.targetX = Math.max(person.w/2, Math.min(W()-person.w/2, person.targetX));
+  dragX=nx;
+},{passive:false});
+canvas.addEventListener('touchend',e=>{e.preventDefault();dragging=false;},{passive:false});
+
+// ═══════════════════════════════════════
+//  RESET
+// ═══════════════════════════════════════
+function resetGame() {
+  score=0; lives=3; time=0; speed=2; combo=0; comboTimer=0;
+  APPLES=[]; HAZARDS=[]; PARTS=[]; POPPINGS=[]; waveT=0;
+  person.init();
+}
+
+// ═══════════════════════════════════════
+//  UPDATE
+// ═══════════════════════════════════════
+function update(dt) {
+  if(state!==S.PLAY){ menuPulse+=dt*2; return; }
+  time+=dt;
+
+  // speed up over time
+  speed = 2 + Math.floor(time/20)*0.5;
+  speed = Math.min(speed, 7);
+
+  // person movement
+  person.x += (person.targetX - person.x)*0.14;
+  person.tilt += ((person.targetX-person.x)*0.007 - person.tilt)*0.2;
+  // mouth nom animation decay
+  person.mouthOpen *= 0.85;
+
+  // spawn
+  updateSpawns(dt);
+
+  // combo timer
+  if (combo>1) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) { combo=0; comboTimer=0; }
+  }
+
+  // update apples
+  bgOff += speed;
+  APPLES = APPLES.filter(a => {
+    a.y += a.spd;
+    a.rot += 0.03;
+    a.x += Math.sin(a.sway + bgOff*0.01)*a.swayAmp;
+
+    // collision with person mouth
+    const mhX = person.x;
+    const mhY = person.y - person.h*0.25;
+    const dx = Math.abs(a.x - mhX);
+    const dy = Math.abs(a.y - mhY);
+    const catchR = (a.sz + person.w)*0.38;
+
+    if (dx < catchR && dy < catchR*1.1) {
+      if (a.T.hazard) {
+        lives--;
+        score = Math.max(0, score + a.T.p);
+        combo=0; comboTimer=0;
+        burst(a.x, a.y, '#ff4444', 16);
+        sfx.hit();
+        if (lives<=0) { over(); }
+      } else {
+        score += a.T.p;
+        combo++;
+        comboTimer = 2.5;
+        if (combo>1 && combo%5===0) sfx.combo();
+        else sfx.nom();
+        person.mouthOpen = 1;
+        pop(a.x, a.y, a.T.e, a.T.p);
+      }
+      return false;
+    }
+
+    return a.y < H()+a.sz;
+  });
+
+  // particles
+  PARTS = PARTS.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.06;p.l-=p.d;return p.l>0;});
+  POPPINGS = POPPINGS.filter(p=>{p.y-=1.5;p.l-=0.04;return p.l>0;});
+}
+
+function over() { state=S.OVER; sfx.die();
+  if(score>highScore){highScore=score;localStorage.setItem('punchHS',highScore);}
+}
+
+function burst(x,y,c,n){ for(let i=0;i<n;i++){
+  const a=Math.random()*Math.PI*2, s=1+Math.random()*4;
+  PARTS.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:1,d:0.025+Math.random()*0.03,r:3+Math.random()*6,c});
+}}
+function pop(x,y,emoji,pts){
+  POPPINGS.push({x,y,emoji,pts,text:pts>0?`+${pts}`:`${pts}`,l:1});
+}
+
+// ═══════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════
+function drawBG() {
+  // wall
+  const wall = ctx.createLinearGradient(0,0,0,H());
+  wall.addColorStop(0,'#2d3a4a');
+  wall.addColorStop(1,'#1e2836');
+  ctx.fillStyle=wall; ctx.fillRect(0,0,W(),H());
+
+  // floor
+  ctx.fillStyle='#8b6914';
+  ctx.fillRect(0, H()*0.62, W(), H()*0.38);
+  // floor tiles
+  ctx.strokeStyle='rgba(0,0,0,0.15)';
+  ctx.lineWidth=1;
+  const tileW = W()/6;
+  for(let i=0;i<7;i++){
+    ctx.beginPath();
+    ctx.moveTo(i*tileW, H()*0.62);
+    ctx.lineTo(i*tileW, H());
+    ctx.stroke();
+  }
+
+  // desks scrolling
+  const scroll = bgOff*0.3 % (H()*0.65);
+  desks.forEach((d,i)=>{
+    const dy = d.y + scroll;
+    const wrap = dy > H()+d.h ? dy - H()*0.65 - d.h : dy;
+    // desk surface
+    ctx.fillStyle='#6d4c2a';
+    ctx.beginPath(); ctx.roundRect(d.x, wrap, d.w, d.h, 3); ctx.fill();
+    // monitor
+    const monW=d.w*0.55, monH=d.h*0.7, monX=d.x+(d.w-monW)/2, monY=wrap-monH*0.9;
+    ctx.fillStyle='#222';
+    ctx.beginPath(); ctx.roundRect(monX, monY, monW, monH, 3); ctx.fill();
+    ctx.fillStyle='#4fc3f7';
+    ctx.fillRect(monX+3, monY+3, monW-6, monH-8);
+    // stand
+    ctx.fillStyle='#333';
+    ctx.fillRect(monX+monW/2-3, monY+monH, 6, d.h*0.4);
+    ctx.fillRect(monX+monW/2-10, monY+monH+d.h*0.3, 20, 4);
+  });
+
+  // ambient sparkles (office dust)
+  ctx.globalAlpha=0.25;
+  for(let i=0;i<15;i++){
+    const sx=(i*89+bgOff*0.8)%W(), sy=(i*67+bgOff*1.2)%H();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(sx,sy,1,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawPerson(x,y,w,h,tilt,mouth) {
+  ctx.save();
+  ctx.translate(x,y); ctx.rotate(tilt);
+
+  // chair
+  ctx.fillStyle='#555';
+  ctx.beginPath(); ctx.roundRect(-w*0.38, h*0.1, w*0.76, h*0.35, 4); ctx.fill();
+  // chair back
+  ctx.fillStyle='#444';
+  ctx.beginPath(); ctx.roundRect(-w*0.35, -h*0.1, w*0.7, h*0.22, 3); ctx.fill();
+
+  // body / shirt
+  const shirtGrad = ctx.createLinearGradient(-w/2,0,w/2,0);
+  shirtGrad.addColorStop(0,'#2980b9');
+  shirtGrad.addColorStop(0.5,'#3498db');
+  shirtGrad.addColorStop(1,'#2980b9');
+  ctx.fillStyle=shirtGrad;
+  ctx.beginPath();
+  ctx.moveTo(-w*0.35,-h*0.05);
+  ctx.bezierCurveTo(-w*0.4,h*0.15,-w*0.28,h*0.3,-w*0.2,h*0.42);
+  ctx.lineTo(w*0.2,h*0.42);
+  ctx.bezierCurveTo(w*0.28,h*0.3,w*0.4,h*0.15,w*0.35,-h*0.05);
+  ctx.closePath(); ctx.fill();
+
+  // tie
+  ctx.fillStyle='#e74c3c';
+  ctx.beginPath();
+  ctx.moveTo(0,-h*0.05);
+  ctx.lineTo(w*0.06,h*0.1);
+  ctx.lineTo(0,h*0.3);
+  ctx.lineTo(-w*0.06,h*0.1);
+  ctx.closePath(); ctx.fill();
+
+  // neck
+  ctx.fillStyle='#fdbf6f';
+  ctx.fillRect(-w*0.08,-h*0.12,w*0.16,h*0.1);
+
+  // head
+  ctx.fillStyle='#fdbf6f';
+  ctx.beginPath(); ctx.arc(0,-h*0.28,w*0.3,0,Math.PI*2); ctx.fill();
+
+  // hair
+  ctx.fillStyle='#2c2c2c';
+  ctx.beginPath(); ctx.arc(0,-h*0.33,w*0.3,Math.PI,Math.PI*2); ctx.fill();
+
+  // eyes (looking up toward falling apples)
+  ctx.fillStyle='#222';
+  ctx.beginPath(); ctx.arc(-w*0.1,-h*0.29,w*0.05,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.1,-h*0.29,w*0.05,0,Math.PI*2); ctx.fill();
+  // pupils (look up)
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(-w*0.1,-h*0.3,w*0.025,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.1,-h*0.3,w*0.025,0,Math.PI*2); ctx.fill();
+
+  // mouth — opens when eating
+  const mo = mouth * w * 0.15;
+  ctx.fillStyle='#c0392b';
+  ctx.beginPath();
+  ctx.ellipse(0,-h*0.2, mo+w*0.04, mo*0.6+w*0.02, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // ears
+  ctx.fillStyle='#fdbf6f';
+  ctx.beginPath(); ctx.ellipse(-w*0.3,-h*0.28,w*0.05,w*0.07,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(w*0.3,-h*0.28,w*0.05,w*0.07,0,0,Math.PI*2); ctx.fill();
+
+  // arms reaching up toward mouth
+  ctx.strokeStyle='#fdbf6f'; ctx.lineWidth=w*0.06; ctx.lineCap='round';
+  // left arm
+  ctx.beginPath(); ctx.moveTo(-w*0.3,h*0.05); ctx.quadraticCurveTo(-w*0.25,-h*0.1,-w*0.1,-h*0.18); ctx.stroke();
+  // right arm
+  ctx.beginPath(); ctx.moveTo(w*0.3,h*0.05); ctx.quadraticCurveTo(w*0.25,-h*0.1,w*0.1,-h*0.18); ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawApple(a) {
+  ctx.save();
+  ctx.translate(a.x,a.y); ctx.rotate(a.rot);
+  ctx.font=`${a.sz}px serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(a.T.e,0,0);
+  ctx.restore();
+}
+
+function drawHUD() {
+  const pad=W()*0.03;
+
+  // score
+  ctx.fillStyle='#fff';
+  ctx.font=`${W()*0.08}px 'ZCOOL KuaiLe',cursive`;
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText(`🍎 ${Math.floor(score)}`,pad,pad);
+
+  // hi score
+  ctx.font=`${W()*0.04}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.fillText(`最高 ${highScore}`,pad,pad+W()*0.08);
+
+  // combo
+  if (combo>1) {
+    ctx.font=`${W()*0.07}px 'ZCOOL KuaiLe',cursive`;
+    ctx.fillStyle=`hsl(${Math.min(combo*10,40)},100%,60%)`;
+    ctx.textAlign='center';
+    ctx.fillText(`🔥 ${combo}x COMBO!`,W()/2,pad);
+  }
+
+  // lives
+  ctx.font=`${W()*0.08}px serif`; ctx.textAlign='right';
+  let ls=''; for(let i=0;i<3;i++) ls+=i<lives?'❤️':'🖤';
+  ctx.fillText(ls,W()-pad,pad);
+
+  // speed
+  ctx.font=`${W()*0.038}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillStyle='#ffd93d'; ctx.textAlign='left';
+  ctx.fillText(`⚡${speed.toFixed(1)}x`,pad,H()-pad-W()*0.04);
+
+  // time
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='right';
+  ctx.fillText(`${Math.floor(time)}s`,W()-pad,H()-pad-W()*0.04);
+}
+
+function drawMenu() {
+  const cx=W()/2, cy=H()/2;
+  drawBG();
+
+  // darken
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W(),H());
+
+  // demo person
+  drawPerson(cx, H()*0.7, W()*0.22, W()*0.22*1.6, Math.sin(menuPulse)*0.05, Math.sin(menuPulse*2)*0.3+0.2);
+
+  // floating 🍎
+  ctx.font=`${W()*0.12}px serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const fy = cy - H()*0.15 + Math.sin(menuPulse)*5;
+  ctx.shadowColor='#e74c3c'; ctx.shadowBlur=15;
+  ctx.fillText('🍎', cx, fy); ctx.shadowBlur=0;
+
+  // title
+  ctx.shadowColor='#ff6b35'; ctx.shadowBlur=20*(0.5+Math.sin(menuPulse)*0.3);
+  ctx.fillStyle='#fff'; ctx.font=`${W()*0.15}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillText('PUNCH', cx, cy-H()*0.28); ctx.shadowBlur=0;
+
+  ctx.fillStyle='#ffd93d'; ctx.font=`${W()*0.055}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillText('办公室吃苹果 🍎', cx, cy-H()*0.15);
+
+  // tap
+  ctx.globalAlpha=0.6+Math.sin(menuPulse*2)*0.4;
+  ctx.fillStyle='#fff'; ctx.font=`${W()*0.062}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillText('👉 点我开始 👈', cx, cy+H()*0.2); ctx.globalAlpha=1;
+
+  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font=`${W()*0.046}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillText(`🏆 最高分 ${highScore}`, cx, cy+H()*0.32);
+
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font=`${W()*0.038}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillText('左右滑动接住苹果 | 小心炸弹和咖啡 ☕', cx, H()-H()*0.06);
+}
+
+function drawOver() {
+  ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W(),H());
+  const cx=W()/2, cy=H()/2;
+  ctx.shadowColor='#ff4444'; ctx.shadowBlur=20;
+  ctx.fillStyle='#ff6b6b'; ctx.font=`${W()*0.13}px 'ZCOOL KuaiLe',cursive`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('💥 游戏结束!',cx,cy-H()*0.24); ctx.shadowBlur=0;
+  ctx.fillStyle='#fff'; ctx.font=`${W()*0.07}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillText(`得分 ${Math.floor(score)}`,cx,cy-H()*0.06);
+  if(score>=highScore&&score>0){
+    ctx.fillStyle='#ffd93d'; ctx.font=`${W()*0.055}px 'ZCOOL KuaiLe',cursive`;
+    ctx.fillText('🎉 新纪录! 🎉',cx,cy+H()*0.04);
+  } else {
+    ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font=`${W()*0.05}px 'ZCOOL KuaiLe',cursive`;
+    ctx.fillText(`最高分 ${highScore}`,cx,cy+H()*0.04);
+  }
+  ctx.globalAlpha=0.6+Math.sin(menuPulse*2)*0.4;
+  ctx.fillStyle='#fff'; ctx.font=`${W()*0.055}px 'ZCOOL KuaiLe',cursive`;
+  ctx.fillText('点我返回主页',cx,cy+H()*0.18); ctx.globalAlpha=1;
+}
+
+function draw() {
+  ctx.clearRect(0,0,W(),H());
+  if(state===S.MENU){ drawMenu(); return; }
+
+  drawBG();
+  APPLES.forEach(drawApple);
+
+  // particles
+  PARTS.forEach(p=>{
+    ctx.globalAlpha=p.l; ctx.fillStyle=p.c;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // score popups
+  POPPINGS.forEach(p=>{
+    ctx.globalAlpha=p.l;
+    ctx.font=`${W()*0.06}px 'ZCOOL KuaiLe',cursive`;
+    ctx.fillStyle=p.text.startsWith('+')?'#ffd93d':'#ff4444';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(p.text,p.x,p.y);
+  });
+  ctx.globalAlpha=1;
+
+  // person
+  drawPerson(person.x, person.y, person.w, person.h, person.tilt, person.mouthOpen);
+
+  drawHUD();
+  if(state===S.OVER) drawOver();
+}
+
+// ═══════════════════════════════════════
+//  LOOP
+// ═══════════════════════════════════════
+let lastTs=0;
+function loop(ts) {
+  const dt=Math.min((ts-lastTs)/1000,0.05);
+  lastTs=ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(ts=>{lastTs=ts;requestAnimationFrame(loop);});
+
+// resize handler
+window.addEventListener('resize',()=>{resize();person.init();});
+</script>
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.inland-security-footer {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  right: 0;
+  width: fit-content;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tooltip-container {
+  position: relative;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.minimax-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 300;
+  color: #adadad;
+  text-decoration: none;
+}
+
+.minimax-link:visited {
+  color: #adadad;
+}
+
+.minimax-link:hover {
+  color: #666666;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: 16px; /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+  font-size: 12px;
+  line-height: 17px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #171717;
+}
+
+/* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+.tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: flex;
+}
+
+.info-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.beian-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #171717;
+}
+
+.beian-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.underline-text {
+  color: #171717;
+  text-decoration: underline;
+}
+
+.underline-text:hover {
+  color: #000000;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .trigger-content {
+    background-color: transparent;
+  }
+
+  .minimax-link,
+  .minimax-link:visited {
+    color: #666666;
+  }
+
+  .minimax-link:hover {
+    color: #adadad;
+  }
+
+  .tooltip-content {
+    background-color: #262626;
+    color: #ededed;
+  }
+
+  .beian-link,
+  .underline-text {
+    color: #ededed;
+  }
+
+  .underline-text:hover {
+    color: #ffffff;
+  }
+}
+
+</style>
+<div class="inland-security-footer">
+  <div class="tooltip-container">
+    <div class="trigger-content">
+      <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+        <span>© 2026 MiniMax</span>
+      </a>
+    </div>
+    <div class="tooltip-content">
+      <section class="info-section">
+        <span>上海稀宇科技有限公司</span>
+      </section>
+
+      <section class="info-section">
+        <a class="beian-link" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179" target="_blank" rel="noreferrer">
+          <img alt="hailuo-beian-icon" src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png" class="beian-icon">
+          <span class="underline-text">沪公网安备31010402010179号</span>
+        </a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+          沪ICP备2023003282号-38
+        </a>
+      </section>
+
+      <section class="info-section">
+        <span>模型名称：MiniMax</span>
+        <span>备案号：Shanghai-MiniMax-202505230046</span>
+      </section>
+
+      <section class="info-section">
+        <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer" class="underline-text">
+          用户协议
+        </a>
+        <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer" class="underline-text">
+          隐私政策
+        </a>
+      </section>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/**
+ * Iframe 元素高亮注入脚本
+ * 需要在目标网站中引入此脚本来支持跨域 iframe 高亮功能
+ *
+ * 使用方法：
+ * 1. 将此脚本添加到目标网站的 HTML 中
+ * 2. 或通过浏览器扩展、用户脚本等方式注入
+ */
+
+(function () {
+  "use strict";
+
+  // 检查是否在 iframe 中
+  if (window.self === window.top) {
+    return; // 不在 iframe 中，不执行
+  }
+
+  // 检查是否已经初始化过
+  if (window.__iframeHighlightInitialized) {
+    return;
+  }
+  window.__iframeHighlightInitialized = true;
+  console.log("Iframe 高亮脚本已加载");
+
+  // 创建高亮覆盖层
+  var overlay = document.createElement("div");
+  overlay.id = "iframe-highlight-overlay";
+  overlay.style.cssText = "\n    position: fixed;\n    top: 0;\n    left: 0;\n    width: 100vw;\n    height: 100vh;\n    pointer-events: none;\n    z-index: 999999;\n    overflow: hidden;\n  ";
+
+  // 创建悬停高亮框（虚线边框）
+  var highlightBox = document.createElement("div");
+  highlightBox.id = "iframe-highlight-box";
+  highlightBox.style.cssText = "\n    position: absolute;\n    border: 2px dashed #007AFF;\n    background: rgba(0, 122, 255, 0.08);\n    pointer-events: none;\n    display: none;\n    transition: all 0.1s ease;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);\n    border-radius: 2px;\n  ";
+
+  // 创建选中节点的常驻高亮框（实线边框）
+  var selectedBox = document.createElement("div");
+  selectedBox.id = "iframe-selected-box";
+  selectedBox.style.cssText = "\n    position: absolute;\n    border: 2px solid #007AFF;\n    pointer-events: none;\n    display: none;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 8px rgba(255, 107, 53, 0.4);\n    border-radius: 2px;\n    z-index: 1000000;\n  ";
+
+  // 创建悬停标签显示
+  var tagLabel = document.createElement("div");
+  tagLabel.id = "iframe-tag-label";
+  tagLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 2px 6px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 2px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000001;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);\n    font-weight: 500;\n  ";
+
+  // 创建选中节点标签
+  var selectedLabel = document.createElement("div");
+  selectedLabel.id = "iframe-selected-label";
+  selectedLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 3px 8px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 3px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000002;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);\n    font-weight: 600;\n  ";
+  overlay.appendChild(highlightBox);
+  overlay.appendChild(selectedBox);
+  overlay.appendChild(tagLabel);
+  overlay.appendChild(selectedLabel);
+  document.body.appendChild(overlay);
+
+  // 存储当前选中的元素
+  var selectedElement = null;
+  var highlightEnabled = false;
+
+  // 更新选中元素的高亮显示
+  function updateSelectedHighlight(element) {
+    console.log("updateSelectedHighlight called with:", element);
+    if (!element) {
+      selectedBox.style.display = "none";
+      selectedLabel.style.display = "none";
+      selectedElement = null;
+      console.log("Cleared selected highlight");
+      return;
+    }
+    selectedElement = element;
+    var rect = element.getBoundingClientRect();
+    console.log("Selected element rect:", rect);
+
+    // 更新选中高亮框位置
+    selectedBox.style.display = "block";
+    selectedBox.style.left = "".concat(rect.left - 2, "px");
+    selectedBox.style.top = "".concat(rect.top - 2, "px");
+    selectedBox.style.width = "".concat(rect.width + 4, "px");
+    selectedBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新选中标签位置和内容
+    selectedLabel.style.display = "block";
+    selectedLabel.textContent = "\u2713 <".concat(element.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 28;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 5) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    var labelWidth = selectedLabel.offsetWidth || 100; // 预估宽度
+    if (labelLeft + labelWidth > window.innerWidth - 10) {
+      labelLeft = window.innerWidth - labelWidth - 10;
+    }
+    selectedLabel.style.left = "".concat(Math.max(5, labelLeft), "px");
+    selectedLabel.style.top = "".concat(labelTop, "px");
+    console.log("Selected highlight positioned at:", {
+      left: selectedBox.style.left,
+      top: selectedBox.style.top,
+      width: selectedBox.style.width,
+      height: selectedBox.style.height
+    });
+  }
+  function getElementSelector(element) {
+    if (!(element instanceof Element)) throw new Error('Argument must be a DOM element');
+    var segments = [];
+    var current = element;
+    while (current !== document.documentElement) {
+      var selector = '';
+      // 优先检查唯一ID
+      if (current.id && document.querySelectorAll("#".concat(current.id)).length === 1) {
+        segments.unshift("#".concat(current.id));
+        break; // ID唯一，无需继续向上
+      }
+
+      // 生成类名选择器（取第一个有效类名）
+      var classes = Array.from(current.classList).filter(function (c) {
+        return !c.startsWith('js-');
+      });
+      var className = classes.length > 0 ? ".".concat(classes[0]) : '';
+
+      // 生成位置索引（nth-child）
+      var tag = current.tagName.toLowerCase();
+      if (!className) {
+        var siblings = Array.from(current.parentNode.children);
+        var index = siblings.findIndex(function (el) {
+          return el === current;
+        }) + 1;
+        selector = "".concat(tag, ":nth-child(").concat(index, ")");
+      } else {
+        selector = className;
+      }
+      segments.unshift(selector);
+      current = current.parentElement;
+    }
+
+    // 处理根元素
+    if (current === document.documentElement) {
+      segments.unshift('html');
+    }
+    return segments.join(' > ');
+  }
+
+  // 获取元素文本内容
+  function getElementText(element) {
+    var _element$textContent;
+    if (element.tagName === "INPUT") {
+      return element.value || element.placeholder || "";
+    }
+    if (element.tagName === "TEXTAREA") {
+      return element.value || element.placeholder || "";
+    }
+    var text = ((_element$textContent = element.textContent) === null || _element$textContent === void 0 ? void 0 : _element$textContent.trim()) || "";
+    return text.length > 50 ? text.substring(0, 50) + "..." : text;
+  }
+
+  // 获取元素属性信息
+  function getElementAttributes(element) {
+    var attrs = {};
+    for (var i = 0; i < element.attributes.length; i++) {
+      var attr = element.attributes[i];
+      attrs[attr.name] = attr.value;
+    }
+    return attrs;
+  }
+
+  // 鼠标悬停事件处理
+  function handleMouseOver(e) {
+    if (!highlightEnabled) return;
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免高亮 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 如果是已选中的元素，不显示悬停高亮
+    if (target === selectedElement) {
+      highlightBox.style.display = "none";
+      tagLabel.style.display = "none";
+      return;
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+
+    // 更新悬停高亮框位置
+    highlightBox.style.display = "block";
+    highlightBox.style.left = "".concat(rect.left - 2, "px");
+    highlightBox.style.top = "".concat(rect.top - 2, "px");
+    highlightBox.style.width = "".concat(rect.width + 4, "px");
+    highlightBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新标签位置和内容
+    tagLabel.style.display = "block";
+    tagLabel.textContent = "<".concat(target.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 22;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 0) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    if (labelLeft + tagLabel.offsetWidth > window.innerWidth) {
+      labelLeft = window.innerWidth - tagLabel.offsetWidth - 5;
+    }
+    tagLabel.style.left = "".concat(Math.max(0, labelLeft), "px");
+    tagLabel.style.top = "".concat(labelTop, "px");
+
+    // 发送消息到父窗口
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 鼠标离开事件处理
+  function handleMouseOut(e) {
+    if (!highlightEnabled) return;
+    var relatedTarget = e.relatedTarget;
+
+    // 如果鼠标移动到高亮相关元素上，不隐藏高亮
+    if (relatedTarget && (relatedTarget === highlightBox || relatedTarget === tagLabel || relatedTarget === overlay || relatedTarget === selectedBox || relatedTarget === selectedLabel)) {
+      return;
+    }
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: null,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 点击事件处理
+  function handleClick(e) {
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免处理 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 检查是否是交互元素，这些元素需要保留默认行为
+    var isInteractiveElement = ['input', 'textarea', 'select', 'button', 'a'].includes(target.tagName.toLowerCase());
+
+    // 如果高亮功能启用，对于非交互元素阻止默认行为和事件传播
+    if (highlightEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+    console.log("Element clicked:", {
+      tagName: target.tagName,
+      selector: selector,
+      rect: rect
+    });
+
+    // 立即更新选中高亮
+    updateSelectedHighlight(target);
+
+    // 隐藏悬停高亮，因为现在是选中状态
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-click",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 监听来自父窗口的消息
+  function handleParentMessage(event) {
+    console.log("Received message from parent:", event.data);
+    if (event.data.type === "iframe-highlight-toggle") {
+      var enabled = event.data.enabled;
+      console.log("Highlight toggle:", enabled);
+      if (enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "enable-iframe-highlight") {
+      console.log("Enable iframe highlight");
+      enableHighlight();
+    } else if (event.data.type === "disable-iframe-highlight") {
+      console.log("Disable iframe highlight");
+      disableHighlight();
+    } else if (event.data.type === "toggle-iframe-highlight") {
+      var _enabled = event.data.enabled !== undefined ? event.data.enabled : !highlightEnabled;
+      console.log("Toggle iframe highlight to:", _enabled);
+      if (_enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "update-selected-element") {
+      var selector = event.data.selector;
+      console.log("Update selected element with selector:", selector);
+      if (selector) {
+        try {
+          var element = document.querySelector(selector);
+          console.log("Found element by selector:", element);
+          updateSelectedHighlight(element);
+        } catch (error) {
+          console.warn("Failed to select element:", error);
+          updateSelectedHighlight(null);
+        }
+      } else {
+        updateSelectedHighlight(null);
+      }
+    } else if (event.data.type === "clear-selected-element") {
+      console.log("Clear selected element");
+      updateSelectedHighlight(null);
+    }
+  }
+
+  // 启用高亮功能
+  function enableHighlight() {
+    console.log("Enabling highlight");
+    document.addEventListener("mouseover", handleMouseOver, true);
+    document.addEventListener("mouseout", handleMouseOut, true);
+    document.addEventListener("click", handleClick, true);
+    highlightEnabled = true;
+    overlay.style.display = "block";
+  }
+
+  // 禁用高亮功能
+  function disableHighlight() {
+    console.log("Disabling highlight");
+    highlightEnabled = false;
+    // 保持事件监听器，但通过 highlightEnabled 变量控制行为
+    // 这样可以保留选中状态的显示
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    // 不隐藏 selectedBox 和 selectedLabel，保留选中状态
+  }
+
+  // 完全禁用高亮功能（移除所有监听器）
+  function fullyDisableHighlight() {
+    console.log("Fully disabling highlight");
+    highlightEnabled = false;
+    document.removeEventListener("mouseover", handleMouseOver, true);
+    document.removeEventListener("mouseout", handleMouseOut, true);
+    document.removeEventListener("click", handleClick, true);
+    overlay.style.display = "none";
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    selectedBox.style.display = "none";
+    selectedLabel.style.display = "none";
+  }
+
+  // 添加事件监听
+  enableHighlight();
+  window.addEventListener("message", handleParentMessage);
+
+  // 暴露全局函数供外部调用
+  window.__iframeHighlightControl = {
+    enable: enableHighlight,
+    disable: disableHighlight,
+    fullyDisable: fullyDisableHighlight,
+    isEnabled: function isEnabled() {
+      return highlightEnabled;
+    },
+    getSelectedElement: function getSelectedElement() {
+      return selectedElement;
+    },
+    updateSelected: updateSelectedHighlight,
+    // 通过消息发送开关控制
+    sendToggleMessage: function sendToggleMessage(enabled) {
+      window.parent.postMessage({
+        type: 'iframe-highlight-status',
+        enabled: enabled || highlightEnabled,
+        source: 'iframe-highlight-injector'
+      }, '*');
+    }
+  };
+
+  // 通知父窗口脚本已加载
+  try {
+    window.parent.postMessage({
+      type: "iframe-highlight-ready",
+      data: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now()
+      },
+      source: "iframe-highlight-injector"
+    }, "*");
+  } catch (error) {
+    console.warn("无法发送就绪消息到父窗口:", error);
+  }
+
+  // 清理函数
+  window.__iframeHighlightCleanup = function () {
+    fullyDisableHighlight();
+    window.removeEventListener("message", handleParentMessage);
+    if (overlay.parentElement) {
+      overlay.parentElement.removeChild(overlay);
+    }
+    delete window.__iframeHighlightInitialized;
+    delete window.__iframeHighlightCleanup;
+  };
+})();
+
+</script>
+</body>
+</html>
