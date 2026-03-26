@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>大厂乱斗</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'PingFang SC', sans-serif; }
+canvas { border-radius: 12px; box-shadow: 0 0 40px rgba(0,0,0,0.8); max-width: 100vw; max-height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// 适配屏幕
+function resize() {
+  const w = Math.min(window.innerWidth, 480);
+  const h = Math.min(window.innerHeight, 800);
+  canvas.width = w;
+  canvas.height = h;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// 游戏状态
+const STATE = { MENU: 0, FIGHT: 1, GAMEOVER: 2 };
+let state = STATE.MENU;
+let winner = null;
+
+// 角色定义
+const chars = [
+  { name: '华为', color: '#cf0a2c', secondary: '#1a1a1a', hp: 100, maxHp: 100, x: 0, y: 0, vx: 0, vy: 0, attack: 0, defend: 0, cooldown: 0, hurtTime: 0, speed: 3, alive: true, emoji: '🇨🇳' },
+  { name: '阿里', color: '#ff6a00', secondary: '#2d1a00', hp: 100, maxHp: 100, x: 0, y: 0, vx: 0, vy: 0, attack: 0, defend: 0, cooldown: 0, hurtTime: 0, speed: 3.5, alive: true, emoji: '🟠' },
+  { name: '腾讯', { name: '腾讯', color: '#1aad19', secondary: '#0d3d0d', hp: 100, maxHp: 100, x: 0, y: 0, vx: 0, vy: 0, attack: 0, defend: 0, cooldown: 0, hurtTime: 0, speed: 4, alive: true, emoji: '🟢' }
+];
+
+// 修复角色定义
+const characters = [
+  { name: '华为', color: '#cf0a2c', secondary: '#1a1a1a', hp: 100, maxHp: 100, x: 0, y: 0, vx: 0, vy: 0, attack: 0, defend: 0, cooldown: 0, hurtTime: 0, speed: 3, alive: true, emoji: '🔴' },
+  { name: '阿里', color: '#ff6a00', secondary: '#2d1a00', hp: 100, maxHp: 100, x: 0, y: 0, vx: 0, vy: 0, attack: 0, defend: 0, cooldown: 0, hurtTime: 0, speed: 3.5, alive: true, emoji: '🟠' },
+  { name: '腾讯', color: '#1aad19', secondary: '#0d3d0d', hp: 100, maxHp: 100, x: 0, y: 0, vx: 0, vy: 0, attack: 0, defend: 0, cooldown: 0, hurtTime: 0, speed: 4, alive: true, emoji: '🟢' }
+];
+
+let particles = [];
+let hitEffects = [];
+
+// 地板
+const groundY = () => canvas.height - 80;
+
+// 初始化
+function initFight() {
+  const gw = canvas.width;
+  const gh = canvas.height;
+  const gy = groundY();
+  characters[0].x = gw * 0.2; characters[0].y = gy;
+  characters[1].x = gw * 0.5; characters[1].y = gy;
+  characters[2].x = gw * 0.8; characters[2].y = gy;
+  characters.forEach(c => {
+    c.hp = c.maxHp; c.alive = true; c.vx = 0; c.vy = 0;
+    c.attack = 0; c.defend = 0; c.cooldown = 0; c.hurtTime = 0;
+  });
+  particles = [];
+  hitEffects = [];
+  winner = null;
+}
+
+// 触摸控制
+let touchStartX = 0, touchStartY = 0, touchCurrentX = 0, touchCurrentY = 0;
+let selectedChar = null;
+let buttons = [];
+
+// 按钮布局 - 底部
+function buildButtons() {
+  buttons = [];
+  const bw = canvas.width / 4;
+  const bh = 70;
+  const by = canvas.height - 75;
+  // 角色按钮
+  characters.forEach((c, i) => {
+    if (c.alive) {
+      buttons.push({ type: 'char', index: i, x: i * bw, y: by, w: bw, h: bh });
+    }
+  });
+  // 动作按钮
+  const actionX = characters.filter(c=>c.alive).length * bw;
+  buttons.push({ type: 'attack', x: actionX, y: by, w: bw, h: bh });
+  buttons.push({ type: 'defend', x: actionX + bw, y: by, w: bw, h: bh });
+}
+
+// 移动摇杆区域
+let moveArea = { x: 10, y: canvas.height - 200, r: 60 };
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = (t.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (t.clientY - rect.top) * (canvas.height / rect.height);
+  touchStartX = x; touchStartY = y; touchCurrentX = x; touchCurrentY = y;
+
+  // 检查点击了哪个角色
+  selectedChar = null;
+  for (let i = 0; i < characters.length; i++) {
+    const c = characters[i];
+    if (!c.alive) continue;
+    if (x > c.x - 30 && x < c.x + 30 && y > c.y - 80 && y < c.y + 10) {
+      selectedChar = i;
+      break;
+    }
+  }
+
+  // 检查按钮
+  for (const btn of buttons) {
+    if (x > btn.x && x < btn.x + btn.w && y > btn.y && y < btn.y + btn.h) {
+      if (btn.type === 'char') selectedChar = btn.index;
+      if (btn.type === 'attack' && selectedChar !== null) doAttack(selectedChar);
+      if (btn.type === 'defend' && selectedChar !== null) doDefend(selectedChar);
+    }
+  }
+});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  touchCurrentX = (t.clientX - rect.left) * (canvas.width / rect.width);
+  touchCurrentY = (t.clientY - rect.top) * (canvas.height / rect.height);
+
+  // 移动选中的角色
+  if (selectedChar !== null && state === STATE.FIGHT) {
+    const dx = touchCurrentX - touchStartX;
+    const dy = touchCurrentY - touchStartY;
+    const c = characters[selectedChar];
+    const nx = c.x + dx * 0.05;
+    c.x = Math.max(30, Math.min(canvas.width - 30, nx));
+    touchStartX = touchCurrentX;
+  }
+});
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  selectedChar = null;
+});
+
+// 点击/鼠标支持
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  if (state === STATE.MENU) {
+    state = STATE.FIGHT;
+    initFight();
+    buildButtons();
+  } else if (state === STATE.GAMEOVER) {
+    state = STATE.MENU;
+  } else if (state === STATE.FIGHT) {
+    for (const btn of buttons) {
+      if (x > btn.x && x < btn.x + btn.w && y > btn.y && y < btn.y + btn.h) {
+        if (btn.type === 'char') { selectedChar = btn.index; }
+        if (btn.type === 'attack' && selectedChar !== null) doAttack(selectedChar);
+        if (btn.type === 'defend' && selectedChar !== null) doDefend(selectedChar);
+      }
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (state !== STATE.FIGHT) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  // 悬停选角色
+  for (let i = 0; i < characters.length; i++) {
+    const c = characters[i];
+    if (!c.alive) continue;
+    if (x > c.x - 30 && x < c.x + 30) { selectedChar = i; break; }
+  }
+});
+
+function doAttack(i) {
+  const c = characters[i];
+  if (!c.alive || c.cooldown > 0) return;
+  c.attack = 20;
+  c.cooldown = 30;
+  // 找最近的敌人
+  let target = null;
+  let minDist = Infinity;
+  for (const other of characters) {
+    if (other === c || !other.alive) continue;
+    const d = Math.abs(other.x - c.x);
+    if (d < minDist) { minDist = d; target = other; }
+  }
+  if (target && minDist < 120) {
+    const dmg = 15 + Math.random() * 10;
+    target.hp -= dmg;
+    target.hurtTime = 15;
+    target.vx = (target.x > c.x ? 1 : -1) * 8;
+    spawnHitEffect(target.x, target.y - 50, dmg);
+    spawnParticles(target.x, target.y - 40, target.color, 8);
+    if (target.hp <= 0) { target.hp = 0; target.alive = false; }
+  }
+  checkWin();
+}
+
+function doDefend(i) {
+  const c = characters[i];
+  if (!c.alive) return;
+  c.defend = 40;
+  spawnParticles(c.x, c.y - 40, '#ffffff', 5);
+}
+
+function spawnHitEffect(x, y, dmg) {
+  hitEffects.push({ x, y, text: `-${Math.round(dmg)}`, life: 40, vy: -2 });
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: -Math.random() * 6,
+      life: 20 + Math.random() * 20,
+      color,
+      size: 3 + Math.random() * 4
+    });
+  }
+}
+
+function checkWin() {
+  const alive = characters.filter(c => c.alive);
+  if (alive.length <= 1) {
+    winner = alive[0] || null;
+    setTimeout(() => { state = STATE.GAMEOVER; }, 800);
+  }
+}
+
+// AI逻辑
+function updateAI() {
+  characters.forEach((c, i) => {
+    if (!c.alive) return;
+    if (c.cooldown > 0) { c.cooldown--; return; }
+    // 随机AI
+    const action = Math.random();
+    if (action < 0.4) {
+      // 接近最近敌人
+      let target = null, minDist = Infinity;
+      characters.forEach(other => {
+        if (other === c || !other.alive) return;
+        const d = Math.abs(other.x - c.x);
+        if (d < minDist) { minDist = d; target = other; }
+      });
+      if (target) {
+        c.x += c.x < target.x ? c.speed : -c.speed;
+      }
+    } else if (action < 0.7) {
+      // 攻击
+      let target = null, minDist = Infinity;
+      characters.forEach(other => {
+        if (other === c || !other.alive) return;
+        const d = Math.abs(other.x - c.x);
+        if (d < minDist) { minDist = d; target = other; }
+      });
+      if (target && minDist < 120) { doAttack(i); }
+    }
+  });
+}
+
+// 物理更新
+function updatePhysics() {
+  characters.forEach(c => {
+    if (!c.alive) return;
+    c.x += c.vx;
+    c.vx *= 0.85;
+    if (c.hurtTime > 0) c.hurtTime--;
+    if (c.defend > 0) c.defend--;
+    if (c.attack > 0) c.attack--;
+    // 边界
+    c.x = Math.max(30, Math.min(canvas.width - 30, c.x));
+    // 碰撞
+    for (const other of characters) {
+      if (other === c || !other.alive || !other.alive) continue;
+      const overlap = 60 - Math.abs(c.x - other.x);
+      if (overlap > 0) {
+        const dir = c.x < other.x ? -1 : 1;
+        c.x += dir * overlap * 0.5;
+      }
+    }
+  });
+  particles = particles.filter(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.3;
+    p.life--;
+    return p.life > 0;
+  });
+  hitEffects = hitEffects.filter(h => {
+    h.y += h.vy; h.life--;
+    return h.life > 0;
+  });
+}
+
+// 绘制角色
+function drawChar(c, idx) {
+  const x = c.x;
+  const y = c.y;
+  const selected = selectedChar === idx;
+
+  ctx.save();
+  // 选中高亮
+  if (selected) {
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 20;
+  }
+  // 身体
+  const bh = 50, bw = 28;
+  ctx.fillStyle = c.color;
+  ctx.fillRect(x - bw/2, y - bh - 20, bw, bh);
+  // 头
+  ctx.beginPath();
+  ctx.arc(x, y - bh - 30, 18, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffd5b4';
+  ctx.fill();
+  ctx.strokeStyle = c.color;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  // 眼睛
+  ctx.fillStyle = '#333';
+  ctx.fillRect(x - 7, y - bh - 34, 5, 5);
+  ctx.fillRect(x + 2, y - bh - 34, 5, 5);
+  // 公司logo/图标
+  ctx.fillStyle = c.color;
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(c.emoji, x, y - bh - 45);
+  // 手臂/攻击动作
+  if (c.attack > 0) {
+    ctx.fillStyle = '#ffd5b4';
+    ctx.fillRect(x + bw/2, y - bh - 10, 25, 8);
+    ctx.fillRect(x - bw/2 - 25, y - bh - 10, 25, 8);
+    // 攻击特效
+    ctx.strokeStyle = '#ffff00';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y - bh - 20, 35, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // 防御
+  if (c.defend > 0) {
+    ctx.strokeStyle = '#00aaff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(x, y - bh/2 - 20, 35, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // 受伤
+  if (c.hurtTime > 0 && c.hurtTime % 4 < 2) {
+    ctx.fillStyle = 'rgba(255,0,0,0.3)';
+    ctx.fillRect(x - bw/2, y - bh - 20, bw, bh);
+  }
+  // 腿
+  ctx.fillStyle = c.secondary;
+  ctx.fillRect(x - 10, y - 20, 8, 20);
+  ctx.fillRect(x + 2, y - 20, 8, 20);
+  // 血条
+  const hpW = 50;
+  const hpH = 6;
+  const hpX = x - hpW/2;
+  const hpY = y - bh - 65;
+  ctx.fillStyle = '#333';
+  ctx.fillRect(hpX - 1, hpY - 1, hpW + 2, hpH + 2);
+  ctx.fillStyle = '#333';
+  ctx.fillRect(hpX, hpY, hpW, hpH);
+  const ratio = c.hp / c.maxHp;
+  ctx.fillStyle = ratio > 0.5 ? '#00ff00' : ratio > 0.25 ? '#ffaa00' : '#ff0000';
+  ctx.fillRect(hpX, hpY, hpW * ratio, hpH);
+  // 名字
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(c.name, x, y + 15);
+  ctx.restore();
+}
+
+// 绘制HP总览
+function drawHUD() {
+  const cols = canvas.width / characters.length;
+  characters.forEach((c, i) => {
+    const cx = cols * i + cols / 2;
+    // 血条
+    const bw = Math.min(cols - 20, 130);
+    const bh = 14;
+    const bx = cx - bw/2;
+    const by = 20;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+    ctx.fillStyle = '#222';
+    ctx.fillRect(bx, by, bw, bh);
+    const ratio = c.hp / c.maxHp;
+    ctx.fillStyle = ratio > 0.5 ? '#00dd44' : ratio > 0.25 ? '#ffaa00' : '#ff2222';
+    ctx.fillRect(bx, by, bw * ratio, bh);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${c.name} ${c.hp}`, cx, by + 11);
+    if (!c.alive) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#888';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('已淘汰', cx, by + 35);
+    }
+  });
+}
+
+// 绘制粒子
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life / 40;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+// 绘制击中文字
+function drawHitEffects() {
+  hitEffects.forEach(h => {
+    ctx.globalAlpha = h.life / 40;
+    ctx.fillStyle = '#ff3333';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(h.text, h.x, h.y);
+  });
+  ctx.globalAlpha = 1;
+}
+
+// 绘制按钮
+function drawButtons() {
+  buildButtons();
+  buttons.forEach(btn => {
+    const colors = {
+      char: ['#333', '#555'],
+      attack: ['#cf0a2c', '#ff2244'],
+      defend: ['#1a55aa', '#2288ff']
+    };
+    const labels = { char: (characters[btn.index]||{}).name||'', attack: '⚔️ 攻击', defend: '🛡️ 防御' };
+    ctx.fillStyle = colors[btn.type][0];
+    ctx.fillRect(btn.x + 2, btn.y + 2, btn.w - 4, btn.h - 4);
+    ctx.fillStyle = colors[btn.type][1];
+    ctx.fillRect(btn.x + 2, btn.y + 2, btn.w - 4, btn.h/2 - 2);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[btn.type], btn.x + btn.w/2, btn.y + btn.h/2 + 5);
+  });
+}
+
+// 绘制菜单
+function drawMenu() {
+  // 背景
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#1a1a3e');
+  grad.addColorStop(1, '#0a0a1e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 标题
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('大厂乱斗', canvas.width/2, 80);
+
+  // 三个角色展示
+  const chars2 = [
+    { name: '华为', color: '#cf0a2c', emoji: '🔴', desc: '战力彪悍' },
+    { name: '阿里', color: '#ff6a00', emoji: '🟠', desc: '财大气粗' },
+    { name: '腾讯', color: '#1aad19', emoji: '🟢', desc: '社交王者' }
+  ];
+  chars2.forEach((c, i) => {
+    const cx = canvas.width / 4 * (i + 1);
+    const cy = canvas.height / 2 - 20;
+    // 圆形背景
+    ctx.beginPath();
+    ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+    ctx.fillStyle = c.color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = '40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.emoji, cx, cy + 15);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(c.name, cx, cy + 80);
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText(c.desc, cx, cy + 98);
+  });
+
+  // 开始提示
+  const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
+  ctx.globalAlpha = pulse;
+  ctx.fillStyle = '#ffcc00';
+  ctx.font = 'bold 20px sans-serif';
+  ctx.fillText('👆 点击开始', canvas.width/2, canvas.height - 120);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#888';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('选择角色 → 攻击/防御', canvas.width/2, canvas.height - 80);
+}
+
+// 绘制游戏结束
+function drawGameOver() {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 28px sans-serif';
+  ctx.textAlign = 'center';
+  if (winner) {
+    ctx.fillStyle = winner.color;
+    ctx.fillText('🏆 冠军', canvas.width/2, canvas.height/2 - 60);
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillText(`${winner.emoji} ${winner.name}`, canvas.width/2, canvas.height/2);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('实力碾压！', canvas.width/2, canvas.height/2 + 35);
+  } else {
+    ctx.fillText('💥 平局！', canvas.width/2, canvas.height/2);
+  }
+  const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 300);
+  ctx.globalAlpha = pulse;
+  ctx.fillStyle = '#ffcc00';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillText('点击重新开始', canvas.width/2, canvas.height/2 + 80);
+  ctx.globalAlpha = 1;
+}
+
+// 绘制地面
+function drawGround() {
+  const gy = groundY();
+  const grad = ctx.createLinearGradient(0, gy, 0, canvas.height);
+  grad.addColorStop(0, '#2a2a4a');
+  grad.addColorStop(1, '#1a1a2e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, gy, canvas.width, canvas.height - gy);
+  // 地面线
+  ctx.strokeStyle = '#4a4a6a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, gy);
+  ctx.lineTo(canvas.width, gy);
+  ctx.stroke();
+  // 装饰
+  ctx.fillStyle = '#3a3a5a';
+  for (let i = 0; i < canvas.width; i += 40) {
+    ctx.fillRect(i, gy + 5, 20, 4);
+  }
+}
+
+// 主循环
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (state === STATE.MENU) {
+    drawMenu();
+  } else if (state === STATE.FIGHT) {
+    updatePhysics();
+    updateAI();
+    // 绘制地面
+    drawGround();
+    // 绘制角色
+    characters.forEach((c, i) => { if (c.alive) drawChar(c, i); });
+    drawParticles();
+    drawHitEffects();
+    drawHUD();
+    drawButtons();
+    // 提示
+    if (selectedChar !== null) {
+      const c = characters[selectedChar];
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`已选中: ${c.name} 拖动移动`, canvas.width/2, canvas.height - 160);
+    }
+  } else if (state === STATE.GAMEOVER) {
+    drawGround();
+    characters.forEach((c, i) => { if (c.alive) drawChar(c, i); });
+    drawGameOver();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
