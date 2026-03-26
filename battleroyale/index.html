@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>大厂乱斗</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'PingFang SC', sans-serif; }
+canvas { border-radius: 12px; box-shadow: 0 0 60px rgba(0,200,255,0.15); max-width: 100vw; max-height: 100vh; touch-action: none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  const w = Math.min(window.innerWidth, 520);
+  const h = Math.min(window.innerHeight, 900);
+  canvas.width = w;
+  canvas.height = h;
+}
+resize();
+window.addEventListener('resize', () => { resize(); });
+
+// ============ 游戏状态 ============
+const STATE = { MENU: 0, FIGHT: 1, RESULT: 2 };
+let state = STATE.MENU;
+
+// ============ 角色类 ============
+class Fighter {
+  constructor(name, color, accent, emoji, x, isPlayer) {
+    this.name = name;
+    this.color = color;
+    this.accent = accent;
+    this.emoji = emoji;
+    this.x = x;
+    this.y = 0;
+    this.vx = 0;
+    this.hp = 100;
+    this.maxHp = 100;
+    this.alive = true;
+    this.isPlayer = isPlayer;
+    this.cooldown = 0;
+    this.attackAnim = 0;
+    this.hurtAnim = 0;
+    this.defendAnim = 0;
+    this.speed = 2.5 + Math.random();
+    this.facing = 1; // 1=right, -1=left
+    this.stunTime = 0;
+    this.skillCD = 0;
+    this.aiTimer = 0;
+    this.aiState = 'idle';
+    this.aiTarget = null;
+  }
+
+  get groundY() { return canvas.height - 120; }
+
+  update(others) {
+    if (!this.alive) return;
+    this.x += this.vx;
+    this.vx *= 0.8;
+    if (this.x < 50) this.x = 50;
+    if (this.x > canvas.width - 50) this.x = canvas.width - 50;
+    if (this.hurtAnim > 0) this.hurtAnim--;
+    if (this.attackAnim > 0) this.attackAnim--;
+    if (this.defendAnim > 0) this.defendAnim--;
+    if (this.stunTime > 0) this.stunTime--;
+    if (this.cooldown > 0) this.cooldown--;
+    if (this.skillCD > 0) this.skillCD--;
+
+    // 碰撞推开
+    for (const other of others) {
+      if (other === this || !other.alive) continue;
+      const dist = Math.abs(this.x - other.x);
+      if (dist < 70) {
+        const push = (70 - dist) * 0.5;
+        const dir = this.x < other.x ? -1 : 1;
+        this.x += dir * push;
+        this.x = Math.max(50, Math.min(canvas.width - 50, this.x));
+      }
+    }
+  }
+
+  // 普通攻击
+  attack(target) {
+    if (!this.alive || this.cooldown > 0 || this.stunTime > 0) return false;
+    this.cooldown = 35;
+    this.attackAnim = 20;
+    const dist = Math.abs(this.x - target.x);
+    if (dist < 110) {
+      let dmg = 12 + Math.random() * 8;
+      if (target.defendAnim > 0) dmg *= 0.4;
+      if (this.skillCD <= 0) {
+        // 暴击
+        dmg *= 1.8;
+        this.skillCD = 120;
+        spawnEffect(target.x, target.y - 70, '💥暴击!', '#ff0');
+      }
+      target.takeDamage(dmg, this.x < target.x ? 1 : -1);
+      spawnHit(target.x, target.y - 50, Math.round(dmg));
+      return true;
+    }
+    // 没打到，挥空
+    spawnEffect(this.x + this.facing * 40, this.y - 60, '挥空!', '#aaa');
+    return false;
+  }
+
+  // 防御
+  defend() {
+    if (!this.alive || this.defendAnim > 0 || this.stunTime > 0) return;
+    this.defendAnim = 60;
+    spawnParticles(this.x, this.y - 60, '#00aaff', 6);
+  }
+
+  // 特殊技能（向前冲）
+  dash() {
+    if (!this.alive || this.cooldown > 0 || this.stunTime > 0 || this.skillCD > 60) return;
+    this.cooldown = 60;
+    this.vx = this.facing * 18;
+    spawnEffect(this.x, this.y - 50, '⚡冲刺!', '#0ff');
+    spawnParticles(this.x, this.y - 50, this.color, 15);
+  }
+
+  takeDamage(dmg, dir) {
+    this.hp -= dmg;
+    this.hurtAnim = 15;
+    this.vx = dir * 6;
+    if (this.hp <= 0) {
+      this.hp = 0;
+      this.alive = false;
+      spawnEffect(this.x, this.y - 80, '💀淘汰!', '#f00');
+      for (let i = 0; i < 30; i++) spawnParticles(this.x, this.y - 60, this.color, 1);
+    }
+  }
+
+  draw(isSelected) {
+    if (!this.alive) {
+      // 淘汰后的墓碑
+      ctx.fillStyle = 'rgba(100,100,100,0.4)';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('💀', this.x, this.y - 30);
+      ctx.fillStyle = '#666';
+      ctx.font = '13px sans-serif';
+      ctx.fillText(this.name, this.x, this.y + 10);
+      return;
+    }
+
+    ctx.save();
+    // 选中高亮
+    if (isSelected) {
+      ctx.shadowColor = '#fff';
+      ctx.shadowBlur = 25;
+    }
+    // 受伤闪烁
+    if (this.hurtAnim > 0 && this.hurtAnim % 4 < 2) {
+      ctx.globalAlpha = 0.5;
+    }
+
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(this.x, this.y + 8, 30, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 身体
+    const bx = this.x - 16, bw = 32, bh = 45;
+    const by = this.y - bh - 25;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, 6);
+    ctx.fill();
+    // 衣服花纹
+    ctx.fillStyle = this.accent;
+    ctx.fillRect(bx + 4, by + bh - 10, bw - 8, 8);
+
+    // 攻击动作 - 手臂伸出
+    if (this.attackAnim > 0) {
+      ctx.fillStyle = '#ffd5b4';
+      const extend = (20 - this.attackAnim) * 2;
+      // 出拳方向
+      ctx.fillRect(this.x + this.facing * 16, by + 12, this.facing * (20 + extend), 10);
+      ctx.fillRect(this.x - this.facing * 16 - this.facing * (10 + extend/2), by + 12, this.facing * (10 + extend/2), 10);
+      // 攻击圈
+      ctx.strokeStyle = '#ffff00';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x + this.facing * 50, by + 16, 20, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      // 普通手臂
+      ctx.fillStyle = '#ffd5b4';
+      ctx.fillRect(this.x - 24, by + 12, 10, 20);
+      ctx.fillRect(this.x + 14, by + 12, 10, 20);
+    }
+
+    // 防御姿态
+    if (this.defendAnim > 0) {
+      ctx.strokeStyle = '#00aaff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(this.x, by + 20, 40, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(0,170,255,0.2)';
+      ctx.beginPath();
+      ctx.arc(this.x, by + 20, 40, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 头
+    ctx.fillStyle = '#ffd5b4';
+    ctx.beginPath();
+    ctx.arc(this.x, by - 10, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // 眼睛 - 根据方向
+    ctx.fillStyle = '#333';
+    const eyeOff = this.facing * 3;
+    ctx.fillRect(this.x - 7 + eyeOff, by - 15, 5, 5);
+    ctx.fillRect(this.x + 2 + eyeOff, by - 15, 5, 5);
+
+    // 公司emoji
+    ctx.font = '18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(this.emoji, this.x, by - 28);
+
+    // 腿
+    ctx.fillStyle = this.accent;
+    const legAnim = this.attackAnim > 0 ? Math.sin(this.attackAnim) * 5 : 0;
+    ctx.fillRect(this.x - 10, this.y - 20, 8, 20);
+    ctx.fillRect(this.x + 2, this.y - 20, 8, 20);
+
+    // 血条
+    const hpW = 55, hpH = 7;
+    const hpX = this.x - hpW/2, hpY = by - 50;
+    ctx.fillStyle = '#222';
+    ctx.fillRect(hpX - 1, hpY - 1, hpW + 2, hpH + 2);
+    ctx.fillStyle = '#333';
+    ctx.fillRect(hpX, hpY, hpW, hpH);
+    const ratio = this.hp / this.maxHp;
+    const hpColor = ratio > 0.5 ? '#00e676' : ratio > 0.25 ? '#ffab00' : '#f44336';
+    ctx.fillStyle = hpColor;
+    ctx.fillRect(hpX, hpY, hpW * ratio, hpH);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(`${Math.ceil(this.hp)}`, this.x, hpY - 2);
+
+    // 名字
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(this.name, this.x, this.y + 20);
+
+    // 技能CD
+    if (this.skillCD > 60) {
+      ctx.fillStyle = '#ff0';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(`🔒${Math.ceil(this.skillCD/60)}s`, this.x, this.y + 32);
+    }
+
+    ctx.restore();
+  }
+}
+
+// ============ 粒子/特效 ============
+let particles = [];
+let effects = [];
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 10,
+      vy: -Math.random() * 8 - 2,
+      life: 25 + Math.random() * 25,
+      color,
+      size: 3 + Math.random() * 5
+    });
+  }
+}
+
+function spawnHit(x, y, dmg) {
+  effects.push({ x, y, text: `-${dmg}`, life: 35, vy: -2, color: '#ff3333', big: false });
+}
+
+function spawnEffect(x, y, text, color) {
+  effects.push({ x, y, text, life: 40, vy: -1.5, color, big: true });
+}
+
+function updateParticles() {
+  particles = particles.filter(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.35;
+    p.life--;
+    return p.life > 0;
+  });
+  effects = effects.filter(e => {
+    e.y += e.vy;
+    e.life--;
+    return e.life > 0;
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life / 40;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+  effects.forEach(e => {
+    ctx.globalAlpha = Math.min(1, e.life / 15);
+    ctx.fillStyle = e.color;
+    ctx.font = e.big ? 'bold 20px sans-serif' : 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(e.text, e.x, e.y);
+  });
+  ctx.globalAlpha = 1;
+}
+
+// ============ 游戏逻辑 ============
+let fighters = [];
+let selectedFighter = null;
+let winner = null;
+let winTimer = 0;
+
+function initFight() {
+  const cx = canvas.width / 2;
+  fighters = [
+    new Fighter('华为', '#cf0a2c', '#1a1a1a', '🔴', cx - 140, false),
+    new Fighter('阿里', '#ff6a00', '#3d1a00', '🟠', cx, true),
+    new Fighter('腾讯', '#1aad19', '#0a3d0a', '🟢', cx + 140, false)
+  ];
+  fighters.forEach(f => f.y = f.groundY);
+  selectedFighter = fighters.find(f => f.isPlayer) || fighters[0];
+  particles = [];
+  effects = [];
+  winner = null;
+  winTimer = 0;
+}
+
+function checkWin() {
+  const alive = fighters.filter(f => f.alive);
+  if (alive.length <= 1) {
+    winner = alive[0] || null;
+    winTimer = 120;
+  }
+}
+
+// ============ AI ============
+function updateAI(f) {
+  if (!f.alive || f.isPlayer) return;
+  f.aiTimer++;
+  if (f.aiTimer < 20) return;
+  f.aiTimer = 0;
+
+  // 找最近的活着的敌人
+  let nearest = null, minDist = Infinity;
+  for (const other of fighters) {
+    if (other === f || !other.alive) continue;
+    const d = Math.abs(f.x - other.x);
+    if (d < minDist) { minDist = d; nearest = other; }
+  }
+  if (!nearest) return;
+
+  f.facing = nearest.x > f.x ? 1 : -1;
+
+  if (minDist > 100) {
+    // 接近
+    f.vx += (nearest.x > f.x ? 1 : -1) * f.speed * 0.3;
+  } else if (minDist < 80) {
+    // 太近，后退
+    f.vx += (nearest.x > f.x ? -1 : 1) * f.speed * 0.2;
+    // 顺便攻击
+    if (Math.random() < 0.5) f.attack(nearest);
+  } else {
+    // 攻击距离
+    if (Math.random() < 0.6) {
+      f.attack(nearest);
+    } else if (Math.random() < 0.15) {
+      f.dash();
+    } else if (Math.random() < 0.2) {
+      f.defend();
+    }
+  }
+
+  // 随机移动
+  if (Math.random() < 0.1) {
+    f.vx += (Math.random() - 0.5) * 4;
+  }
+}
+
+// ============ 控制 ============
+// 触摸
+let touchStart = null;
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const x = (t.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (t.clientY - rect.top) * (canvas.height / rect.height);
+  touchStart = { x, y, id: t.identifier };
+  handleClick(x, y);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!touchStart || state !== STATE.FIGHT) return;
+  const t = Array.from(e.touches).find(t => t.identifier === touchStart.id);
+  if (!t) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = (t.clientX - rect.left) * (canvas.width / rect.width);
+  // 拖动角色
+  if (selectedFighter && selectedFighter.alive && selectedFighter.isPlayer) {
+    const dx = x - touchStart.x;
+    selectedFighter.vx = dx * 0.15;
+    touchStart.x = x;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  touchStart = null;
+}, { passive: false });
+
+// 鼠标
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  handleClick(x, y);
+});
+
+// 键盘
+const keys = {};
+document.addEventListener('keydown', e => { keys[e.key] = true; });
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+function handleClick(x, y) {
+  if (state === STATE.MENU) {
+    state = STATE.FIGHT;
+    initFight();
+    return;
+  }
+  if (state === STATE.RESULT) {
+    state = STATE.MENU;
+    return;
+  }
+  if (state !== STATE.FIGHT) return;
+
+  // 检查按钮区域
+  const btnY = canvas.height - 90;
+  if (y > btnY) {
+    const btnW = canvas.width / 5;
+    const idx = Math.floor(x / btnW);
+    if (idx < 3) {
+      // 选中角色
+      const f = fighters[idx];
+      if (f && f.alive) selectedFighter = f;
+    } else if (idx === 3) {
+      if (selectedFighter && selectedFighter.isPlayer) selectedFighter.attack(getNearest(selectedFighter));
+    } else if (idx === 4) {
+      if (selectedFighter && selectedFighter.isPlayer) {
+        if (keys['Shift']) selectedFighter.dash();
+        else selectedFighter.defend();
+      }
+    }
+    return;
+  }
+
+  // 点击场景选中角色
+  for (const f of fighters) {
+    if (!f.alive) continue;
+    if (Math.abs(x - f.x) < 50 && Math.abs(y - (f.y - 50)) < 80) {
+      selectedFighter = f;
+      break;
+    }
+  }
+}
+
+function getNearest(f) {
+  let nearest = null, minDist = Infinity;
+  for (const other of fighters) {
+    if (other === f || !other.alive) continue;
+    const d = Math.abs(f.x - other.x);
+    if (d < minDist) { minDist = d; nearest = other; }
+  }
+  return nearest;
+}
+
+// ============ 绘制 ============
+function drawArena() {
+  // 背景
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#0a0a2e');
+  grad.addColorStop(1, '#1a1a3e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(0,200,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < canvas.width; i += 40) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+  }
+  for (let i = 0; i < canvas.height; i += 40) {
+    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+  }
+
+  // 地面
+  const gy = canvas.height - 120;
+  ctx.fillStyle = '#1a1a3e';
+  ctx.fillRect(0, gy, canvas.width, canvas.height - gy);
+  ctx.strokeStyle = 'rgba(0,200,255,0.3)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke();
+
+  // 装饰线
+  for (let i = 0; i < canvas.width; i += 30) {
+    ctx.fillStyle = 'rgba(0,200,255,0.1)';
+    ctx.fillRect(i, gy + 4, 15, 3);
+  }
+}
+
+function drawHUD() {
+  // 顶部栏
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, canvas.width, 50);
+  ctx.fillStyle = 'rgba(0,200,255,0.1)';
+  ctx.fillRect(0, 0, canvas.width, 2);
+
+  fighters.forEach((f, i) => {
+    const cx = canvas.width / 4 * (i + 1) - canvas.width / 8;
+    const bw = 120, bh = 14;
+    const bx = cx - bw/2, by = 12;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(bx, by, bw, bh);
+    const ratio = f.hp / f.maxHp;
+    const hpColor = ratio > 0.5 ? '#00e676' : ratio > 0.25 ? '#ffab00' : '#f44336';
+    ctx.fillStyle = '#222';
+    ctx.fillRect(bx + 1, by + 1, bw - 2, bh - 2);
+    ctx.fillStyle = hpColor;
+    ctx.fillRect(bx + 1, by + 1, (bw - 2) * ratio, bh - 2);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${f.emoji} ${f.name} ${Math.ceil(f.hp)}`, cx, by - 2);
+  });
+}
+
+function drawControls() {
+  const btnY = canvas.height - 90;
+  const btnH = 80;
+  const cols = 5;
+  const bw = canvas.width / cols;
+
+  // 背景条
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, btnY, canvas.width, btnH);
+
+  // 角色按钮
+  fighters.forEach((f, i) => {
+    const bx = i * bw;
+    const isSelected = f === selectedFighter;
+    ctx.fillStyle = isSelected ? f.color : '#1a1a2e';
+    ctx.fillRect(bx + 2, btnY + 4, bw - 4, btnH - 8);
+    if (isSelected) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 2, btnY + 4, bw - 4, btnH - 8);
+    }
+    ctx.font = '22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.emoji, bx + bw/2, btnY + 28);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(f.name, bx + bw/2, btnY + 50);
+    if (!f.alive) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(bx + 2, btnY + 4, bw - 4, btnH - 8);
+    }
+  });
+
+  // 攻击按钮
+  const ax = 3 * bw;
+  const isPlayer = selectedFighter && selectedFighter.isPlayer && selectedFighter.alive;
+  ctx.fillStyle = isPlayer ? '#cf0a2c' : '#333';
+  ctx.fillRect(ax + 2, btnY + 4, bw - 4, btnH - 8);
+  ctx.font = '24px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('⚔️', ax + bw/2, btnY + 35);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillText('攻击', ax + bw/2, btnY + 55);
+
+  // 防御/冲刺按钮
+  const dx = 4 * bw;
+  ctx.fillStyle = isPlayer ? '#1565c0' : '#333';
+  ctx.fillRect(dx + 2, btnY + 4, bw - 4, btnH - 8);
+  ctx.font = '24px sans-serif';
+  ctx.fillText(keys['Shift'] ? '⚡' : '🛡️', dx + bw/2, btnY + 35);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.fillText(keys['Shift'] ? '冲刺' : '防御', dx + bw/2, btnY + 55);
+}
+
+function drawMenu() {
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#0a0a2e');
+  grad.addColorStop(1, '#1a0a2e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(255,0,100,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < canvas.width; i += 40) {
+    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+  }
+  for (let i = 0; i < canvas.height; i += 40) {
+    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+  }
+
+  // 标题
+  const t = Date.now() / 1000;
+  ctx.save();
+  ctx.shadowColor = '#ff1493';
+  ctx.shadowBlur = 30 + Math.sin(t * 2) * 10;
+  ctx.fillStyle = '#ff1493';
+  ctx.font = 'bold 44px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('大厂乱斗', canvas.width/2, 100);
+  ctx.restore();
+
+  ctx.fillStyle = '#aaa';
+  ctx.font = '16px sans-serif';
+  ctx.fillText('华为 vs 阿里 vs 腾讯', canvas.width/2, 135);
+
+  // 角色展示
+  const chars = [
+    { name: '华为', color: '#cf0a2c', emoji: '🔴', desc: '战力彪悍', ai: 'AI控制' },
+    { name: '阿里', color: '#ff6a00', emoji: '🟠', desc: '财大气粗', ai: '你控制!' },
+    { name: '腾讯', color: '#1aad19', emoji: '🟢', desc: '社交王者', ai: 'AI控制' }
+  ];
+  chars.forEach((c, i) => {
+    const cx = canvas.width / 4 * (i + 1);
+    const cy = canvas.height / 2 - 30;
+    // 光环
+    ctx.beginPath();
+    ctx.arc(cx, cy, 55, 0, Math.PI * 2);
+    ctx.strokeStyle = c.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = c.color + '33';
+    ctx.fill();
+    ctx.fillStyle = c.color;
+    ctx.font = '50px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.emoji, cx, cy + 20);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(c.name, cx, cy + 80);
+    ctx.fillStyle = '#888';
+    ctx.font = '13px sans-serif';
+    ctx.fillText(c.desc, cx, cy + 98);
+    ctx.fillStyle = i === 1 ? '#ff0' : '#555';
+    ctx.font = i === 1 ? 'bold 12px sans-serif' : '11px sans-serif';
+    ctx.fillText(i === 1 ? '⭐ ' + c.ai : c.ai, cx, cy + 114);
+  });
+
+  // 玩法提示
+  const tipY = canvas.height / 2 + 100;
+  ctx.fillStyle = '#555';
+  ctx.font = '13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('点击底部按钮控制阿里员工', canvas.width/2, tipY);
+  ctx.fillText('⚔️ 攻击 · 🛡️ 防御 · Shift+防御=冲刺', canvas.width/2, tipY + 22);
+  ctx.fillText('击败另外两方获胜！', canvas.width/2, tipY + 44);
+
+  // 开始
+  const pulse = 0.8 + 0.2 * Math.sin(t * 3);
+  ctx.save();
+  ctx.translate(canvas.width/2, canvas.height - 100);
+  ctx.scale(pulse, pulse);
+  ctx.fillStyle = '#e91e63';
+  ctx.beginPath();
+  ctx.roundRect(-100, -30, 200, 60, 30);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath();
+  ctx.roundRect(-100, -30, 200, 30, 30);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 20px sans-serif';
+  ctx.fillText('👆 点击开始战斗!', 0, 8);
+  ctx.restore();
+}
+
+function drawResult() {
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (winner) {
+    ctx.fillStyle = winner.color;
+    ctx.font = 'bold 30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🏆 冠军', canvas.width/2, canvas.height/2 - 80);
+    ctx.font = '60px sans-serif';
+    ctx.fillText(winner.emoji, canvas.width/2, canvas.height/2 - 20);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText(winner.name, canvas.width/2, canvas.height/2 + 35);
+    const msgs = ['实力碾压全场!', '大获全胜!', '独占鳌头!'];
+    ctx.fillStyle = '#aaa';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(msgs[Math.floor(Math.random() * msgs.length)], canvas.width/2, canvas.height/2 + 65);
+  } else {
+    ctx.fillStyle = '#aaa';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('💥 同归于尽!', canvas.width/2, canvas.height/2);
+  }
+
+  const pulse = 0.8 + 0.2 * Math.sin(Date.now() / 200);
+  ctx.save();
+  ctx.translate(canvas.width/2, canvas.height - 100);
+  ctx.scale(pulse, pulse);
+  ctx.fillStyle = '#e91e63';
+  ctx.beginPath();
+  ctx.roundRect(-100, -30, 200, 60, 30);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillText('🔄 再来一局', 0, 7);
+  ctx.restore();
+}
+
+// ============ 主循环 ============
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (state === STATE.MENU) {
+    drawMenu();
+  } else if (state === STATE.FIGHT) {
+    // 键盘控制
+    if (selectedFighter && selectedFighter.isPlayer && selectedFighter.alive) {
+      if (keys['ArrowLeft'] || keys['a']) selectedFighter.vx -= 3;
+      if (keys['ArrowRight'] || keys['d']) selectedFighter.vx += 3;
+      if (keys[' '] || keys['z']) { selectedFighter.attack(getNearest(selectedFighter)); keys[' '] = false; }
+      if (keys['x']) { selectedFighter.defend(); keys['x'] = false; }
+      if (keys['Shift']) { selectedFighter.dash(); keys['Shift'] = false; }
+    }
+
+    // 更新
+    fighters.forEach(f => f.update(fighters));
+    fighters.forEach(f => updateAI(f));
+    updateParticles();
+
+    // 绘制
+    drawArena();
+    fighters.forEach(f => f.draw(f === selectedFighter));
+    drawParticles();
+    drawHUD();
+    drawControls();
+
+    // 胜利检测
+    if (winner) {
+      winTimer--;
+      drawResult();
+      if (winTimer <= 0) state = STATE.RESULT;
+    }
+  } else if (state === STATE.RESULT) {
+    drawArena();
+    fighters.forEach(f => f.draw(f === selectedFighter));
+    drawResult();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.inland-security-footer {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  right: 0;
+  width: fit-content;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tooltip-container {
+  position: relative;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.minimax-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 300;
+  color: #adadad;
+  text-decoration: none;
+}
+
+.minimax-link:visited {
+  color: #adadad;
+}
+
+.minimax-link:hover {
+  color: #666666;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: 16px; /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+  font-size: 12px;
+  line-height: 17px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #171717;
+}
+
+/* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+.tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: flex;
+}
+
+.info-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.beian-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #171717;
+}
+
+.beian-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.underline-text {
+  color: #171717;
+  text-decoration: underline;
+}
+
+.underline-text:hover {
+  color: #000000;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .trigger-content {
+    background-color: transparent;
+  }
+
+  .minimax-link,
+  .minimax-link:visited {
+    color: #666666;
+  }
+
+  .minimax-link:hover {
+    color: #adadad;
+  }
+
+  .tooltip-content {
+    background-color: #262626;
+    color: #ededed;
+  }
+
+  .beian-link,
+  .underline-text {
+    color: #ededed;
+  }
+
+  .underline-text:hover {
+    color: #ffffff;
+  }
+}
+
+</style>
+<div class="inland-security-footer">
+  <div class="tooltip-container">
+    <div class="trigger-content">
+      <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+        <span>© 2026 MiniMax</span>
+      </a>
+    </div>
+    <div class="tooltip-content">
+      <section class="info-section">
+        <span>上海稀宇科技有限公司</span>
+      </section>
+
+      <section class="info-section">
+        <a class="beian-link" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179" target="_blank" rel="noreferrer">
+          <img alt="hailuo-beian-icon" src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png" class="beian-icon">
+          <span class="underline-text">沪公网安备31010402010179号</span>
+        </a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+          沪ICP备2023003282号-38
+        </a>
+      </section>
+
+      <section class="info-section">
+        <span>模型名称：MiniMax</span>
+        <span>备案号：Shanghai-MiniMax-202505230046</span>
+      </section>
+
+      <section class="info-section">
+        <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer" class="underline-text">
+          用户协议
+        </a>
+        <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer" class="underline-text">
+          隐私政策
+        </a>
+      </section>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/**
+ * Iframe 元素高亮注入脚本
+ * 需要在目标网站中引入此脚本来支持跨域 iframe 高亮功能
+ *
+ * 使用方法：
+ * 1. 将此脚本添加到目标网站的 HTML 中
+ * 2. 或通过浏览器扩展、用户脚本等方式注入
+ */
+
+(function () {
+  "use strict";
+
+  // 检查是否在 iframe 中
+  if (window.self === window.top) {
+    return; // 不在 iframe 中，不执行
+  }
+
+  // 检查是否已经初始化过
+  if (window.__iframeHighlightInitialized) {
+    return;
+  }
+  window.__iframeHighlightInitialized = true;
+  console.log("Iframe 高亮脚本已加载");
+
+  // 创建高亮覆盖层
+  var overlay = document.createElement("div");
+  overlay.id = "iframe-highlight-overlay";
+  overlay.style.cssText = "\n    position: fixed;\n    top: 0;\n    left: 0;\n    width: 100vw;\n    height: 100vh;\n    pointer-events: none;\n    z-index: 999999;\n    overflow: hidden;\n  ";
+
+  // 创建悬停高亮框（虚线边框）
+  var highlightBox = document.createElement("div");
+  highlightBox.id = "iframe-highlight-box";
+  highlightBox.style.cssText = "\n    position: absolute;\n    border: 2px dashed #007AFF;\n    background: rgba(0, 122, 255, 0.08);\n    pointer-events: none;\n    display: none;\n    transition: all 0.1s ease;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);\n    border-radius: 2px;\n  ";
+
+  // 创建选中节点的常驻高亮框（实线边框）
+  var selectedBox = document.createElement("div");
+  selectedBox.id = "iframe-selected-box";
+  selectedBox.style.cssText = "\n    position: absolute;\n    border: 2px solid #007AFF;\n    pointer-events: none;\n    display: none;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 8px rgba(255, 107, 53, 0.4);\n    border-radius: 2px;\n    z-index: 1000000;\n  ";
+
+  // 创建悬停标签显示
+  var tagLabel = document.createElement("div");
+  tagLabel.id = "iframe-tag-label";
+  tagLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 2px 6px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 2px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000001;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);\n    font-weight: 500;\n  ";
+
+  // 创建选中节点标签
+  var selectedLabel = document.createElement("div");
+  selectedLabel.id = "iframe-selected-label";
+  selectedLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 3px 8px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 3px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000002;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);\n    font-weight: 600;\n  ";
+  overlay.appendChild(highlightBox);
+  overlay.appendChild(selectedBox);
+  overlay.appendChild(tagLabel);
+  overlay.appendChild(selectedLabel);
+  document.body.appendChild(overlay);
+
+  // 存储当前选中的元素
+  var selectedElement = null;
+  var highlightEnabled = false;
+
+  // 更新选中元素的高亮显示
+  function updateSelectedHighlight(element) {
+    console.log("updateSelectedHighlight called with:", element);
+    if (!element) {
+      selectedBox.style.display = "none";
+      selectedLabel.style.display = "none";
+      selectedElement = null;
+      console.log("Cleared selected highlight");
+      return;
+    }
+    selectedElement = element;
+    var rect = element.getBoundingClientRect();
+    console.log("Selected element rect:", rect);
+
+    // 更新选中高亮框位置
+    selectedBox.style.display = "block";
+    selectedBox.style.left = "".concat(rect.left - 2, "px");
+    selectedBox.style.top = "".concat(rect.top - 2, "px");
+    selectedBox.style.width = "".concat(rect.width + 4, "px");
+    selectedBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新选中标签位置和内容
+    selectedLabel.style.display = "block";
+    selectedLabel.textContent = "\u2713 <".concat(element.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 28;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 5) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    var labelWidth = selectedLabel.offsetWidth || 100; // 预估宽度
+    if (labelLeft + labelWidth > window.innerWidth - 10) {
+      labelLeft = window.innerWidth - labelWidth - 10;
+    }
+    selectedLabel.style.left = "".concat(Math.max(5, labelLeft), "px");
+    selectedLabel.style.top = "".concat(labelTop, "px");
+    console.log("Selected highlight positioned at:", {
+      left: selectedBox.style.left,
+      top: selectedBox.style.top,
+      width: selectedBox.style.width,
+      height: selectedBox.style.height
+    });
+  }
+  function getElementSelector(element) {
+    if (!(element instanceof Element)) throw new Error('Argument must be a DOM element');
+    var segments = [];
+    var current = element;
+    while (current !== document.documentElement) {
+      var selector = '';
+      // 优先检查唯一ID
+      if (current.id && document.querySelectorAll("#".concat(current.id)).length === 1) {
+        segments.unshift("#".concat(current.id));
+        break; // ID唯一，无需继续向上
+      }
+
+      // 生成类名选择器（取第一个有效类名）
+      var classes = Array.from(current.classList).filter(function (c) {
+        return !c.startsWith('js-');
+      });
+      var className = classes.length > 0 ? ".".concat(classes[0]) : '';
+
+      // 生成位置索引（nth-child）
+      var tag = current.tagName.toLowerCase();
+      if (!className) {
+        var siblings = Array.from(current.parentNode.children);
+        var index = siblings.findIndex(function (el) {
+          return el === current;
+        }) + 1;
+        selector = "".concat(tag, ":nth-child(").concat(index, ")");
+      } else {
+        selector = className;
+      }
+      segments.unshift(selector);
+      current = current.parentElement;
+    }
+
+    // 处理根元素
+    if (current === document.documentElement) {
+      segments.unshift('html');
+    }
+    return segments.join(' > ');
+  }
+
+  // 获取元素文本内容
+  function getElementText(element) {
+    var _element$textContent;
+    if (element.tagName === "INPUT") {
+      return element.value || element.placeholder || "";
+    }
+    if (element.tagName === "TEXTAREA") {
+      return element.value || element.placeholder || "";
+    }
+    var text = ((_element$textContent = element.textContent) === null || _element$textContent === void 0 ? void 0 : _element$textContent.trim()) || "";
+    return text.length > 50 ? text.substring(0, 50) + "..." : text;
+  }
+
+  // 获取元素属性信息
+  function getElementAttributes(element) {
+    var attrs = {};
+    for (var i = 0; i < element.attributes.length; i++) {
+      var attr = element.attributes[i];
+      attrs[attr.name] = attr.value;
+    }
+    return attrs;
+  }
+
+  // 鼠标悬停事件处理
+  function handleMouseOver(e) {
+    if (!highlightEnabled) return;
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免高亮 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 如果是已选中的元素，不显示悬停高亮
+    if (target === selectedElement) {
+      highlightBox.style.display = "none";
+      tagLabel.style.display = "none";
+      return;
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+
+    // 更新悬停高亮框位置
+    highlightBox.style.display = "block";
+    highlightBox.style.left = "".concat(rect.left - 2, "px");
+    highlightBox.style.top = "".concat(rect.top - 2, "px");
+    highlightBox.style.width = "".concat(rect.width + 4, "px");
+    highlightBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新标签位置和内容
+    tagLabel.style.display = "block";
+    tagLabel.textContent = "<".concat(target.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 22;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 0) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    if (labelLeft + tagLabel.offsetWidth > window.innerWidth) {
+      labelLeft = window.innerWidth - tagLabel.offsetWidth - 5;
+    }
+    tagLabel.style.left = "".concat(Math.max(0, labelLeft), "px");
+    tagLabel.style.top = "".concat(labelTop, "px");
+
+    // 发送消息到父窗口
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 鼠标离开事件处理
+  function handleMouseOut(e) {
+    if (!highlightEnabled) return;
+    var relatedTarget = e.relatedTarget;
+
+    // 如果鼠标移动到高亮相关元素上，不隐藏高亮
+    if (relatedTarget && (relatedTarget === highlightBox || relatedTarget === tagLabel || relatedTarget === overlay || relatedTarget === selectedBox || relatedTarget === selectedLabel)) {
+      return;
+    }
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: null,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 点击事件处理
+  function handleClick(e) {
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免处理 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 检查是否是交互元素，这些元素需要保留默认行为
+    var isInteractiveElement = ['input', 'textarea', 'select', 'button', 'a'].includes(target.tagName.toLowerCase());
+
+    // 如果高亮功能启用，对于非交互元素阻止默认行为和事件传播
+    if (highlightEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+    console.log("Element clicked:", {
+      tagName: target.tagName,
+      selector: selector,
+      rect: rect
+    });
+
+    // 立即更新选中高亮
+    updateSelectedHighlight(target);
+
+    // 隐藏悬停高亮，因为现在是选中状态
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-click",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 监听来自父窗口的消息
+  function handleParentMessage(event) {
+    console.log("Received message from parent:", event.data);
+    if (event.data.type === "iframe-highlight-toggle") {
+      var enabled = event.data.enabled;
+      console.log("Highlight toggle:", enabled);
+      if (enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "enable-iframe-highlight") {
+      console.log("Enable iframe highlight");
+      enableHighlight();
+    } else if (event.data.type === "disable-iframe-highlight") {
+      console.log("Disable iframe highlight");
+      disableHighlight();
+    } else if (event.data.type === "toggle-iframe-highlight") {
+      var _enabled = event.data.enabled !== undefined ? event.data.enabled : !highlightEnabled;
+      console.log("Toggle iframe highlight to:", _enabled);
+      if (_enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "update-selected-element") {
+      var selector = event.data.selector;
+      console.log("Update selected element with selector:", selector);
+      if (selector) {
+        try {
+          var element = document.querySelector(selector);
+          console.log("Found element by selector:", element);
+          updateSelectedHighlight(element);
+        } catch (error) {
+          console.warn("Failed to select element:", error);
+          updateSelectedHighlight(null);
+        }
+      } else {
+        updateSelectedHighlight(null);
+      }
+    } else if (event.data.type === "clear-selected-element") {
+      console.log("Clear selected element");
+      updateSelectedHighlight(null);
+    }
+  }
+
+  // 启用高亮功能
+  function enableHighlight() {
+    console.log("Enabling highlight");
+    document.addEventListener("mouseover", handleMouseOver, true);
+    document.addEventListener("mouseout", handleMouseOut, true);
+    document.addEventListener("click", handleClick, true);
+    highlightEnabled = true;
+    overlay.style.display = "block";
+  }
+
+  // 禁用高亮功能
+  function disableHighlight() {
+    console.log("Disabling highlight");
+    highlightEnabled = false;
+    // 保持事件监听器，但通过 highlightEnabled 变量控制行为
+    // 这样可以保留选中状态的显示
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    // 不隐藏 selectedBox 和 selectedLabel，保留选中状态
+  }
+
+  // 完全禁用高亮功能（移除所有监听器）
+  function fullyDisableHighlight() {
+    console.log("Fully disabling highlight");
+    highlightEnabled = false;
+    document.removeEventListener("mouseover", handleMouseOver, true);
+    document.removeEventListener("mouseout", handleMouseOut, true);
+    document.removeEventListener("click", handleClick, true);
+    overlay.style.display = "none";
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    selectedBox.style.display = "none";
+    selectedLabel.style.display = "none";
+  }
+
+  // 添加事件监听
+  enableHighlight();
+  window.addEventListener("message", handleParentMessage);
+
+  // 暴露全局函数供外部调用
+  window.__iframeHighlightControl = {
+    enable: enableHighlight,
+    disable: disableHighlight,
+    fullyDisable: fullyDisableHighlight,
+    isEnabled: function isEnabled() {
+      return highlightEnabled;
+    },
+    getSelectedElement: function getSelectedElement() {
+      return selectedElement;
+    },
+    updateSelected: updateSelectedHighlight,
+    // 通过消息发送开关控制
+    sendToggleMessage: function sendToggleMessage(enabled) {
+      window.parent.postMessage({
+        type: 'iframe-highlight-status',
+        enabled: enabled || highlightEnabled,
+        source: 'iframe-highlight-injector'
+      }, '*');
+    }
+  };
+
+  // 通知父窗口脚本已加载
+  try {
+    window.parent.postMessage({
+      type: "iframe-highlight-ready",
+      data: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now()
+      },
+      source: "iframe-highlight-injector"
+    }, "*");
+  } catch (error) {
+    console.warn("无法发送就绪消息到父窗口:", error);
+  }
+
+  // 清理函数
+  window.__iframeHighlightCleanup = function () {
+    fullyDisableHighlight();
+    window.removeEventListener("message", handleParentMessage);
+    if (overlay.parentElement) {
+      overlay.parentElement.removeChild(overlay);
+    }
+    delete window.__iframeHighlightInitialized;
+    delete window.__iframeHighlightCleanup;
+  };
+})();
+
+</script>
+</body>
+</html>
