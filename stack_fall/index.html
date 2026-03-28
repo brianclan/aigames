@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Stack Fall</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    background:#1a1a2e;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+    overflow:hidden;
+    font-family:'Segoe UI',sans-serif;
+    touch-action:none;
+    user-select:none;
+  }
+  #hud{
+    position:fixed;top:0;left:0;right:0;
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 20px;
+    color:#fff;font-size:16px;z-index:10;
+  }
+  #hud span{font-weight:700;}
+  #scoreEl{color:#ffd700;font-size:22px;}
+  #bestEl{color:#a29bfe;font-size:16px;}
+  canvas{display:block;cursor:pointer;}
+  #overlay{
+    position:fixed;inset:0;
+    background:rgba(26,26,46,0.93);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    z-index:20;color:#fff;
+  }
+  #overlay h1{
+    font-size:44px;margin-bottom:6px;
+    background:linear-gradient(135deg,#ffd700,#ff6b6b);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  #overlay p{color:#aaa;font-size:15px;margin-bottom:28px;text-align:center;max-width:280px;line-height:1.6;}
+  #finalScore{font-size:60px;color:#ffd700;font-weight:900;margin:6px 0 20px;}
+  .btn{
+    padding:13px 38px;border:none;border-radius:40px;
+    font-size:17px;font-weight:700;cursor:pointer;
+    transition:transform .15s,box-shadow .15s;margin:6px;
+  }
+  .btn:active{transform:scale(0.94);}
+  .btn-primary{
+    background:linear-gradient(135deg,#ffd700,#ff9500);color:#1a1a2e;
+    box-shadow:0 4px 20px rgba(255,215,0,.4);
+  }
+  #hint{
+    position:fixed;bottom:14px;left:0;right:0;
+    text-align:center;color:rgba(255,255,255,.28);
+    font-size:13px;pointer-events:none;z-index:5;
+  }
+  .score-pop{
+    position:fixed;pointer-events:none;
+    font-size:22px;font-weight:900;
+    color:#ffd700;text-shadow:0 0 10px rgba(255,215,0,.9);
+    animation:scorePop .7s ease-out forwards;z-index:30;
+  }
+  @keyframes scorePop{
+    0%{transform:translateY(0) scale(1);opacity:1;}
+    100%{transform:translateY(-70px) scale(1.5);opacity:0;}
+  }
+  .combo-pop{
+    position:fixed;pointer-events:none;
+    font-size:28px;font-weight:900;
+    color:#a29bfe;text-shadow:0 0 15px rgba(162,155,254,.9);
+    animation:comboPop .8s ease-out forwards;z-index:31;
+  }
+  @keyframes comboPop{
+    0%{transform:translateY(0) scale(1);opacity:1;}
+    100%{transform:translateY(-90px) scale(1.6);opacity:0;}
+  }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div>🏆 <span id="scoreEl">0</span></div>
+  <div>⭐ 最高 <span id="bestEl">0</span></div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="overlay">
+  <h1>🏗️ Stack Fall</h1>
+  <p>用方向键或滑动控制方块落下的方向<br>精准叠放，得分！</p>
+  <button class="btn btn-primary" id="startBtn">开始游戏</button>
+</div>
+
+<div id="hint">⬅️➡️ 方向键 / 左右滑动 控制方向</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('startBtn');
+  const scoreEl = document.getElementById('scoreEl');
+  const bestEl = document.getElementById('bestEl');
+
+  let W, H;
+  let running = false;
+  let score = 0;
+  let gameOver = false;
+  let gravity = { x: 0, y: 1 }; // gravity direction unit vector
+  let blocks = []; // placed blocks
+  let currentBlock = null;
+  let particles = [];
+  let combo = 0;
+  let spawnTimer = 0;
+  let spawnInterval = 90; // frames between spawns
+  let gridCols = 5;
+  let cellW, cellH;
+  let cameraY = 0; // scrolling camera
+  let targetCameraY = 0;
+  let level = 1;
+  let difficultyTimer = 0;
+
+  const PALETTE = [
+    '#ff6b6b','#ffd700','#4ecdc4','#a29bfe','#fd79a8',
+    '#00cec9','#e17055','#74b9ff','#55efc4','#fab1a0'
+  ];
+
+  function resize() {
+    W = canvas.width = Math.min(window.innerWidth, 500);
+    H = canvas.height = window.innerHeight;
+    cellW = W / gridCols;
+    cellH = cellW;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function randomColor() {
+    return PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  }
+
+  function spawnBlock() {
+    const col = Math.floor(Math.random() * gridCols);
+    const color = randomColor();
+    currentBlock = {
+      col, color,
+      x: col * cellW + cellW / 2,
+      y: cameraY - cellH,
+      vx: 0, vy: 0,
+      size: cellW * 0.9,
+      settled: false,
+      age: 0
+    };
+  }
+
+  function spawnParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 3;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2,
+        color,
+        life: 1,
+        size: 3 + Math.random() * 4
+      });
+    }
+  }
+
+  function showScore(x, y, pts, isCombo) {
+    const el = document.createElement('div');
+    el.className = isCombo ? 'combo-pop' : 'score-pop';
+    el.textContent = isCombo ? pts + ' COMBO!' : '+' + pts;
+    el.style.left = Math.min(Math.max(x - 30, 10), W - 60) + 'px';
+    el.style.top = Math.min(Math.max(y - 40, 10), H - 40) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 800);
+  }
+
+  function applyGravity() {
+    // Normalize gravity
+    const len = Math.sqrt(gravity.x * gravity.x + gravity.y * gravity.y);
+    const nx = gravity.x / len;
+    const ny = gravity.y / len;
+    const gStrength = 3.5 + level * 0.3;
+
+    if (!currentBlock || currentBlock.settled) return;
+    currentBlock.vx += nx * gStrength * 0.08;
+    currentBlock.vy += ny * gStrength * 0.08;
+
+    // Speed cap
+    const spd = Math.sqrt(currentBlock.vx * currentBlock.vx + currentBlock.vy * currentBlock.vy);
+    const maxSpd = 8;
+    if (spd > maxSpd) {
+      currentBlock.vx = (currentBlock.vx / spd) * maxSpd;
+      currentBlock.vy = (currentBlock.vy / spd) * maxSpd;
+    }
+
+    currentBlock.x += currentBlock.vx;
+    currentBlock.y += currentBlock.vy;
+    currentBlock.age++;
+
+    // Wall bounce (horizontal gravity)
+    const halfSize = currentBlock.size / 2;
+    if (currentBlock.x < halfSize) {
+      currentBlock.x = halfSize;
+      currentBlock.vx *= -0.4;
+    }
+    if (currentBlock.x > W - halfSize) {
+      currentBlock.x = W - halfSize;
+      currentBlock.vx *= -0.4;
+    }
+
+    // Check landing on placed blocks or floor
+    checkLanding();
+  }
+
+  function getBlockTop(col) {
+    // Returns the top Y of the highest block in a column
+    let topY = H - cellH; // floor
+    for (const b of blocks) {
+      const bc = Math.floor(b.x / cellW);
+      if (bc === col) {
+        if (b.y < topY) topY = b.y;
+      }
+    }
+    return topY;
+  }
+
+  function checkLanding() {
+    if (!currentBlock) return;
+    const gx = gravity.x, gy = gravity.y;
+    const len = Math.sqrt(gx*gx+gy*gy);
+    const nx = gx/len, ny = gy/len;
+
+    // Direction-aware: block moves in gravity direction
+    // Check if block's leading edge reached floor or another block
+    const halfSize = currentBlock.size / 2;
+    const speed = Math.sqrt(currentBlock.vx*currentBlock.vx + currentBlock.vy*currentBlock.vy);
+
+    if (speed < 0.5) return; // wait for speed
+
+    // Compute leading edge position
+    const leadX = currentBlock.x + nx * halfSize;
+    const leadY = currentBlock.y + ny * halfSize;
+
+    // Floor boundary (bottom of screen in gravity-down, or other edges)
+    let floorY, floorX;
+    if (ny >= Math.abs(nx)) {
+      // Gravity mostly down
+      floorY = H - cellH;
+      if (leadY + currentBlock.vy >= floorY) {
+        settleBlock(floorY - ny * halfSize);
+        return;
+      }
+    } else if (ny <= -Math.abs(nx)) {
+      // Gravity mostly up
+      floorY = cameraY;
+      if (leadY + currentBlock.vy <= floorY) {
+        settleBlock(floorY - ny * halfSize);
+        return;
+      }
+    }
+
+    if (nx > Math.abs(ny)) {
+      // Right
+      floorX = W - halfSize;
+      if (leadX >= floorX) { settleBlock(floorX - nx * halfSize); return; }
+    } else if (nx < -Math.abs(ny)) {
+      // Left
+      floorX = halfSize;
+      if (leadX <= floorX) { settleBlock(floorX - nx * halfSize); return; }
+    }
+
+    // Check collision with placed blocks
+    for (const b of blocks) {
+      if (Math.abs(b.x - currentBlock.x) > cellW * 1.2) continue;
+      if (Math.abs(b.y - currentBlock.y) > cellH * 1.2) continue;
+      const dx = currentBlock.x - b.x;
+      const dy = currentBlock.y - b.y;
+      const dot = dx * nx + dy * ny;
+      if (dot < 0) continue; // moving away
+      const perpDist = Math.abs(-nx * dy + ny * dx);
+      if (perpDist > halfSize + b.size/2 - 2) continue;
+      if (dot < halfSize + b.size/2) {
+        // Collision!
+        const newY = b.y - ny * (halfSize + b.size/2);
+        const newX = b.x - nx * (halfSize + b.size/2);
+        settleBlock(ny >= Math.abs(nx) ? newY : (ny <= -Math.abs(ny) ? newY : currentBlock.y),
+                    nx >= Math.abs(ny) ? newX : (nx <= -Math.abs(nx) ? newX : currentBlock.x));
+        return;
+      }
+    }
+  }
+
+  function settleBlock(y) {
+    if (!currentBlock) return;
+
+    // Snap to grid
+    const col = Math.floor(currentBlock.x / cellW);
+    const snappedCol = Math.max(0, Math.min(gridCols - 1, col));
+    currentBlock.x = snappedCol * cellW + cellW / 2;
+    currentBlock.y = y;
+    currentBlock.settled = true;
+    currentBlock.vx = 0;
+    currentBlock.vy = 0;
+
+    // Score: check if same color nearby
+    let matched = false;
+    let matchCount = 0;
+    for (const b of blocks) {
+      if (b.color === currentBlock.color) {
+        const dist = Math.sqrt((b.x-currentBlock.x)**2 + (b.y-currentBlock.y)**2);
+        if (dist < cellW * 1.6) {
+          matchCount++;
+        }
+      }
+    }
+
+    if (matchCount >= 1) {
+      combo++;
+      const pts = combo >= 3 ? 30 : (combo >= 2 ? 20 : 10);
+      score += pts;
+      matched = true;
+      spawnParticles(currentBlock.x, currentBlock.y, currentBlock.color, 12);
+      showScore(currentBlock.x, currentBlock.y, pts, combo >= 2);
+    } else {
+      combo = 0;
+      score += 5;
+      spawnParticles(currentBlock.x, currentBlock.y, currentBlock.color, 6);
+    }
+
+    // Push blocks up to make room
+    cameraY -= cellH;
+    targetCameraY = cameraY;
+
+    blocks.push(currentBlock);
+    scoreEl.textContent = score;
+
+    // Remove blocks that fell too low (game over condition)
+    const bottomY = H + cellH * 2;
+    const topY = cameraY - cellH * 4;
+    if (blocks.length > 60) {
+      // Remove blocks that scrolled off bottom
+      blocks = blocks.filter(b => b.y < bottomY && b.y > topY - cellH * 10);
+    }
+
+    currentBlock = null;
+    combo = 0;
+    spawnBlock();
+  }
+
+  function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.12;
+      p.life -= 0.025;
+      if (p.life <= 0) { particles.splice(i, 1); }
+    }
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - cameraY, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawBlock(b) {
+    const sx = b.x - b.size / 2;
+    const sy = b.y - b.size / 2 - cameraY;
+    if (sy > H + 10 || sy + b.size < -10) return;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    roundRect(ctx, sx + 3, sy + 3, b.size, b.size, 6);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = b.color;
+    roundRect(ctx, sx, sy, b.size, b.size, 6);
+    ctx.fill();
+
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    roundRect(ctx, sx + 4, sy + 4, b.size * 0.4, b.size * 0.25, 3);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, sx, sy, b.size, b.size, 6);
+    ctx.stroke();
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function drawCurrentBlock() {
+    if (!currentBlock) return;
+    const b = currentBlock;
+    const sx = b.x - b.size / 2;
+    const sy = b.y - b.size / 2 - cameraY;
+
+    // Glow
+    ctx.save();
+    ctx.shadowColor = b.color;
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = b.color;
+    roundRect(ctx, sx, sy, b.size, b.size, 6);
+    ctx.fill();
+    ctx.restore();
+
+    // Body
+    ctx.fillStyle = b.color;
+    roundRect(ctx, sx, sy, b.size, b.size, 6);
+    ctx.fill();
+
+    // Pulsing inner ring
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 150);
+    ctx.fillStyle = `rgba(255,255,255,${0.15 + pulse * 0.2})`;
+    roundRect(ctx, sx + 6, sy + 6, b.size - 12, b.size - 12, 4);
+    ctx.fill();
+
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    roundRect(ctx, sx + 4, sy + 4, b.size * 0.4, b.size * 0.25, 3);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, sx, sy, b.size, b.size, 6);
+    ctx.stroke();
+  }
+
+  function drawGravityArrow() {
+    const cx = W / 2;
+    const cy = 60;
+    const len = 22;
+    const gx = gravity.x, gy = gravity.y;
+    const gl = Math.sqrt(gx*gx+gy*gy);
+    const nx = gx/gl, ny = gy/gl;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - nx * len, cy - ny * len);
+    ctx.lineTo(cx + nx * len, cy + ny * len);
+    ctx.stroke();
+    // Arrowhead
+    const angle = Math.atan2(ny, nx);
+    ctx.beginPath();
+    ctx.moveTo(cx + nx * len, cy + ny * len);
+    ctx.lineTo(cx + nx * len - 8 * Math.cos(angle - 0.5), cy + ny * len - 8 * Math.sin(angle - 0.5));
+    ctx.lineTo(cx + nx * len - 8 * Math.cos(angle + 0.5), cy + ny * len - 8 * Math.sin(angle + 0.5));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBackground() {
+    // Gradient bg
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#1a1a2e');
+    grad.addColorStop(1, '#16213e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= gridCols; i++) {
+      const x = i * cellW;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+    const totalH = H + 1000;
+    for (let i = 0; i <= Math.ceil(totalH / cellH); i++) {
+      const y = H - ((i * cellH - cameraY) % H + H) % H;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+  }
+
+  function gameLoop() {
+    if (gameOver) return;
+    ctx.clearRect(0, 0, W, H);
+    drawBackground();
+    drawParticles();
+
+    // Camera smooth follow
+    cameraY += (targetCameraY - cameraY) * 0.08;
+
+    // Draw placed blocks
+    for (const b of blocks) drawBlock(b);
+
+    // Draw current block
+    drawCurrentBlock();
+
+    // Apply gravity
+    applyGravity();
+
+    // Update particles
+    updateParticles();
+
+    // Gravity arrow indicator
+    drawGravityArrow();
+
+    // Difficulty
+    difficultyTimer++;
+    if (difficultyTimer % 600 === 0) {
+      level++;
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function setGravity(dir) {
+    const maps = {
+      up:    { x: 0, y: -1 },
+      down:  { x: 0, y: 1 },
+      left:  { x: -1, y: 0 },
+      right: { x: 1, y: 0 }
+    };
+    if (maps[dir]) gravity = maps[dir];
+  }
+
+  // Keyboard controls
+  document.addEventListener('keydown', e => {
+    if (!running) return;
+    if (e.key === 'ArrowLeft' || e.key === 'a') setGravity('left');
+    if (e.key === 'ArrowRight' || e.key === 'd') setGravity('right');
+    if (e.key === 'ArrowUp' || e.key === 'w') setGravity('up');
+    if (e.key === 'ArrowDown' || e.key === 's') setGravity('down');
+  });
+
+  // Touch swipe controls
+  let touchStartX = 0, touchStartY = 0;
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+  }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      setGravity(dx > 0 ? 'right' : 'left');
+    } else {
+      setGravity(dy > 0 ? 'down' : 'up');
+    }
+  }, { passive: false });
+
+  function startGame() {
+    score = 0;
+    combo = 0;
+    gameOver = false;
+    blocks = [];
+    particles = [];
+    gravity = { x: 0, y: 1 };
+    cameraY = 0;
+    targetCameraY = 0;
+    level = 1;
+    difficultyTimer = 0;
+    scoreEl.textContent = '0';
+    bestEl.textContent = localStorage.getItem('stackFallBest') || 0;
+    overlay.style.display = 'none';
+    running = true;
+    spawnBlock();
+    gameLoop();
+  }
+
+  function endGame() {
+    gameOver = true;
+    running = false;
+    const best = parseInt(localStorage.getItem('stackFallBest') || '0');
+    if (score > best) localStorage.setItem('stackFallBest', score);
+    setTimeout(() => {
+      overlay.innerHTML = `
+        <h1>游戏结束</h1>
+        <div id="finalScore">${score}</div>
+        <p>最高纪录：${Math.max(score, best)}</p>
+        <button class="btn btn-primary" id="restartBtn">再来一次</button>
+      `;
+      overlay.style.display = 'flex';
+      document.getElementById('restartBtn').addEventListener('click', startGame);
+    }, 400);
+  }
+
+  startBtn.addEventListener('click', startGame);
+
+  bestEl.textContent = localStorage.getItem('stackFallBest') || 0;
+})();
+</script>
+</body>
+</html>
