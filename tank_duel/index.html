@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Tank Duel</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#1a1a2e;
+  font-family:'Courier New',monospace;
+  display:flex; flex-direction:column;
+  align-items:center; overflow:hidden;
+  height:100vh; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+#header {
+  display:flex; justify-content:space-between; align-items:center;
+  width:100%; padding:6px 12px;
+  background:#16213e;
+  border-bottom:1px solid #0f3460;
+}
+.player-info {
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.player-name { font-size:0.75rem; letter-spacing:2px; }
+.p1-name { color:#ff6b6b; }
+.p2-name { color:#4ecdc4; }
+.hp-bar-wrap { width:100px; height:10px; background:#333; border-radius:5px; overflow:hidden; }
+.hp-bar { height:100%; border-radius:5px; transition:width 0.3s; }
+.hp1 { background:#ff6b6b; }
+.hp2 { background:#4ecdc4; }
+.hp-text { font-size:0.65rem; color:#aaa; }
+#wind-info {
+  display:flex; flex-direction:column; align-items:center;
+  font-size:0.7rem; color:#ffd93d;
+}
+#turn-banner {
+  font-size:0.8rem; color:#ffd93d; letter-spacing:2px; text-align:center;
+  padding:3px 0; background:#0f3460; width:100%;
+}
+#canvas-wrap { position:relative; flex:1; width:100%; }
+canvas {
+  display:block; width:100%; height:100%;
+  touch-action:none;
+}
+/* Controls */
+#controls {
+  width:100%; background:#16213e;
+  border-top:1px solid #0f3460;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1px;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.ctrl-side {
+  display:flex; flex-direction:column; align-items:center;
+  gap:6px; padding:8px 10px;
+}
+.ctrl-side.p1 { border-right:1px solid #0f3460; }
+.ctrl-label { font-size:0.6rem; letter-spacing:2px; color:#888; }
+.angle-row, .power-row {
+  display:flex; align-items:center; gap:6px; width:100%;
+}
+.ctrl-val { font-size:0.85rem; min-width:36px; text-align:center; }
+.p1 .ctrl-val { color:#ff6b6b; }
+.p2 .ctrl-val { color:#4ecdc4; }
+.adj-btn {
+  flex:1; height:34px; border-radius:8px; border:none;
+  font-size:1rem; font-weight:bold; cursor:pointer;
+  background:#0f3460; color:#fff;
+  -webkit-tap-highlight-color:transparent;
+}
+.adj-btn:active { opacity:0.7; }
+.fire-btn {
+  width:100%; height:38px; border-radius:8px; border:none;
+  font-size:0.85rem; font-weight:bold; cursor:pointer; letter-spacing:2px;
+}
+.p1 .fire-btn { background:#ff6b6b; color:#1a1a2e; }
+.p2 .fire-btn { background:#4ecdc4; color:#1a1a2e; }
+.fire-btn:disabled { opacity:0.35; cursor:default; }
+.fire-btn:active:not(:disabled) { opacity:0.8; }
+
+/* Overlay */
+#overlay {
+  position:fixed; inset:0; background:#1a1a2eee;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; z-index:20;
+}
+#overlay h2 { font-size:2rem; margin-bottom:8px; }
+#overlay .sub { font-size:0.9rem; color:#aaa; margin-bottom:24px; }
+#start-btn {
+  background:#ffd93d; color:#1a1a2e;
+  border:none; border-radius:10px;
+  padding:12px 36px; font-size:1rem;
+  font-weight:bold; letter-spacing:2px; cursor:pointer;
+}
+#start-btn:active { opacity:0.8; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="player-info">
+    <div class="player-name p1-name">P1 RED</div>
+    <div class="hp-bar-wrap"><div class="hp-bar hp1" id="hp1-bar"></div></div>
+    <div class="hp-text"><span id="hp1-val">100</span> HP</div>
+  </div>
+  <div id="wind-info">
+    <div id="wind-arrow">→</div>
+    <div id="wind-val">0.0</div>
+    <div style="font-size:0.55rem;color:#888">WIND</div>
+  </div>
+  <div class="player-info" style="align-items:flex-end">
+    <div class="player-name p2-name">P2 CYAN</div>
+    <div class="hp-bar-wrap"><div class="hp-bar hp2" id="hp2-bar"></div></div>
+    <div class="hp-text"><span id="hp2-val">100</span> HP</div>
+  </div>
+</div>
+
+<div id="turn-banner" id="turn-banner">P1 RED's Turn</div>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="controls">
+  <!-- P1 left side -->
+  <div class="ctrl-side p1">
+    <div class="ctrl-label">ANGLE &nbsp; POWER</div>
+    <div class="angle-row">
+      <button class="adj-btn" id="p1-ang-dn">−</button>
+      <span class="ctrl-val" id="p1-ang">45°</span>
+      <button class="adj-btn" id="p1-ang-up">+</button>
+      &nbsp;
+      <button class="adj-btn" id="p1-pow-dn">−</button>
+      <span class="ctrl-val" id="p1-pow">50</span>
+      <button class="adj-btn" id="p1-pow-up">+</button>
+    </div>
+    <button class="fire-btn" id="p1-fire">🔥 FIRE</button>
+  </div>
+  <!-- P2 right side -->
+  <div class="ctrl-side p2">
+    <div class="ctrl-label">ANGLE &nbsp; POWER</div>
+    <div class="angle-row">
+      <button class="adj-btn" id="p2-ang-dn">−</button>
+      <span class="ctrl-val" id="p2-ang">135°</span>
+      <button class="adj-btn" id="p2-ang-up">+</button>
+      &nbsp;
+      <button class="adj-btn" id="p2-pow-dn">−</button>
+      <span class="ctrl-val" id="p2-pow">50</span>
+      <button class="adj-btn" id="p2-pow-up">+</button>
+    </div>
+    <button class="fire-btn" id="p2-fire">FIRE 🔥</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <h2 style="color:#ffd93d">TANK DUEL</h2>
+  <div class="sub">2 Players · Take Turns · Aim & Fire!</div>
+  <button id="start-btn">START GAME</button>
+</div>
+
+<script>
+// ── Canvas ─────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+
+function resizeCanvas() {
+  canvas.width  = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  if (gameStarted) { buildTerrain(); resetPositions(); draw(); }
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ── State ──────────────────────────────────────────────────
+const MAX_HP = 100;
+let hp = [MAX_HP, MAX_HP];
+let angles  = [45, 135];   // degrees, p1 fires right, p2 fires left
+let powers  = [50,  50];   // 1-100
+let turn    = 0;           // 0=P1, 1=P2
+let firing  = false;
+let gameStarted = false;
+
+let terrain = [];          // y values per x pixel
+let tankX   = [0, 0];
+let tankY   = [0, 0];
+const TANK_W = 28, TANK_H = 14, BARREL_LEN = 22;
+const COLORS = ['#ff6b6b','#4ecdc4'];
+const GROUND_COLOR = '#2d5a27';
+const GROUND_TOP   = '#4a7c59';
+
+let wind = 0; // px/frame² addition
+
+// Projectile
+let proj = null;
+let explosions = [];
+let particles  = [];
+
+// ── Terrain ────────────────────────────────────────────────
+function buildTerrain() {
+  const W = canvas.width, H = canvas.height;
+  terrain = new Array(W);
+  // Simple smooth random terrain
+  const baseY = H * 0.62;
+  let y = baseY;
+  const points = [];
+  const step = Math.max(1, Math.floor(W / 20));
+  for (let x = 0; x <= W; x += step) {
+    points.push({ x, y: baseY + (Math.random() - 0.5) * H * 0.25 });
+  }
+  // Interpolate
+  for (let x = 0; x < W; x++) {
+    let seg = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      if (x >= points[i].x && x <= points[i+1].x) { seg = i; break; }
+    }
+    const p0 = points[seg], p1 = points[seg+1];
+    const t = (x - p0.x) / (p1.x - p0.x || 1);
+    // Smooth step
+    const st = t*t*(3-2*t);
+    terrain[x] = p0.y + (p1.y - p0.y) * st;
+  }
+  // Flatten platforms for tanks
+  const flatW = 40;
+  const p1cx = Math.floor(W * 0.15);
+  const p2cx = Math.floor(W * 0.85);
+  for (const cx of [p1cx, p2cx]) {
+    const fy = terrain[cx];
+    for (let x = cx - flatW; x <= cx + flatW; x++) {
+      if (x >= 0 && x < W) terrain[x] = fy;
+    }
+  }
+}
+
+function resetPositions() {
+  const W = canvas.width;
+  tankX[0] = Math.floor(W * 0.15);
+  tankX[1] = Math.floor(W * 0.85);
+  for (let i = 0; i < 2; i++) {
+    tankY[i] = terrain[tankX[i]];
+  }
+}
+
+function terrainY(x) {
+  const xi = Math.round(x);
+  if (xi < 0) return terrain[0];
+  if (xi >= terrain.length) return terrain[terrain.length-1];
+  return terrain[xi];
+}
+
+// ── Draw ───────────────────────────────────────────────────
+function draw() {
+  if (!canvas.width) return;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#0f3460');
+  sky.addColorStop(1, '#16213e');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  // deterministic stars
+  const rng = mulberry32(42);
+  for (let i = 0; i < 60; i++) {
+    ctx.fillRect(rng()*W, rng()*H*0.55, 1, 1);
+  }
+
+  // Terrain
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for (let x = 0; x < W; x++) ctx.lineTo(x, terrain[x]);
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = GROUND_COLOR;
+  ctx.fill();
+  // Top strip
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    if (x === 0) ctx.moveTo(0, terrain[0]);
+    else ctx.lineTo(x, terrain[x]);
+  }
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = GROUND_TOP;
+  ctx.stroke();
+
+  // Tanks
+  drawTank(0);
+  drawTank(1);
+
+  // Projectile trail + bullet
+  if (proj) {
+    if (proj.trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(proj.trail[0].x, proj.trail[0].y);
+      for (const p of proj.trail) ctx.lineTo(p.x, p.y);
+      ctx.strokeStyle = 'rgba(255,220,80,0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#ffd93d';
+    ctx.fill();
+  }
+
+  // Explosions
+  for (const ex of explosions) {
+    const alpha = ex.life / ex.maxLife;
+    const r = ex.radius * (1 - alpha * 0.3);
+    const grad = ctx.createRadialGradient(ex.x, ex.y, 0, ex.x, ex.y, r);
+    grad.addColorStop(0, `rgba(255,255,200,${alpha})`);
+    grad.addColorStop(0.3, `rgba(255,150,50,${alpha*0.9})`);
+    grad.addColorStop(1,   `rgba(255,50,0,0)`);
+    ctx.beginPath();
+    ctx.arc(ex.x, ex.y, r, 0, Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTank(i) {
+  const cx = tankX[i], cy = tankY[i];
+  const col = COLORS[i];
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Body
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.roundRect(-TANK_W/2, -TANK_H, TANK_W, TANK_H, 4);
+  ctx.fill();
+  // Tracks
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(-TANK_W/2, -6, TANK_W, 6);
+  // Turret dome
+  ctx.beginPath();
+  ctx.arc(0, -TANK_H, 9, Math.PI, 0);
+  ctx.fillStyle = col;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Barrel
+  const ang = (angles[i] * Math.PI) / 180;
+  ctx.save();
+  ctx.rotate(-ang + (i === 0 ? 0 : Math.PI));
+  // For p1: angle goes up-right; p2: angle goes up-left (mirrored)
+  ctx.restore();
+
+  // Barrel line from turret center
+  const bAng = i === 0
+    ? -(angles[i] * Math.PI / 180)         // p1 fires rightward
+    : (Math.PI + angles[i] * Math.PI / 180); // p2 fires leftward... recompute below
+  const bAngReal = i === 0
+    ? (-angles[i] * Math.PI / 180)
+    : (Math.PI - angles[i] * Math.PI / 180);
+
+  const bx = Math.cos(bAngReal) * BARREL_LEN;
+  const by = Math.sin(bAngReal) * BARREL_LEN;
+  ctx.beginPath();
+  ctx.moveTo(0, -TANK_H);
+  ctx.lineTo(bx, -TANK_H + by);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // HP indicator above tank
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(-18, -TANK_H - 14, 36, 7);
+  ctx.fillStyle = col;
+  ctx.fillRect(-18, -TANK_H - 14, 36 * (hp[i] / MAX_HP), 7);
+
+  ctx.restore();
+}
+
+// ── Firing ─────────────────────────────────────────────────
+function barrelTip(i) {
+  const cx = tankX[i], cy = tankY[i] - TANK_H;
+  const ang = i === 0
+    ? (-angles[i] * Math.PI / 180)
+    : (Math.PI - angles[i] * Math.PI / 180);
+  return {
+    x: cx + Math.cos(ang) * BARREL_LEN,
+    y: cy + Math.sin(ang) * BARREL_LEN,
+    vx: Math.cos(ang) * powers[i] * 0.18,
+    vy: Math.sin(ang) * powers[i] * 0.18,
+  };
+}
+
+function fire(i) {
+  if (firing || turn !== i) return;
+  firing = true;
+  setFireButtons(false);
+  const tip = barrelTip(i);
+  proj = { x: tip.x, y: tip.y, vx: tip.vx, vy: tip.vy, owner: i, trail: [] };
+  requestAnimationFrame(projectileLoop);
+}
+
+const GRAVITY = 0.18;
+const EXPLODE_R = 36;
+
+function projectileLoop() {
+  if (!proj) return;
+
+  proj.trail.push({ x: proj.x, y: proj.y });
+  if (proj.trail.length > 28) proj.trail.shift();
+
+  proj.vx += wind * 0.012;
+  proj.vy += GRAVITY;
+  proj.x  += proj.vx;
+  proj.y  += proj.vy;
+
+  const W = canvas.width, H = canvas.height;
+  let hit = false;
+
+  // Hit terrain
+  if (proj.y >= terrainY(proj.x)) { hit = true; explode(proj.x, proj.y, proj.owner); }
+  // Out of bounds
+  if (proj.x < -50 || proj.x > W + 50 || proj.y > H + 50) { hit = true; missShot(); }
+
+  // Hit enemy tank
+  const enemy = proj.owner === 0 ? 1 : 0;
+  const dx = proj.x - tankX[enemy], dy = proj.y - (tankY[enemy] - TANK_H/2);
+  if (Math.sqrt(dx*dx + dy*dy) < TANK_W * 0.8) { hit = true; explode(proj.x, proj.y, proj.owner, true); }
+
+  draw();
+  if (!hit) requestAnimationFrame(projectileLoop);
+  else animateExplosions();
+}
+
+function explode(ex, ey, owner, directHit = false) {
+  proj = null;
+  const enemy = owner === 0 ? 1 : 0;
+
+  // Damage based on distance to enemy tank
+  const dx = ex - tankX[enemy], dy = ey - (tankY[enemy] - TANK_H/2);
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  let dmg = 0;
+  if (dist < EXPLODE_R) {
+    dmg = Math.round(directHit ? 35 : 35 * (1 - dist / EXPLODE_R));
+    dmg = Math.max(dmg, directHit ? 20 : 0);
+  }
+
+  explosions.push({ x: ex, y: ey, radius: EXPLODE_R, life: 30, maxLife: 30 });
+
+  // Blast particles
+  for (let i = 0; i < 18; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 1 + Math.random() * 4;
+    particles.push({
+      x: ex, y: ey,
+      vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
+      life: 20 + Math.random()*20, maxLife: 40,
+      color: ['#ffd93d','#ff6b6b','#ff9a3c'][Math.floor(Math.random()*3)]
+    });
+  }
+
+  // Crater in terrain
+  for (let x = Math.floor(ex - EXPLODE_R); x <= Math.ceil(ex + EXPLODE_R); x++) {
+    if (x < 0 || x >= terrain.length) continue;
+    const d = Math.abs(x - ex);
+    const depth = Math.sqrt(Math.max(0, EXPLODE_R*EXPLODE_R - d*d)) * 0.6;
+    terrain[x] += depth;
+  }
+  // Re-flatten under tanks so they don't sink
+  for (let i2 = 0; i2 < 2; i2++) {
+    const cx = tankX[i2];
+    const fy = terrain[cx];
+    for (let x = cx - 20; x <= cx + 20; x++) {
+      if (x >= 0 && x < terrain.length) terrain[x] = Math.min(terrain[x], fy);
+    }
+    tankY[i2] = terrain[tankX[i2]];
+  }
+
+  if (dmg > 0) {
+    hp[enemy] = Math.max(0, hp[enemy] - dmg);
+    updateHPUI();
+  }
+}
+
+function missShot() {
+  proj = null;
+}
+
+function animateExplosions() {
+  let any = false;
+  for (const ex of explosions) { ex.life--; if (ex.life > 0) any = true; }
+  for (const p  of particles)  {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15;
+    p.life--;
+  }
+  explosions = explosions.filter(e => e.life > 0);
+  particles  = particles.filter(p => p.life > 0);
+  draw();
+
+  if (any || particles.length) {
+    requestAnimationFrame(animateExplosions);
+  } else {
+    // Check win
+    if (hp[0] <= 0 || hp[1] <= 0) {
+      endGame();
+    } else {
+      nextTurn();
+    }
+  }
+}
+
+function nextTurn() {
+  turn = turn === 0 ? 1 : 0;
+  wind = (Math.random() - 0.5) * 8;
+  firing = false;
+  updateTurnUI();
+  setFireButtons(true);
+  draw();
+}
+
+function endGame() {
+  firing = false;
+  const winner = hp[0] > 0 ? 1 : 2;
+  const col = winner === 1 ? '#ff6b6b' : '#4ecdc4';
+  const overlay = document.getElementById('overlay');
+  overlay.querySelector('h2').textContent = `P${winner} WINS!`;
+  overlay.querySelector('h2').style.color = col;
+  overlay.querySelector('.sub').textContent = `HP: P1 ${hp[0]} | P2 ${hp[1]}`;
+  document.getElementById('start-btn').textContent = 'PLAY AGAIN';
+  overlay.style.display = 'flex';
+}
+
+// ── UI Updates ─────────────────────────────────────────────
+function updateHPUI() {
+  document.getElementById('hp1-val').textContent = hp[0];
+  document.getElementById('hp2-val').textContent = hp[1];
+  document.getElementById('hp1-bar').style.width = hp[0] + '%';
+  document.getElementById('hp2-bar').style.width = hp[1] + '%';
+}
+
+function updateTurnUI() {
+  const names = ['P1 RED', 'P2 CYAN'];
+  document.getElementById('turn-banner').textContent = `${names[turn]}'s Turn`;
+  // Dim inactive side controls
+  document.querySelector('.ctrl-side.p1').style.opacity = turn === 0 ? '1' : '0.4';
+  document.querySelector('.ctrl-side.p2').style.opacity = turn === 1 ? '1' : '0.4';
+
+  // Wind
+  const wv = wind.toFixed(1);
+  document.getElementById('wind-val').textContent = Math.abs(wv);
+  document.getElementById('wind-arrow').textContent = wind >= 0 ? '→' : '←';
+}
+
+function setFireButtons(enabled) {
+  document.getElementById('p1-fire').disabled = !enabled || turn !== 0;
+  document.getElementById('p2-fire').disabled = !enabled || turn !== 1;
+}
+
+function updateAnglePowerUI() {
+  document.getElementById('p1-ang').textContent = angles[0] + '°';
+  document.getElementById('p2-ang').textContent = angles[1] + '°';
+  document.getElementById('p1-pow').textContent = powers[0];
+  document.getElementById('p2-pow').textContent = powers[1];
+}
+
+// ── Controls binding ───────────────────────────────────────
+function adjAngle(p, d) {
+  if (turn !== p || firing) return;
+  angles[p] = Math.max(5, Math.min(85, angles[p] + d));
+  updateAnglePowerUI(); draw();
+}
+function adjPower(p, d) {
+  if (turn !== p || firing) return;
+  powers[p] = Math.max(10, Math.min(100, powers[p] + d));
+  updateAnglePowerUI(); draw();
+}
+
+function bindAdj(id, fn) {
+  const el = document.getElementById(id);
+  let timer;
+  const start = e => { e.preventDefault(); fn(); timer = setInterval(fn, 120); };
+  const stop  = () => clearInterval(timer);
+  el.addEventListener('touchstart', start, {passive:false});
+  el.addEventListener('touchend',   stop);
+  el.addEventListener('touchcancel',stop);
+  el.addEventListener('mousedown',  start);
+  el.addEventListener('mouseup',    stop);
+  el.addEventListener('mouseleave', stop);
+}
+
+bindAdj('p1-ang-dn', () => adjAngle(0, -5));
+bindAdj('p1-ang-up', () => adjAngle(0, +5));
+bindAdj('p1-pow-dn', () => adjPower(0, -5));
+bindAdj('p1-pow-up', () => adjPower(0, +5));
+bindAdj('p2-ang-dn', () => adjAngle(1, -5));
+bindAdj('p2-ang-up', () => adjAngle(1, +5));
+bindAdj('p2-pow-dn', () => adjPower(1, -5));
+bindAdj('p2-pow-up', () => adjPower(1, +5));
+
+document.getElementById('p1-fire').addEventListener('click', () => fire(0));
+document.getElementById('p2-fire').addEventListener('click', () => fire(1));
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if (!gameStarted || firing) return;
+  if (turn === 0) {
+    if (e.key === 'ArrowUp')    adjAngle(0, +5);
+    if (e.key === 'ArrowDown')  adjAngle(0, -5);
+    if (e.key === 'ArrowRight') adjPower(0, +5);
+    if (e.key === 'ArrowLeft')  adjPower(0, -5);
+    if (e.key === ' ')          fire(0);
+  }
+  if (turn === 1) {
+    if (e.key === 'w') adjAngle(1, +5);
+    if (e.key === 's') adjAngle(1, -5);
+    if (e.key === 'd') adjPower(1, +5);
+    if (e.key === 'a') adjPower(1, -5);
+    if (e.key === 'q') fire(1);
+  }
+});
+
+// ── Start ──────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('overlay').style.display = 'none';
+  startGame();
+});
+
+function startGame() {
+  hp = [MAX_HP, MAX_HP];
+  angles = [45, 135];
+  powers = [50, 50];
+  turn = 0;
+  firing = false;
+  explosions = [];
+  particles = [];
+  proj = null;
+  gameStarted = true;
+  wind = (Math.random() - 0.5) * 6;
+  resizeCanvas();
+  buildTerrain();
+  resetPositions();
+  updateHPUI();
+  updateTurnUI();
+  updateAnglePowerUI();
+  setFireButtons(true);
+  draw();
+}
+
+// ── Util: deterministic RNG for stars ─────────────────────
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ── Init ───────────────────────────────────────────────────
+resizeCanvas();
+</script>
+</body>
+</html>
