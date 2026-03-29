@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>狗狗大追捕 Kid Run</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:#87CEEB;
+    display:flex;align-items:center;justify-content:center;
+    height:100vh;overflow:hidden;
+    font-family:'PingFang SC','Microsoft YaHei',sans-serif;
+    touch-action:none;user-select:none;
+  }
+  #hud{
+    position:fixed;top:0;left:0;right:0;
+    display:flex;justify-content:space-between;align-items:center;
+    padding:12px 18px;color:#fff;z-index:10;
+  }
+  #scoreEl{color:#fff;font-size:20px;font-weight:700;text-shadow:0 2px 4px rgba(0,0,0,.4)}
+  #distEl{color:#ffd700;font-size:16px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+  #dogEl{color:#ff9966;font-size:14px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+  canvas{display:block}
+  #overlay{
+    position:fixed;inset:0;
+    background:rgba(30,60,90,.88);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    z-index:20;color:#fff;
+  }
+  #overlay h1{
+    font-size:36px;margin-bottom:4px;
+    background:linear-gradient(135deg,#ffd700,#ff9966);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  #overlay p{color:#cce8f4;font-size:13px;margin-bottom:20px;text-align:center;max-width:270px;line-height:1.7}
+  .btn{
+    padding:12px 34px;border:none;border-radius:40px;
+    font-size:16px;font-weight:700;cursor:pointer;
+    transition:transform .15s;margin:6px;
+  }
+  .btn:active{transform:scale(.94)}
+  .btn-primary{
+    background:linear-gradient(135deg,#ffd700,#ff9966);color:#5a3000;
+    box-shadow:0 4px 18px rgba(255,180,0,.4);
+  }
+  .hud-bar{
+    position:fixed;top:48px;left:18px;right:18px;height:6px;
+    background:rgba(255,255,255,.2);border-radius:3px;overflow:hidden;z-index:10;
+  }
+  #dogBar{height:100%;background:#ff6b6b;border-radius:3px;transition:width .3s}
+  .score-pop{
+    position:fixed;pointer-events:none;font-size:20px;font-weight:900;
+    color:#ffd700;text-shadow:0 0 8px rgba(255,200,0,.9);
+    animation:sp .7s ease-out forwards;z-index:30;
+  }
+  @keyframes sp{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-55px) scale(1.4);opacity:0}}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div id="scoreEl">🏆 0</div>
+  <div id="distEl">🏃 0m</div>
+  <div id="dogEl">🐕 距离</div>
+</div>
+<div class="hud-bar"><div id="dogBar" style="width:20%"></div></div>
+<canvas id="c"></canvas>
+<div id="overlay">
+  <h1>🐕 狗狗大追捕</h1>
+  <p>点击跳跃躲避障碍！<br>收集骨头🍖可让狗狗跑慢一点<br>狗狗追上你 = 游戏结束</p>
+  <button class="btn btn-primary" id="startBtn">开始逃跑</button>
+</div>
+<script>
+(function(){
+  const canvas=document.getElementById('c');
+  const ctx=canvas.getContext('2d');
+  const overlay=document.getElementById('overlay');
+  const scoreEl=document.getElementById('scoreEl');
+  const distEl=document.getElementById('distEl');
+  const dogBar=document.getElementById('dogBar');
+  const dogEl=document.getElementById('dogEl');
+
+  let W,H;
+  let running=false, gameOver=false;
+  let score=0, distance=0, best=0;
+  let GROUND_Y, JUMP_V, GRAV, GROUND_H=60;
+  let gameSpeed=4;
+  let dogDist=80;  // how close dog is (0=caught, 100=safe)
+  let dogSlowTimer=0;
+  let bgX=0, bgX2=0;
+  let invincible=0;
+
+  // kid
+  let kid={x:0,y:0,vy:0,w:36,h:50,jumping:false,canDouble:true,runFrame:0};
+
+  // world objects
+  let obstacles=[], collectibles=[], dustParticles=[];
+
+  const LANES=[0,1,2]; // 0=ground, 1=mid-air platform height, 2=higher
+  // ground obstacles: cone, trash, hydrant, fence
+  const OBSTACLES=[
+    {emoji:'🚧',w:40,h:40,pts:1,lane:0},
+    {emoji:'🗑️',w:44,h:52,pts:1,lane:0},
+    {emoji:'🔥',w:40,h:54,pts:1,lane:0},
+    {emoji:'🪨',w:36,h:34,pts:1,lane:0},
+    {emoji:'🐕',w:50,h:50,pts:0,lane:0,isDog:true}, // dog shortcut obstacle
+  ];
+  const COLLECTIBLES=[
+    {emoji:'🍖',pts:5,isBone:true},
+    {emoji:'👟',pts:8},
+    {emoji:'⭐',pts:15},
+  ];
+
+  function resize(){
+    W=canvas.width=Math.min(window.innerWidth,500);
+    H=canvas.height=window.innerHeight;
+    GROUND_Y=H-GROUND_H;
+    JUMP_V=-(14+H*.012);
+    GRAV=0.65+H*.0028;
+  }
+  window.addEventListener('resize',resize);
+  resize();
+
+  function resetGame(){
+    score=0; distance=0; gameSpeed=4;
+    dogDist=80; dogSlowTimer=0; invincible=0;
+    obstacles=[]; collectibles=[]; dustParticles=[];
+    kid={x:W*.28,y:GROUND_Y,w:36,h:50,vy:0,jumping:false,canDouble:true,runFrame:0};
+    bgX=0; bgX2=W;
+    scoreEl.textContent='🏆 0';
+    distEl.textContent='🏃 0m';
+  }
+
+  function spawnObstacle(){
+    const o=OBSTACLES[Math.floor(Math.random()*OBSTACLES.length)];
+    obstacles.push({
+      x:W+50, y:GROUND_Y-o.h,
+      w:o.w, h:o.h, emoji:o.emoji, pts:o.pts, lane:o.lane, isDog:!!o.isDog,
+      passed:false
+    });
+  }
+
+  function spawnCollectible(){
+    const c=COLLECTIBLES[Math.floor(Math.random()*COLLECTIBLES.length)];
+    // spawn in air or ground
+    const inAir=Math.random()<.5;
+    collectibles.push({
+      x:W+50,
+      y: inAir ? GROUND_Y-70-Math.random()*50 : GROUND_Y-28,
+      size:30, emoji:c.emoji, pts:c.pts, isBone:!!c.isBone, collected:false
+    });
+  }
+
+  function addDust(x,y,n,col){
+    for(let i=0;i<n;i++){
+      dustParticles.push({
+        x,y, vx:(Math.random()-.5)*3, vy:-Math.random()*3,
+        life:1, r:3+Math.random()*4, color:col||'#e8d5b0'
+      });
+    }
+  }
+
+  function popScore(x,y,pts,cls){
+    const el=document.createElement('div');
+    el.className='score-pop';
+    el.textContent='+'+pts;
+    el.style.left=Math.min(Math.max(x-20,10),W-60)+'px';
+    el.style.top=Math.min(Math.max(y-30,10),H-40)+'px';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),750);
+  }
+
+  // ── Drawing ──────────────────────────────────────────────
+
+  function drawBg(){
+    // Sky
+    const sky=ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0,'#87CEEB'); sky.addColorStop(1,'#cce8f4');
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+
+    // Clouds
+    ctx.font='38px sans-serif';
+    const clouds=[
+      {x:(bgX*0.15+50)%(W+200)-100,y:55,s:'☁️'},
+      {x:(bgX*0.12+250)%(W+200)-100,y:90,s:'☁️'},
+      {x:(bgX*0.18+400)%(W+200)-100,y:40,s:'☁️'},
+    ];
+    for(const c of clouds){
+      ctx.globalAlpha=.85;
+      ctx.fillText(c.s,c.x,c.y);
+    }
+    ctx.globalAlpha=1;
+
+    // Sun
+    ctx.save();
+    ctx.font='36px sans-serif';
+    ctx.shadowColor='#ffd700'; ctx.shadowBlur=20;
+    ctx.fillText('🌞',W-55,55);
+    ctx.restore();
+
+    // Buildings (parallax)
+    const bldColors=['#d4a574','#c19a6b','#e8c9a0','#bfa07a'];
+    for(let i=0;i<8;i++){
+      const bx=((bgX*0.3+i*90)%(W+180))-90;
+      const bh=80+((i*37)%60);
+      ctx.fillStyle=bldColors[i%4];
+      ctx.fillRect(bx,H-GROUND_H-bh,70,bh);
+      // windows
+      ctx.fillStyle='#f5e6c8';
+      for(let wy=0;wy<bh-20;wy+=22){
+        for(let wx=8;wx<62;wx+=20){
+          if(Math.random()>.3){
+            ctx.fillRect(bx+wx, H-GROUND_H-bh+10+wy, 12, 14);
+          }
+        }
+      }
+    }
+
+    // Ground
+    const gnd=ctx.createLinearGradient(0,GROUND_Y,0,H);
+    gnd.addColorStop(0,'#8BC34A'); gnd.addColorStop(.15,'#7CB342'); gnd.addColorStop(1,'#558B2F');
+    ctx.fillStyle=gnd; ctx.fillRect(0,GROUND_Y,W,H-GROUND_Y);
+
+    // Ground line
+    ctx.strokeStyle='#a5d65a'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,GROUND_Y); ctx.lineTo(W,GROUND_Y); ctx.stroke();
+
+    // Lane markings
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=2;
+    ctx.setLineDash([20,30]);
+    ctx.beginPath(); ctx.moveTo(0,GROUND_Y+GROUND_H/2); ctx.lineTo(W,GROUND_Y+GROUND_H/2);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function drawKid(){
+    const k=kid;
+    const sx=k.x-k.w/2, sy=k.y-k.h;
+    const bounce=Math.sin(k.runFrame*.25)*3;
+
+    ctx.save();
+    if(invincible>0 && Math.floor(invincible/5)%2===0){
+      ctx.globalAlpha=.4;
+    }
+
+    // Shadow
+    ctx.fillStyle='rgba(0,0,0,.2)';
+    ctx.beginPath(); ctx.ellipse(k.x, GROUND_Y, k.w*.6, 6, 0,0,Math.PI*2); ctx.fill();
+
+    // Kid body
+    ctx.font=k.h+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.shadowColor='rgba(0,0,0,.3)'; ctx.shadowBlur=4;
+    ctx.fillText('🏃', k.x, sy+bounce+k.h);
+
+    ctx.restore();
+  }
+
+  function drawDog(){
+    // Dog approaches from left side
+    const dogX=W*.05;
+    const dogY=GROUND_Y;
+    const scale=0.8+dogDist*.002;
+    const shake=Math.sin(Date.now()/80)*3;
+
+    ctx.save();
+    ctx.font=(50*scale)+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.shadowColor='rgba(0,0,0,.3)'; ctx.shadowBlur=4;
+    ctx.fillText('🐕', dogX+shake, dogY);
+    ctx.restore();
+
+    // Dog bark lines
+    if(Math.random()<.05){
+      ctx.strokeStyle='rgba(255,100,0,.3)';
+      ctx.lineWidth=2;
+      for(let i=0;i<3;i++){
+        ctx.beginPath();
+        ctx.moveTo(dogX+20+i*10, dogY-40-i*8);
+        ctx.lineTo(dogX+35+i*10, dogY-40-i*8-10);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawObstacle(o){
+    ctx.font=o.h+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.shadowColor='rgba(0,0,0,.3)'; ctx.shadowBlur=4;
+    ctx.fillText(o.emoji, o.x, o.y+o.h);
+    ctx.shadowBlur=0;
+  }
+
+  function drawCollectible(c){
+    if(c.collected) return;
+    const bob=Math.sin(Date.now()/200+c.x)*5;
+    ctx.save();
+    ctx.font=c.size+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor='#ffd700'; ctx.shadowBlur=12;
+    ctx.fillText(c.emoji, c.x, c.y+bob);
+    ctx.restore();
+  }
+
+  function drawDust(){
+    for(const p of dustParticles){
+      ctx.save(); ctx.globalAlpha=p.life*.7;
+      ctx.fillStyle=p.color;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // ── Update ────────────────────────────────────────────────
+
+  function update(){
+    if(!running) return;
+
+    // Distance & speed
+    distance+=gameSpeed*.3;
+    distEl.textContent='🏃 '+Math.floor(distance)+'m';
+
+    // Dog distance
+    if(dogSlowTimer>0){
+      dogSlowTimer--;
+      dogDist=Math.min(100,dogDist+.8);
+    } else {
+      dogDist=Math.max(0, dogDist-.35-(distance*.001));
+    }
+
+    const barW=Math.max(0,Math.min(100,dogDist));
+    dogBar.style.width=barW+'%';
+    if(barW<25) dogBar.style.background='#ff3333';
+    else if(barW<50) dogBar.style.background='#ff9900';
+    else dogBar.style.background='#ff6b6b';
+    dogEl.textContent='🐕 '+(dogDist<20?'危险!':dogDist<50?'接近!':'距离');
+
+    if(dogDist<=0){ endGame(); return; }
+
+    if(invincible>0) invincible--;
+
+    // Kid physics
+    kid.vy+=GRAV;
+    kid.y+=kid.vy;
+    if(kid.y>=GROUND_Y){
+      kid.y=GROUND_Y;
+      kid.vy=0;
+      kid.jumping=false;
+      kid.canDouble=true;
+    }
+    kid.runFrame+=gameSpeed*.4;
+
+    // Spawn
+    if(Math.random()<.018+distance*.0001) spawnObstacle();
+    if(Math.random()<.025) spawnCollectible();
+
+    // Update obstacles
+    for(let i=obstacles.length-1;i>=0;i--){
+      const o=obstacles[i];
+      o.x-=gameSpeed;
+
+      // Collision with kid
+      if(!o.passed && invincible<=0){
+        const kx=kid.x, ky=kid.y-kid.h*.5;
+        const ox=o.x, oy=o.y+o.h*.5;
+        if(Math.abs(kx-ox)<(kid.w+o.w)*.45 && Math.abs(ky-oy)<(kid.h+o.h)*.45){
+          // Hit!
+          invincible=120;
+          addDust(kid.x,kid.y-kid.h*.5,10,'#ff6666');
+          dogDist=Math.min(100,dogDist+18);
+          o.passed=true;
+        }
+      }
+
+      // Passed obstacle
+      if(!o.passed && o.x<kid.x-kid.w){
+        o.passed=true;
+        score+=o.pts||0;
+        scoreEl.textContent='🏆 '+score;
+      }
+
+      if(o.x<-80) obstacles.splice(i,1);
+    }
+
+    // Update collectibles
+    for(let i=collectibles.length-1;i>=0;i--){
+      const c=collectibles[i];
+      c.x-=gameSpeed;
+      if(c.collected){ collectibles.splice(i,1); continue; }
+
+      const dx=Math.abs(c.x-kid.x), dy=Math.abs(c.y-(kid.y-kid.h*.5));
+      if(dx<kid.w*.8 && dy<kid.h*.8){
+        c.collected=true;
+        score+=c.pts;
+        scoreEl.textContent='🏆 '+score;
+        if(c.isBone){
+          dogSlowTimer=180;
+          addDust(c.x,c.y,12,'#ffd700');
+          popScore(c.x,c.y,'🍖+'+c.pts+' 慢!','score-pop');
+        } else {
+          addDust(c.x,c.y,8,'#fff');
+          popScore(c.x,c.y,c.pts,'score-pop');
+        }
+      }
+
+      if(c.x<-40) collectibles.splice(i,1);
+    }
+
+    // Dust trail
+    if(!kid.jumping && Math.random()<.3){
+      addDust(kid.x-kid.w*.3, GROUND_Y, 1);
+    }
+
+    // Update dust
+    for(let i=dustParticles.length-1;i>=0;i--){
+      const p=dustParticles[i];
+      p.x+=p.vx; p.y+=p.vy; p.vy+=.1;
+      p.life-=.04;
+      if(p.life<=0) dustParticles.splice(i,1);
+    }
+
+    // Speed increase
+    gameSpeed=4+distance*.008;
+
+    // Parallax
+    bgX-=gameSpeed*.4;
+  }
+
+  // ── Main loop ─────────────────────────────────────────────
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    drawBg();
+    drawDust();
+    for(const o of obstacles) drawObstacle(o);
+    for(const c of collectibles) drawCollectible(c);
+    drawKid();
+    drawDog();
+  }
+
+  function gameLoop(){
+    if(gameOver) return;
+    update(); draw();
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ── Controls ─────────────────────────────────────────────
+
+  function doJump(){
+    if(!running) return;
+    if(!kid.jumping){
+      kid.vy=JUMP_V;
+      kid.jumping=true;
+      kid.canDouble=true;
+      addDust(kid.x,GROUND_Y,6);
+    } else if(kid.canDouble){
+      kid.vy=JUMP_V*.75;
+      kid.canDouble=false;
+      addDust(kid.x,kid.y-kid.h*.5,4);
+    }
+  }
+
+  canvas.addEventListener('click',doJump);
+  canvas.addEventListener('touchstart',e=>{e.preventDefault();doJump();},{passive:false});
+  document.addEventListener('keydown',e=>{
+    if(e.code==='Space'||e.key==='ArrowUp'||e.key==='w'){e.preventDefault();doJump();}
+  });
+
+  function startGame(){
+    resetGame();
+    overlay.style.display='none';
+    running=true; gameOver=false;
+    best=parseInt(localStorage.getItem('kidRunBest')||'0');
+    gameLoop();
+  }
+
+  function endGame(){
+    gameOver=true; running=false;
+    if(score>best) localStorage.setItem('kidRunBest',score);
+    setTimeout(()=>{
+      overlay.innerHTML=
+        '<h1>被抓住了！</h1>'+
+        '<div style="font-size:60px;color:#ffd700;font-weight:900;margin:8px 0 14px">'+score+'</div>'+
+        '<p style="color:#cce8f4;font-size:14px;margin-bottom:22px">跑了 '+Math.floor(distance)+' 米<br>最高纪录：'+Math.max(score,best)+'</p>'+
+        '<button class="btn btn-primary" id="reBtn">再跑一次</button>';
+      overlay.style.display='flex';
+      document.getElementById('reBtn').onclick=startGame;
+    },400);
+  }
+
+  document.getElementById('startBtn').onclick=startGame;
+})();
+</script>
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.inland-security-footer {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  right: 0;
+  width: fit-content;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tooltip-container {
+  position: relative;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.minimax-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 300;
+  color: #adadad;
+  text-decoration: none;
+}
+
+.minimax-link:visited {
+  color: #adadad;
+}
+
+.minimax-link:hover {
+  color: #666666;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: 16px; /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+  font-size: 12px;
+  line-height: 17px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #171717;
+}
+
+/* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+.tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: flex;
+}
+
+.info-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.beian-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #171717;
+}
+
+.beian-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.underline-text {
+  color: #171717;
+  text-decoration: underline;
+}
+
+.underline-text:hover {
+  color: #000000;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .trigger-content {
+    background-color: transparent;
+  }
+
+  .minimax-link,
+  .minimax-link:visited {
+    color: #666666;
+  }
+
+  .minimax-link:hover {
+    color: #adadad;
+  }
+
+  .tooltip-content {
+    background-color: #262626;
+    color: #ededed;
+  }
+
+  .beian-link,
+  .underline-text {
+    color: #ededed;
+  }
+
+  .underline-text:hover {
+    color: #ffffff;
+  }
+}
+
+</style>
+<div class="inland-security-footer">
+  <div class="tooltip-container">
+    <div class="trigger-content">
+      <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+        <span>© 2026 MiniMax</span>
+      </a>
+    </div>
+    <div class="tooltip-content">
+      <section class="info-section">
+        <span>上海稀宇科技有限公司</span>
+      </section>
+
+      <section class="info-section">
+        <a class="beian-link" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179" target="_blank" rel="noreferrer">
+          <img alt="hailuo-beian-icon" src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png" class="beian-icon">
+          <span class="underline-text">沪公网安备31010402010179号</span>
+        </a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+          沪ICP备2023003282号-38
+        </a>
+      </section>
+
+      <section class="info-section">
+        <span>模型名称：MiniMax</span>
+        <span>备案号：Shanghai-MiniMax-202505230046</span>
+      </section>
+
+      <section class="info-section">
+        <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer" class="underline-text">
+          用户协议
+        </a>
+        <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer" class="underline-text">
+          隐私政策
+        </a>
+      </section>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/**
+ * Iframe 元素高亮注入脚本
+ * 需要在目标网站中引入此脚本来支持跨域 iframe 高亮功能
+ *
+ * 使用方法：
+ * 1. 将此脚本添加到目标网站的 HTML 中
+ * 2. 或通过浏览器扩展、用户脚本等方式注入
+ */
+
+(function () {
+  "use strict";
+
+  // 检查是否在 iframe 中
+  if (window.self === window.top) {
+    return; // 不在 iframe 中，不执行
+  }
+
+  // 检查是否已经初始化过
+  if (window.__iframeHighlightInitialized) {
+    return;
+  }
+  window.__iframeHighlightInitialized = true;
+  console.log("Iframe 高亮脚本已加载");
+
+  // 创建高亮覆盖层
+  var overlay = document.createElement("div");
+  overlay.id = "iframe-highlight-overlay";
+  overlay.style.cssText = "\n    position: fixed;\n    top: 0;\n    left: 0;\n    width: 100vw;\n    height: 100vh;\n    pointer-events: none;\n    z-index: 999999;\n    overflow: hidden;\n  ";
+
+  // 创建悬停高亮框（虚线边框）
+  var highlightBox = document.createElement("div");
+  highlightBox.id = "iframe-highlight-box";
+  highlightBox.style.cssText = "\n    position: absolute;\n    border: 2px dashed #007AFF;\n    background: rgba(0, 122, 255, 0.08);\n    pointer-events: none;\n    display: none;\n    transition: all 0.1s ease;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);\n    border-radius: 2px;\n  ";
+
+  // 创建选中节点的常驻高亮框（实线边框）
+  var selectedBox = document.createElement("div");
+  selectedBox.id = "iframe-selected-box";
+  selectedBox.style.cssText = "\n    position: absolute;\n    border: 2px solid #007AFF;\n    pointer-events: none;\n    display: none;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 8px rgba(255, 107, 53, 0.4);\n    border-radius: 2px;\n    z-index: 1000000;\n  ";
+
+  // 创建悬停标签显示
+  var tagLabel = document.createElement("div");
+  tagLabel.id = "iframe-tag-label";
+  tagLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 2px 6px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 2px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000001;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);\n    font-weight: 500;\n  ";
+
+  // 创建选中节点标签
+  var selectedLabel = document.createElement("div");
+  selectedLabel.id = "iframe-selected-label";
+  selectedLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 3px 8px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 3px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000002;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);\n    font-weight: 600;\n  ";
+  overlay.appendChild(highlightBox);
+  overlay.appendChild(selectedBox);
+  overlay.appendChild(tagLabel);
+  overlay.appendChild(selectedLabel);
+  document.body.appendChild(overlay);
+
+  // 存储当前选中的元素
+  var selectedElement = null;
+  var highlightEnabled = false;
+
+  // 更新选中元素的高亮显示
+  function updateSelectedHighlight(element) {
+    console.log("updateSelectedHighlight called with:", element);
+    if (!element) {
+      selectedBox.style.display = "none";
+      selectedLabel.style.display = "none";
+      selectedElement = null;
+      console.log("Cleared selected highlight");
+      return;
+    }
+    selectedElement = element;
+    var rect = element.getBoundingClientRect();
+    console.log("Selected element rect:", rect);
+
+    // 更新选中高亮框位置
+    selectedBox.style.display = "block";
+    selectedBox.style.left = "".concat(rect.left - 2, "px");
+    selectedBox.style.top = "".concat(rect.top - 2, "px");
+    selectedBox.style.width = "".concat(rect.width + 4, "px");
+    selectedBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新选中标签位置和内容
+    selectedLabel.style.display = "block";
+    selectedLabel.textContent = "\u2713 <".concat(element.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 28;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 5) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    var labelWidth = selectedLabel.offsetWidth || 100; // 预估宽度
+    if (labelLeft + labelWidth > window.innerWidth - 10) {
+      labelLeft = window.innerWidth - labelWidth - 10;
+    }
+    selectedLabel.style.left = "".concat(Math.max(5, labelLeft), "px");
+    selectedLabel.style.top = "".concat(labelTop, "px");
+    console.log("Selected highlight positioned at:", {
+      left: selectedBox.style.left,
+      top: selectedBox.style.top,
+      width: selectedBox.style.width,
+      height: selectedBox.style.height
+    });
+  }
+  function getElementSelector(element) {
+    if (!(element instanceof Element)) throw new Error('Argument must be a DOM element');
+    var segments = [];
+    var current = element;
+    while (current !== document.documentElement) {
+      var selector = '';
+      // 优先检查唯一ID
+      if (current.id && document.querySelectorAll("#".concat(current.id)).length === 1) {
+        segments.unshift("#".concat(current.id));
+        break; // ID唯一，无需继续向上
+      }
+
+      // 生成类名选择器（取第一个有效类名）
+      var classes = Array.from(current.classList).filter(function (c) {
+        return !c.startsWith('js-');
+      });
+      var className = classes.length > 0 ? ".".concat(classes[0]) : '';
+
+      // 生成位置索引（nth-child）
+      var tag = current.tagName.toLowerCase();
+      if (!className) {
+        var siblings = Array.from(current.parentNode.children);
+        var index = siblings.findIndex(function (el) {
+          return el === current;
+        }) + 1;
+        selector = "".concat(tag, ":nth-child(").concat(index, ")");
+      } else {
+        selector = className;
+      }
+      segments.unshift(selector);
+      current = current.parentElement;
+    }
+
+    // 处理根元素
+    if (current === document.documentElement) {
+      segments.unshift('html');
+    }
+    return segments.join(' > ');
+  }
+
+  // 获取元素文本内容
+  function getElementText(element) {
+    var _element$textContent;
+    if (element.tagName === "INPUT") {
+      return element.value || element.placeholder || "";
+    }
+    if (element.tagName === "TEXTAREA") {
+      return element.value || element.placeholder || "";
+    }
+    var text = ((_element$textContent = element.textContent) === null || _element$textContent === void 0 ? void 0 : _element$textContent.trim()) || "";
+    return text.length > 50 ? text.substring(0, 50) + "..." : text;
+  }
+
+  // 获取元素属性信息
+  function getElementAttributes(element) {
+    var attrs = {};
+    for (var i = 0; i < element.attributes.length; i++) {
+      var attr = element.attributes[i];
+      attrs[attr.name] = attr.value;
+    }
+    return attrs;
+  }
+
+  // 鼠标悬停事件处理
+  function handleMouseOver(e) {
+    if (!highlightEnabled) return;
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免高亮 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 如果是已选中的元素，不显示悬停高亮
+    if (target === selectedElement) {
+      highlightBox.style.display = "none";
+      tagLabel.style.display = "none";
+      return;
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+
+    // 更新悬停高亮框位置
+    highlightBox.style.display = "block";
+    highlightBox.style.left = "".concat(rect.left - 2, "px");
+    highlightBox.style.top = "".concat(rect.top - 2, "px");
+    highlightBox.style.width = "".concat(rect.width + 4, "px");
+    highlightBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新标签位置和内容
+    tagLabel.style.display = "block";
+    tagLabel.textContent = "<".concat(target.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 22;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 0) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    if (labelLeft + tagLabel.offsetWidth > window.innerWidth) {
+      labelLeft = window.innerWidth - tagLabel.offsetWidth - 5;
+    }
+    tagLabel.style.left = "".concat(Math.max(0, labelLeft), "px");
+    tagLabel.style.top = "".concat(labelTop, "px");
+
+    // 发送消息到父窗口
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 鼠标离开事件处理
+  function handleMouseOut(e) {
+    if (!highlightEnabled) return;
+    var relatedTarget = e.relatedTarget;
+
+    // 如果鼠标移动到高亮相关元素上，不隐藏高亮
+    if (relatedTarget && (relatedTarget === highlightBox || relatedTarget === tagLabel || relatedTarget === overlay || relatedTarget === selectedBox || relatedTarget === selectedLabel)) {
+      return;
+    }
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: null,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 点击事件处理
+  function handleClick(e) {
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免处理 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 检查是否是交互元素，这些元素需要保留默认行为
+    var isInteractiveElement = ['input', 'textarea', 'select', 'button', 'a'].includes(target.tagName.toLowerCase());
+
+    // 如果高亮功能启用，对于非交互元素阻止默认行为和事件传播
+    if (highlightEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+    console.log("Element clicked:", {
+      tagName: target.tagName,
+      selector: selector,
+      rect: rect
+    });
+
+    // 立即更新选中高亮
+    updateSelectedHighlight(target);
+
+    // 隐藏悬停高亮，因为现在是选中状态
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-click",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 监听来自父窗口的消息
+  function handleParentMessage(event) {
+    console.log("Received message from parent:", event.data);
+    if (event.data.type === "iframe-highlight-toggle") {
+      var enabled = event.data.enabled;
+      console.log("Highlight toggle:", enabled);
+      if (enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "enable-iframe-highlight") {
+      console.log("Enable iframe highlight");
+      enableHighlight();
+    } else if (event.data.type === "disable-iframe-highlight") {
+      console.log("Disable iframe highlight");
+      disableHighlight();
+    } else if (event.data.type === "toggle-iframe-highlight") {
+      var _enabled = event.data.enabled !== undefined ? event.data.enabled : !highlightEnabled;
+      console.log("Toggle iframe highlight to:", _enabled);
+      if (_enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "update-selected-element") {
+      var selector = event.data.selector;
+      console.log("Update selected element with selector:", selector);
+      if (selector) {
+        try {
+          var element = document.querySelector(selector);
+          console.log("Found element by selector:", element);
+          updateSelectedHighlight(element);
+        } catch (error) {
+          console.warn("Failed to select element:", error);
+          updateSelectedHighlight(null);
+        }
+      } else {
+        updateSelectedHighlight(null);
+      }
+    } else if (event.data.type === "clear-selected-element") {
+      console.log("Clear selected element");
+      updateSelectedHighlight(null);
+    }
+  }
+
+  // 启用高亮功能
+  function enableHighlight() {
+    console.log("Enabling highlight");
+    document.addEventListener("mouseover", handleMouseOver, true);
+    document.addEventListener("mouseout", handleMouseOut, true);
+    document.addEventListener("click", handleClick, true);
+    highlightEnabled = true;
+    overlay.style.display = "block";
+  }
+
+  // 禁用高亮功能
+  function disableHighlight() {
+    console.log("Disabling highlight");
+    highlightEnabled = false;
+    // 保持事件监听器，但通过 highlightEnabled 变量控制行为
+    // 这样可以保留选中状态的显示
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    // 不隐藏 selectedBox 和 selectedLabel，保留选中状态
+  }
+
+  // 完全禁用高亮功能（移除所有监听器）
+  function fullyDisableHighlight() {
+    console.log("Fully disabling highlight");
+    highlightEnabled = false;
+    document.removeEventListener("mouseover", handleMouseOver, true);
+    document.removeEventListener("mouseout", handleMouseOut, true);
+    document.removeEventListener("click", handleClick, true);
+    overlay.style.display = "none";
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    selectedBox.style.display = "none";
+    selectedLabel.style.display = "none";
+  }
+
+  // 添加事件监听
+  enableHighlight();
+  window.addEventListener("message", handleParentMessage);
+
+  // 暴露全局函数供外部调用
+  window.__iframeHighlightControl = {
+    enable: enableHighlight,
+    disable: disableHighlight,
+    fullyDisable: fullyDisableHighlight,
+    isEnabled: function isEnabled() {
+      return highlightEnabled;
+    },
+    getSelectedElement: function getSelectedElement() {
+      return selectedElement;
+    },
+    updateSelected: updateSelectedHighlight,
+    // 通过消息发送开关控制
+    sendToggleMessage: function sendToggleMessage(enabled) {
+      window.parent.postMessage({
+        type: 'iframe-highlight-status',
+        enabled: enabled || highlightEnabled,
+        source: 'iframe-highlight-injector'
+      }, '*');
+    }
+  };
+
+  // 通知父窗口脚本已加载
+  try {
+    window.parent.postMessage({
+      type: "iframe-highlight-ready",
+      data: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now()
+      },
+      source: "iframe-highlight-injector"
+    }, "*");
+  } catch (error) {
+    console.warn("无法发送就绪消息到父窗口:", error);
+  }
+
+  // 清理函数
+  window.__iframeHighlightCleanup = function () {
+    fullyDisableHighlight();
+    window.removeEventListener("message", handleParentMessage);
+    if (overlay.parentElement) {
+      overlay.parentElement.removeChild(overlay);
+    }
+    delete window.__iframeHighlightInitialized;
+    delete window.__iframeHighlightCleanup;
+  };
+})();
+
+</script>
+</body>
+</html>
