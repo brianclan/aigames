@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pixel Devil</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+  #info {
+    display: flex;
+    justify-content: space-between;
+    width: 400;
+    max-width: 95vw;
+    color: #aaa;
+    font-size: 12px;
+    margin-bottom: 5px;
+    padding: 0 2px;
+  }
+  #info span { color: #e94560; font-weight: bold; }
+  canvas {
+    border: 3px solid #e94560;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(233,69,96,0.4);
+    display: block;
+  }
+  #overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 10;
+    background: rgba(26,26,46,0.95);
+    padding: 28px 36px;
+    border-radius: 8px;
+    border: 2px solid #e94560;
+  }
+  #overlay h1 {
+    font-size: 24px;
+    color: #e94560;
+    text-shadow: 0 0 15px #e94560;
+    margin-bottom: 8px;
+  }
+  #overlay p { color: #aaa; margin-bottom: 14px; font-size: 13px; }
+  #overlay .btn {
+    background: #e94560;
+    color: #fff;
+    border: none;
+    padding: 9px 26px;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 3px;
+    margin: 4px;
+  }
+  #overlay .btn:hover { background: #ff6b81; }
+  .hidden { display: none; }
+  #hint { font-size: 11px; color: #555; margin-top: 10px; }
+  #deaths { font-size: 11px; color: #e94560; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="info">
+  <div>LEVEL <span id="level">1</span>/5</div>
+  <div>DEATHS <span id="deaths">0</span></div>
+</div>
+<div id="overlay">
+  <h1 id="ovTitle">👿 PIXEL DEVIL</h1>
+  <p id="ovMsg">Trap platformer — reach the flag!</p>
+  <button class="btn" onclick="startGame()" id="ovBtn">START</button>
+  <div id="deaths2"></div>
+  <p id="hint">← → / A D to move · SPACE / ↑ to jump</p>
+</div>
+<canvas id="canvas"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = 400, H = 560;
+canvas.width = W;
+canvas.height = H;
+
+const overlay = document.getElementById('overlay');
+const levelEl = document.getElementById('level');
+const deathsEl = document.getElementById('deaths');
+const deaths2El = document.getElementById('deaths2');
+const ovTitle = document.getElementById('ovTitle');
+const ovMsg = document.getElementById('ovMsg');
+const ovBtn = document.getElementById('ovBtn');
+
+let gameState = 'idle';
+let level = 1, deaths = 0;
+let frame = 0, tick = 0;
+let respawnTimer = 0;
+
+// Player
+const P = { x: 40, y: 0, vx: 0, vy: 0, w: 16, h: 24, onGround: false, dead: false, facing: 1 };
+const GRAVITY = 0.55;
+const JUMP = -10.5;
+const MOVE = 3.5;
+const FRICTION = 0.82;
+const MAX_FALL = 14;
+
+const keys = {};
+window.addEventListener('keydown', e => {
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','d','w','s',' ','A','D','W','S'].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
+  if (gameState !== 'playing') startGame();
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// Touch controls
+let touchX = null;
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  touchX = e.touches[0].clientX;
+  if (gameState !== 'playing') { startGame(); return; }
+  const rect = canvas.getBoundingClientRect();
+  const gx = (e.touches[0].clientX - rect.left) / rect.width * W;
+  if (gx < W/3) keys['ArrowLeft'] = true;
+  else if (gx > W*2/3) keys['ArrowRight'] = true;
+  else { keys[' '] = true; }
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  keys['ArrowLeft'] = false;
+  keys['ArrowRight'] = false;
+  keys[' '] = false;
+});
+
+// Platforms: {x, y, w, h, type}
+// type: 'solid'|'spike'|'moveX'|'moveY'|'fall'|'thrust'
+// Moving: add mx, my, mx2, my2, speed, dir
+const LEVELS = [
+  // ===== LEVEL 1 =====
+  [
+    { x: 0, y: H-30, w: W, h: 30, type: 'solid' },
+    { x: 90, y: H-110, w: 80, h: 14, type: 'solid' },
+    { x: 200, y: H-190, w: 80, h: 14, type: 'solid' },
+    { x: 310, y: H-270, w: 80, h: 14, type: 'solid' },
+    { x: 200, y: H-340, w: 80, h: 14, type: 'solid' },
+    // spike on step
+    { x: 240, y: H-110+1, w: 8, h: 12, type: 'spike' },
+    // flag
+    { x: 215, y: H-340-28, w: 2, h: 28, type: 'flag' },
+  ],
+  // ===== LEVEL 2 =====
+  [
+    { x: 0, y: H-30, w: W, h: 30, type: 'solid' },
+    // gap in middle
+    { x: 160, y: H-30, w: 80, h: 30, type: 'solid' },
+    // moving platform horizontal
+    { x: 80, y: H-150, w: 70, h: 14, type: 'moveX', mx: 80, mx2: 250, speed: 1.5, dir: 1 },
+    // vertical moving
+    { x: 280, y: H-150, w: 70, h: 14, type: 'moveY', my: H-260, my2: H-150, speed: 1.2, dir: 1 },
+    { x: 150, y: H-300, w: 90, h: 14, type: 'solid' },
+    // thrust trap
+    { x: 200, y: H-300+1, w: 8, h: 12, type: 'spike' },
+    { x: 80, y: H-380, w: 60, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-380 },
+    { x: 220, y: H-440, w: 80, h: 14, type: 'solid' },
+    { x: 340, y: H-440, w: 60, h: 14, type: 'solid' },
+    { x: 345, y: H-440+1, w: 8, h: 12, type: 'spike' },
+    { x: 345, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    { x: 60, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    { x: 0, y: H-440, w: 14, h: 14, type: 'solid' },
+    { x: 60, y: H-440-24, w: 2, h: 24, type: 'flag' },
+  ],
+  // ===== LEVEL 3 =====
+  [
+    { x: 0, y: H-30, w: 120, h: 30, type: 'solid' },
+    { x: 0, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    // fast horizontal platform
+    { x: 140, y: H-110, w: 65, h: 14, type: 'moveX', mx: 140, mx2: 300, speed: 2.5, dir: 1 },
+    // floating spike
+    { x: 200, y: H-180, w: 8, h: 12, type: 'spike' },
+    { x: 280, y: H-180, w: 70, h: 14, type: 'solid' },
+    { x: 310, y: H-180+1, w: 8, h: 12, type: 'spike' },
+    // falling platforms sequence
+    { x: 50, y: H-280, w: 60, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-280 },
+    { x: 150, y: H-280, w: 60, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-280 },
+    { x: 250, y: H-280, w: 60, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-280 },
+    // thrust at end
+    { x: 330, y: H-340, w: 70, h: 14, type: 'solid' },
+    { x: 360, y: H-340+1, w: 8, h: 12, type: 'spike' },
+    // final climb
+    { x: 20, y: H-400, w: 70, h: 14, type: 'moveX', mx: 20, mx2: 200, speed: 2, dir: 1 },
+    { x: 320, y: H-460, w: 80, h: 14, type: 'solid' },
+    { x: 320, y: H-460+1, w: 8, h: 12, type: 'spike' },
+    { x: 330, y: H-460-24, w: 2, h: 24, type: 'flag' },
+  ],
+  // ===== LEVEL 4 =====
+  [
+    { x: 0, y: H-30, w: W, h: 30, type: 'solid' },
+    { x: 0, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    { x: W-8, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    // narrow platforms
+    { x: 70, y: H-110, w: 45, h: 14, type: 'solid' },
+    { x: 160, y: H-170, w: 45, h: 14, type: 'solid' },
+    { x: 250, y: H-230, w: 45, h: 14, type: 'solid' },
+    // fast vertical
+    { x: 320, y: H-200, w: 60, h: 14, type: 'moveY', my: H-200, my2: H-380, speed: 3, dir: 1 },
+    // bouncing spike
+    { x: 100, y: H-260, w: 8, h: 12, type: 'spike' },
+    { x: 180, y: H-300, w: 8, h: 12, type: 'spike' },
+    { x: 260, y: H-340, w: 8, h: 12, type: 'spike' },
+    // fall sequence
+    { x: 30, y: H-380, w: 55, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-380 },
+    { x: 120, y: H-380, w: 55, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-380 },
+    { x: 210, y: H-380, w: 55, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-380 },
+    { x: 300, y: H-380, w: 55, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-380 },
+    // final platform
+    { x: 170, y: H-460, w: 70, h: 14, type: 'solid' },
+    { x: 195, y: H-460+1, w: 8, h: 12, type: 'spike' },
+    { x: 175, y: H-460-24, w: 2, h: 24, type: 'flag' },
+  ],
+  // ===== LEVEL 5 =====
+  [
+    { x: 0, y: H-30, w: 100, h: 30, type: 'solid' },
+    { x: 0, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    // gauntlet - narrow paths with spikes
+    { x: 120, y: H-30, w: 60, h: 30, type: 'solid' },
+    { x: 120, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    { x: 172, y: H-30+1, w: 8, h: 12, type: 'spike' },
+    // moving platform over spike pit
+    { x: 200, y: H-120, w: 60, h: 14, type: 'moveX', mx: 200, mx2: 340, speed: 2, dir: 1 },
+    { x: 340, y: H-120, w: 60, h: 14, type: 'solid' },
+    { x: 392, y: H-120+1, w: 8, h: 12, type: 'spike' },
+    // vertical climb with moving spikes
+    { x: 340, y: H-200, w: 60, h: 14, type: 'moveY', my: H-200, my2: H-340, speed: 2.5, dir: 1 },
+    { x: 30, y: H-200, w: 60, h: 14, type: 'moveX', mx: 30, mx2: 200, speed: 2, dir: 1 },
+    { x: 50, y: H-200+1, w: 8, h: 12, type: 'spike' },
+    // falling platforms over spike floor
+    { x: 140, y: H-280, w: 50, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-280 },
+    { x: 220, y: H-280, w: 50, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-280 },
+    { x: 300, y: H-280, w: 50, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-280 },
+    // spike ceiling!
+    { x: 0, y: H-370, w: W, h: 14, type: 'solid' },
+    { x: 0, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 40, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 80, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 120, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 160, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 200, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 240, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 280, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 320, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    { x: 360, y: H-370+12, w: 8, h: 12, type: 'spike' },
+    // ground again
+    { x: 0, y: H-440, w: 100, h: 14, type: 'solid' },
+    { x: 130, y: H-440, w: 50, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-440 },
+    { x: 210, y: H-440, w: 50, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-440 },
+    { x: 290, y: H-440, w: 50, h: 14, type: 'fall', triggered: false, vy: 0, origY: H-440 },
+    { x: 360, y: H-440, w: 40, h: 14, type: 'solid' },
+    { x: 385, y: H-440+1, w: 8, h: 12, type: 'spike' },
+    // flag
+    { x: 365, y: H-440-24, w: 2, h: 24, type: 'flag' },
+  ],
+];
+
+let platforms = [];
+let particles = [];
+
+function startGame() {
+  if (gameState === 'win') { level = 1; deaths = 0; }
+  if (gameState !== 'win' && gameState !== 'idle') return;
+  gameState = 'playing';
+  loadLevel(level);
+  overlay.classList.add('hidden');
+  loop();
+}
+
+function loadLevel(n) {
+  level = n;
+  levelEl.textContent = n;
+  deathsEl.textContent = deaths;
+  tick = 0; frame = 0; respawnTimer = 0;
+  P.x = 40; P.y = H - 70; P.vx = 0; P.vy = 0; P.onGround = false; P.dead = false;
+  P.facing = 1;
+  particles = [];
+  // Deep copy level platforms
+  platforms = JSON.parse(JSON.stringify(LEVELS[n-1]));
+  // Set player start
+  platforms.forEach(p => {
+    if (p.type === 'flag') {
+      p.x = p.x; // keep flag position
+    }
+  });
+}
+
+function loop() {
+  if (gameState !== 'playing') return;
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function update() {
+  if (P.dead) {
+    respawnTimer--;
+    if (respawnTimer <= 0) {
+      loadLevel(level);
+    }
+    return;
+  }
+
+  tick++;
+  frame++;
+
+  // Input
+  let moving = false;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+    P.vx = -MOVE; P.facing = -1; moving = true;
+  } else if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+    P.vx = MOVE; P.facing = 1; moving = true;
+  } else {
+    P.vx *= FRICTION;
+  }
+  if ((keys[' '] || keys['ArrowUp'] || keys['w'] || keys['W']) && P.onGround) {
+    P.vy = JUMP; P.onGround = false;
+  }
+
+  // Physics
+  P.vy += GRAVITY;
+  if (P.vy > MAX_FALL) P.vy = MAX_FALL;
+  P.x += P.vx;
+  P.y += P.vy;
+
+  // Update platforms
+  for (const p of platforms) {
+    if (p.type === 'moveX') {
+      p.x += p.speed * p.dir;
+      if (p.x <= p.mx || p.x >= p.mx2) p.dir *= -1;
+    }
+    if (p.type === 'moveY') {
+      p.y += p.speed * p.dir;
+      if (p.y <= p.my || p.y >= p.my2) p.dir *= -1;
+    }
+    if (p.type === 'fall') {
+      if (p.triggered) {
+        p.vy = p.vy || 0;
+        p.vy += 0.3;
+        p.y += p.vy;
+      }
+    }
+  }
+
+  // Collision
+  P.onGround = false;
+  for (const p of platforms) {
+    if (p.type === 'spike') { checkSpike(p); continue; }
+    if (p.type === 'flag') { checkFlag(p); continue; }
+    if (p.type === 'solid' || p.type === 'moveX' || p.type === 'moveY' || p.type === 'fall') {
+      resolveCollision(p);
+    }
+  }
+
+  // Fall death
+  if (P.y > H + 50) die();
+}
+
+function checkSpike(p) {
+  const sx = p.x + p.w/2, sy = p.y + p.h/2;
+  const px = P.x + P.w/2, py = P.y + P.h/2;
+  if (Math.abs(sx - px) < (p.w + P.w)/2 - 2 && Math.abs(sy - py) < (p.h + P.h)/2 - 2) {
+    die();
+  }
+}
+
+function checkFlag(p) {
+  const fx = p.x + p.w/2;
+  const fy = p.y;
+  if (P.x + P.w > p.x && P.x < p.x + p.w && P.y + P.h > p.y && P.y < p.y + p.h + 28) {
+    winLevel();
+  }
+}
+
+function resolveCollision(p) {
+  const px = P.x, py = P.y, pw = P.w, ph = P.h;
+  const bx = p.x, by = p.y, bw = p.w, bh = p.h;
+
+  if (px + pw <= bx || px >= bx + bw || py + ph <= by || py >= by + bh) return;
+
+  // Trigger fall platform when stepped on
+  if (p.type === 'fall' && !p.triggered && P.vy >= 0) {
+    const prevPY = py - P.vy + P.h;
+    if (prevPY <= by + 2) {
+      p.triggered = true;
+      p.vy = 0;
+    }
+  }
+
+  const overlapL = (px + pw) - bx;
+  const overlapR = (bx + bw) - px;
+  const overlapT = (py + ph) - by;
+  const overlapB = (by + bh) - py;
+
+  const min = Math.min(overlapL, overlapR, overlapT, overlapB);
+
+  if (min === overlapT && P.vy >= 0) {
+    P.y = by - ph;
+    P.vy = 0;
+    P.onGround = true;
+    if (p.type === 'moveX') P.x += p.speed * p.dir;
+    if (p.type === 'moveY' && platforms.includes(p)) P.y += p.speed * p.dir;
+  } else if (min === overlapB && P.vy < 0) {
+    P.y = by + bh;
+    P.vy = 0;
+  } else if (min === overlapL) {
+    P.x = bx - pw;
+    P.vx = 0;
+  } else if (min === overlapR) {
+    P.x = bx + bw;
+    P.vx = 0;
+  }
+}
+
+function die() {
+  if (P.dead) return;
+  P.dead = true;
+  deaths++;
+  deathsEl.textContent = deaths;
+  spawnParticles(P.x + P.w/2, P.y + P.h/2, '#e94560', 15);
+  respawnTimer = 45;
+}
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.5 + Math.random() * 5;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      life: 20 + Math.random() * 20,
+      color,
+      size: 2 + Math.random() * 4
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function winLevel() {
+  gameState = 'idle';
+  if (level >= 5) {
+    ovTitle.textContent = '🎉 YOU WIN!';
+    ovMsg.textContent = `All 5 levels cleared! Deaths: ${deaths}`;
+    ovBtn.textContent = 'PLAY AGAIN';
+    gameState = 'win';
+  } else {
+    ovTitle.textContent = `✅ LEVEL ${level} CLEAR!`;
+    ovMsg.textContent = 'Well done!';
+    ovBtn.textContent = `NEXT →`;
+    level++;
+    deaths2El.textContent = `Deaths so far: ${deaths}`;
+  }
+  overlay.classList.remove('hidden');
+}
+
+function draw() {
+  // Background
+  ctx.fillStyle = '#0f0f23';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines (subtle)
+  ctx.strokeStyle = 'rgba(233,69,96,0.07)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 20) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 20) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Platforms
+  for (const p of platforms) {
+    drawPlatform(p);
+  }
+
+  // Particles
+  updateParticles();
+  for (const p of particles) {
+    ctx.globalAlpha = p.life / 40;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Player
+  if (!P.dead) {
+    drawPixelChar(P.x, P.y, P.w, P.h, P.facing);
+  }
+
+  // Death flash
+  if (P.dead && respawnTimer > 35) {
+    ctx.globalAlpha = (respawnTimer - 35) / 10;
+    ctx.fillStyle = '#e94560';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawPlatform(p) {
+  if (p.type === 'spike') {
+    ctx.fillStyle = '#e94560';
+    const sx = p.x, sy = p.y, sw = p.w, sh = p.h;
+    // Draw triangle spike pointing up
+    ctx.beginPath();
+    ctx.moveTo(sx + sw/2, sy);
+    ctx.lineTo(sx + sw, sy + sh);
+    ctx.lineTo(sx, sy + sh);
+    ctx.closePath();
+    ctx.fill();
+    // Glow
+    ctx.shadowColor = '#e94560';
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    return;
+  }
+  if (p.type === 'flag') {
+    // Pole
+    ctx.fillStyle = '#ffd54f';
+    ctx.fillRect(p.x, p.y, 2, 28);
+    // Flag
+    ctx.fillStyle = '#e94560';
+    ctx.beginPath();
+    ctx.moveTo(p.x + 2, p.y);
+    ctx.lineTo(p.x + 22, p.y + 7);
+    ctx.lineTo(p.x + 2, p.y + 14);
+    ctx.closePath();
+    ctx.fill();
+    return;
+  }
+  if (p.type === 'fall' && !p.triggered) {
+    ctx.fillStyle = '#3a3a5c';
+  } else if (p.type === 'fall' && p.triggered) {
+    ctx.fillStyle = '#2a2a3c';
+  } else {
+    ctx.fillStyle = '#4a4a6e';
+  }
+  ctx.fillRect(p.x, p.y, p.w, p.h);
+  // Top highlight
+  ctx.fillStyle = p.type === 'fall' ? '#5a5a7e' : '#6a6a9e';
+  ctx.fillRect(p.x, p.y, p.w, 3);
+  // Moving indicator
+  if (p.type === 'moveX' || p.type === 'moveY') {
+    ctx.fillStyle = 'rgba(233,69,96,0.4)';
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = '#e94560';
+    ctx.fillRect(p.x + p.w/2 - 3, p.y + 3, 6, p.h - 6);
+  }
+  // Fall warning
+  if (p.type === 'fall' && !p.triggered) {
+    ctx.fillStyle = 'rgba(233,69,96,0.2)';
+    ctx.fillRect(p.x + p.w/2 - 4, p.y + 2, 8, 4);
+  }
+}
+
+function drawPixelChar(x, y, w, h, facing) {
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  if (facing < 0) ctx.scale(-1, 1);
+  ctx.translate(-w/2, -h/2);
+
+  const c = '#a0d8ef'; // body color (cyan-ish)
+  const c2 = '#5bc0de';
+  const c3 = '#ffcc66'; // head/skin
+
+  // Head
+  ctx.fillStyle = c3;
+  ctx.fillRect(3, 0, 10, 8);
+  // Eyes
+  ctx.fillStyle = '#111';
+  ctx.fillRect(9, 2, 3, 3);
+  // Body
+  ctx.fillStyle = c;
+  ctx.fillRect(2, 8, 12, 10);
+  ctx.fillStyle = c2;
+  ctx.fillRect(2, 8, 12, 3);
+  // Legs (animated)
+  const walk = Math.floor(frame / 6) % 2;
+  ctx.fillStyle = '#3a3a6a';
+  if (P.onGround && Math.abs(P.vx) > 0.5) {
+    if (walk === 0) {
+      ctx.fillRect(3, 18, 4, 6);
+      ctx.fillRect(9, 18, 4, 6);
+    } else {
+      ctx.fillRect(2, 18, 4, 6);
+      ctx.fillRect(10, 18, 4, 6);
+    }
+  } else {
+    ctx.fillRect(3, 18, 4, 6);
+    ctx.fillRect(9, 18, 4, 6);
+  }
+  // Arms
+  ctx.fillStyle = c3;
+  ctx.fillRect(-1, 9, 3, 7);
+  ctx.fillRect(14, 9, 3, 7);
+
+  ctx.restore();
+}
+
+// Show level select on start
+ovTitle.textContent = '👿 PIXEL DEVIL';
+ovMsg.textContent = 'Trap platformer! 5 Levels — survive!';
+ovBtn.textContent = 'START';
+deaths2El.textContent = '';
+</script>
+</body>
+</html>
