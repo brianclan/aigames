@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>游戏名：猫咪catch鱼。玩法：做一个猫咪cat</title>
+  <style>
+    html,body{margin:0;height:100%;background:#10131f;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;overflow:hidden}
+    .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+    .tip{opacity:.8;font-size:13px;padding:0 20px;text-align:center}
+    .btn{appearance:none;border:none;border-radius:14px;padding:16px 26px;background:#7ac7ff;color:#111;font-size:28px;font-weight:800}
+    .meta{font-size:14px;opacity:.75}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="meta">游戏名：猫咪catch鱼。玩法：做一个猫咪cat</div>
+    <button class="btn" id="tap">Tap 0</button>
+    <div class="tip">游戏名：猫咪catch鱼。玩法：做一个猫咪catch鱼的小游戏</div>
+    <div class="tip">鼠标点击或触摸都可玩</div>
+  </div>
+  <script>
+    let n = 0;
+    const el = document.getElementById('tap');
+    const inc = () => { n += 1; el.textContent = 'Tap ' + n; };
+    el.addEventListener('click', inc);
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); inc(); }, { passive: false });
+  </script>
+</body>
+</html>
