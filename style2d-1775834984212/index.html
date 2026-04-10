@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>style2d</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #ffe8d9 0%, #ffd2cc 45%, #ffc4b8 100%);
+      font-family: Arial, Helvetica, sans-serif;
+      touch-action: manipulation;
+    }
+    #game {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+    .hud {
+      position: fixed;
+      left: 0;
+      right: 0;
+      top: 0;
+      padding: max(12px, env(safe-area-inset-top)) 14px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      color: #4b2d2d;
+      font-weight: 700;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    }
+    .pill {
+      background: rgba(255,255,255,0.68);
+      border: 2px solid rgba(255,255,255,0.6);
+      border-radius: 999px;
+      padding: 8px 12px;
+      min-width: 92px;
+      text-align: center;
+      box-shadow: 0 6px 18px rgba(138, 72, 72, 0.12);
+    }
+    .centerPanel {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(92vw, 420px);
+      background: rgba(255,255,255,0.88);
+      border-radius: 24px;
+      padding: 22px 18px;
+      text-align: center;
+      color: #4a2a2a;
+      box-shadow: 0 18px 40px rgba(124, 73, 73, 0.2);
+      border: 2px solid rgba(255,255,255,0.7);
+    }
+    .title {
+      font-size: 34px;
+      margin: 0 0 10px;
+      letter-spacing: 1px;
+    }
+    .desc {
+      font-size: 16px;
+      line-height: 1.5;
+      margin: 0 0 16px;
+    }
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #ff8f7a, #ff6b6b);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 14px 28px;
+      box-shadow: 0 10px 24px rgba(255,107,107,0.28);
+    }
+    .sub {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #7a5858;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div class="hud">
+    <div class="pill" id="score">得分 0</div>
+    <div class="pill" id="time">时间 30</div>
+  </div>
+  <div class="centerPanel" id="overlay">
+    <div class="card">
+      <h1 class="title">style2d</h1>
+      <p class="desc">点击掉落的星星加分，别碰炸弹。30 秒内尽量拿到更高分数。</p>
+      <button class="btn" id="startBtn">开始测试</button>
+      <div class="sub">支持触摸与鼠标点击</div>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const timeEl = document.getElementById('time');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('startBtn');
+
+    let W = 0, H = 0, DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    function resize() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    const state = {
+      running: false,
+      score: 0,
+      timeLeft: 30,
+      items: [],
+      particles: [],
+      waves: [],
+      spawnTimer: 0,
+      lastTime: 0
+    };
+
+    function rand(a, b) { return Math.random() * (b - a) + a; }
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+    function spawnItem() {
+      const isBomb = Math.random() < 0.22;
+      const r = isBomb ? rand(18, 26) : rand(16, 24);
+      state.items.push({
+        x: rand(r + 10, W - r - 10),
+        y: -r - 10,
+        r,
+        vy: rand(H * 0.18, H * 0.3),
+        spin: rand(-2.5, 2.5),
+        rot: rand(0, Math.PI * 2),
+        type: isBomb ? 'bomb' : 'star',
+        alive: true
+      });
+    }
+
+    function addBurst(x, y, color, count) {
+      for (let i = 0; i < count; i++) {
+        const a = rand(0, Math.PI * 2);
+        const s = rand(40, 180);
+        state.particles.push({
+          x, y,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s,
+          life: rand(0.35, 0.7),
+          maxLife: 0,
+          size: rand(3, 7),
+          color
+        });
+        state.particles[state.particles.length - 1].maxLife = state.particles[state.particles.length - 1].life;
+      }
+      state.waves.push({ x, y, r: 10, alpha: 0.5, color });
+    }
+
+    function drawBackground(t) {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#ffe8d9');
+      g.addColorStop(0.5, '#ffd2cc');
+      g.addColorStop(1, '#ffc4b8');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      for (let i = 0; i < 6; i++) {
+        const x = (W / 5) * i + Math.sin(t * 0.0005 + i) * 18;
+        const y = H * (0.15 + i * 0.12);
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.beginPath();
+        ctx.arc(x, y, 28 + (i % 3) * 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.ellipse(W * 0.2, H * 0.1, 90, 38, 0.2, 0, Math.PI * 2);
+      ctx.ellipse(W * 0.75, H * 0.18, 110, 44, -0.15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawStar(x, y, r, rot, fill) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rr = i % 2 === 0 ? r : r * 0.46;
+        const a = -Math.PI / 2 + i * Math.PI / 5;
+        const px = Math.cos(a) * rr;
+        const py = Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBomb(x, y, r) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = '#2c2c3a';
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#55556a';
+      ctx.beginPath();
+      ctx.arc(-r * 0.25, -r * 0.25, r * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#5d4037';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.15, -r * 0.75);
+      ctx.quadraticCurveTo(r * 0.5, -r * 1.2, r * 0.6, -r * 1.45);
+      ctx.stroke();
+      ctx.fillStyle = '#ff845e';
+      ctx.beginPath();
+      ctx.moveTo(r * 0.56, -r * 1.5);
+      ctx.quadraticCurveTo(r * 0.86, -r * 1.9, r * 0.66, -r * 2.18);
+      ctx.quadraticCurveTo(r * 0.46, -r * 1.92, r * 0.56, -r * 1.5);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function update(dt) {
+      if (!state.running) return;
+      state.timeLeft -= dt;
+      if (state.timeLeft <= 0) {
+        state.timeLeft = 0;
+        endGame();
+      }
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        spawnItem();
+        state.spawnTimer = rand(0.35, 0.75);
+      }
+
+      for (const item of state.items) {
+        item.y += item.vy * dt;
+        item.rot += item.spin * dt;
+        if (item.y - item.r > H + 10) item.alive = false;
+      }
+      state.items = state.items.filter(i => i.alive);
+
+      for (const p of state.particles) {
+        p.life -= dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 280 * dt;
+      }
+      state.particles = state.particles.filter(p => p.life > 0);
+
+      for (const w of state.waves) {
+        w.r += 180 * dt;
+        w.alpha -= 0.9 * dt;
+      }
+      state.waves = state.waves.filter(w => w.alpha > 0);
+
+      scoreEl.textContent = '得分 ' + state.score;
+      timeEl.textContent = '时间 ' + Math.ceil(state.timeLeft);
+    }
+
+    function render(t) {
+      drawBackground(t);
+
+      for (const w of state.waves) {
+        ctx.strokeStyle = w.color.replace('ALPHA', String(clamp(w.alpha, 0, 1)));
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      for (const item of state.items) {
+        if (item.type === 'star') {
+          drawStar(item.x, item.y, item.r, item.rot, '#ffd54f');
+          drawStar(item.x, item.y, item.r * 0.55, -item.rot * 1.2, '#fff3b0');
+        } else {
+          drawBomb(item.x, item.y, item.r);
+        }
+      }
+
+      for (const p of state.particles) {
+        const a = clamp(p.life / p.maxLife, 0, 1);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+
+      if (!state.running && state.timeLeft === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    function loop(ts) {
+      if (!state.lastTime) state.lastTime = ts;
+      const dt = Math.min(0.033, (ts - state.lastTime) / 1000);
+      state.lastTime = ts;
+      update(dt);
+      render(ts);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    function hitTest(x, y) {
+      if (!state.running) return;
+      for (let i = state.items.length - 1; i >= 0; i--) {
+        const item = state.items[i];
+        const dx = x - item.x;
+        const dy = y - item.y;
+        if (dx * dx + dy * dy <= item.r * item.r) {
+          item.alive = false;
+          if (item.type === 'star') {
+            state.score += 1;
+            addBurst(x, y, '#ffd54f', 10);
+          } else {
+            state.score = Math.max(0, state.score - 2);
+            addBurst(x, y, '#ff6b6b', 16);
+            state.waves.push({ x, y, r: 12, alpha: 0.7, color: 'rgba(255,107,107,ALPHA)' });
+          }
+          scoreEl.textContent = '得分 ' + state.score;
+          return;
+        }
+      }
+      state.waves.push({ x, y, r: 8, alpha: 0.28, color: 'rgba(255,255,255,ALPHA)' });
+    }
+
+    function getPoint(ev) {
+      const rect = canvas.getBoundingClientRect();
+      if (ev.touches && ev.touches[0]) {
+        return { x: ev.touches[0].clientX - rect.left, y: ev.touches[0].clientY - rect.top };
+      }
+      return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+    }
+
+    canvas.addEventListener('pointerdown', (ev) => {
+      const p = getPoint(ev);
+      hitTest(p.x, p.y);
+    });
+    canvas.addEventListener('touchstart', (ev) => {
+      const p = getPoint(ev);
+      hitTest(p.x, p.y);
+      ev.preventDefault();
+    }, { passive: false });
+
+    function startGame() {
+      state.running = true;
+      state.score = 0;
+      state.timeLeft = 30;
+      state.items = [];
+      state.particles = [];
+      state.waves = [];
+      state.spawnTimer = 0.2;
+      state.lastTime = 0;
+      scoreEl.textContent = '得分 0';
+      timeEl.textContent = '时间 30';
+      overlay.classList.add('hidden');
+    }
+
+    function endGame() {
+      state.running = false;
+      overlay.classList.remove('hidden');
+      overlay.querySelector('.card').innerHTML = '<h1 class="title">测试结束</h1><p class="desc">你的得分是 <b>' + state.score + '</b> 分。再来一局，继续测试点击手感和掉落节奏。</p><button class="btn" id="restartBtn">再玩一次</button><div class="sub">点击星星 +1，点到炸弹 -2</div>';
+      document.getElementById('restartBtn').addEventListener('click', startGame, { once: true });
+    }
+
+    startBtn.addEventListener('click', startGame);
+    render(0);
+  </script>
+</body>
+</html>
