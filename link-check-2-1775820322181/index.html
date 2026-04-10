@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Link Check 2</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+      font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      touch-action: manipulation;
+    }
+    body {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+    #app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.25), transparent 30%),
+        radial-gradient(circle at 80% 30%, rgba(34, 197, 94, 0.2), transparent 30%),
+        radial-gradient(circle at 50% 80%, rgba(251, 191, 36, 0.16), transparent 35%);
+    }
+    .hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px 14px;
+      display: flex;
+      gap: 10px;
+      z-index: 5;
+    }
+    .card {
+      flex: 1;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.16);
+      color: #fff;
+      border-radius: 16px;
+      padding: 12px 14px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+    }
+    .label {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }
+    .value {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    #arena {
+      position: absolute;
+      inset: 0;
+    }
+    #target {
+      position: absolute;
+      width: 86px;
+      height: 86px;
+      border: none;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ffffff 0%, #fde68a 18%, #f59e0b 55%, #ea580c 100%);
+      box-shadow: 0 12px 28px rgba(245, 158, 11, 0.45), 0 0 0 10px rgba(255,255,255,0.08);
+      transform: translate(-50%, -50%) scale(1);
+      transition: transform 0.08s ease;
+      cursor: pointer;
+    }
+    #target:active {
+      transform: translate(-50%, -50%) scale(0.92);
+    }
+    #center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(88vw, 420px);
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(255,255,255,0.14);
+      color: #fff;
+      border-radius: 24px;
+      padding: 24px 20px;
+      text-align: center;
+      z-index: 6;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    }
+    #title {
+      font-size: 30px;
+      font-weight: 800;
+      margin: 0 0 10px;
+      letter-spacing: 0.5px;
+    }
+    #desc {
+      margin: 0 0 18px;
+      font-size: 15px;
+      line-height: 1.5;
+      opacity: 0.9;
+    }
+    #startBtn {
+      border: none;
+      border-radius: 999px;
+      padding: 14px 28px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+      background: linear-gradient(180deg, #fef08a 0%, #fbbf24 100%);
+      box-shadow: 0 10px 24px rgba(251, 191, 36, 0.35);
+      cursor: pointer;
+    }
+    #hint {
+      position: absolute;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 16px;
+      border-radius: 999px;
+      color: rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.1);
+      font-size: 13px;
+      z-index: 4;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .hidden { display: none; }
+    @media (max-width: 380px) {
+      .value { font-size: 24px; }
+      #target { width: 74px; height: 74px; }
+      #title { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="hud">
+      <div class="card">
+        <div class="label">分数</div>
+        <div class="value" id="score">0</div>
+      </div>
+      <div class="card">
+        <div class="label">时间</div>
+        <div class="value" id="time">20</div>
+      </div>
+    </div>
+
+    <div id="arena">
+      <button id="target" class="hidden" aria-label="target"></button>
+    </div>
+
+    <div id="center">
+      <h1 id="title">Link Check 2</h1>
+      <p id="desc">点击随机出现的圆点得分，20 秒结束后可重新开始。</p>
+      <button id="startBtn">开始游戏</button>
+    </div>
+
+    <div id="hint">支持触摸和鼠标点击</div>
+  </div>
+
+  <script>
+    (function () {
+      const arena = document.getElementById('arena');
+      const target = document.getElementById('target');
+      const scoreEl = document.getElementById('score');
+      const timeEl = document.getElementById('time');
+      const center = document.getElementById('center');
+      const startBtn = document.getElementById('startBtn');
+      const desc = document.getElementById('desc');
+
+      let score = 0;
+      let timeLeft = 20;
+      let timer = null;
+      let running = false;
+
+      function clamp(n, min, max) {
+        return Math.max(min, Math.min(max, n));
+      }
+
+      function moveTarget() {
+        const arenaRect = arena.getBoundingClientRect();
+        const size = target.offsetWidth || 86;
+        const topPadding = 110;
+        const bottomPadding = 60;
+        const minX = size / 2 + 12;
+        const maxX = arenaRect.width - size / 2 - 12;
+        const minY = size / 2 + topPadding;
+        const maxY = arenaRect.height - size / 2 - bottomPadding;
+        const x = Math.random() * Math.max(1, maxX - minX) + minX;
+        const y = Math.random() * Math.max(1, maxY - minY) + minY;
+        target.style.left = clamp(x, minX, maxX) + 'px';
+        target.style.top = clamp(y, minY, maxY) + 'px';
+      }
+
+      function updateHud() {
+        scoreEl.textContent = String(score);
+        timeEl.textContent = String(timeLeft);
+      }
+
+      function endGame() {
+        running = false;
+        clearInterval(timer);
+        timer = null;
+        target.classList.add('hidden');
+        center.classList.remove('hidden');
+        desc.textContent = '时间到，你获得了 ' + score + ' 分。再来一次，刷新你的最高纪录。';
+        startBtn.textContent = '再玩一次';
+      }
+
+      function startGame() {
+        score = 0;
+        timeLeft = 20;
+        running = true;
+        updateHud();
+        center.classList.add('hidden');
+        target.classList.remove('hidden');
+        moveTarget();
+        clearInterval(timer);
+        timer = setInterval(function () {
+          timeLeft -= 1;
+          updateHud();
+          if (timeLeft <= 0) {
+            endGame();
+          }
+        }, 1000);
+      }
+
+      target.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        if (!running) return;
+        score += 1;
+        updateHud();
+        moveTarget();
+      }, { passive: false });
+
+      startBtn.addEventListener('click', startGame);
+
+      window.addEventListener('resize', function () {
+        if (running) moveTarget();
+      });
+
+      updateHud();
+    })();
+  </script>
+</body>
+</html>
