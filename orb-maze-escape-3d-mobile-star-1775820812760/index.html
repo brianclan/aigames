@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Orb Maze Escape 3D</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+    body {
+      background: radial-gradient(circle at top, #12304d 0%, #07111e 55%, #03070c 100%);
+      color: #eef6ff;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    canvas { display: block; }
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .panel {
+      position: absolute;
+      backdrop-filter: blur(18px);
+      background: rgba(8, 21, 39, 0.58);
+      border: 1px solid rgba(171, 223, 255, 0.2);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      border-radius: 20px;
+    }
+    #topbar {
+      top: 18px;
+      left: 18px;
+      display: flex;
+      gap: 12px;
+      padding: 14px 16px;
+      min-width: 320px;
+    }
+    .stat { min-width: 82px; }
+    .label {
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(198, 226, 255, 0.7);
+      margin-bottom: 5px;
+    }
+    .value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    #message {
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 360px;
+      max-width: 520px;
+      padding: 24px 28px;
+      text-align: center;
+      pointer-events: auto;
+      opacity: 0;
+      transition: opacity 180ms ease;
+    }
+    #message.visible { opacity: 1; }
+    #message h1 {
+      font-size: 34px;
+      margin-bottom: 10px;
+    }
+    #message p {
+      color: rgba(225, 240, 255, 0.82);
+      line-height: 1.55;
+      font-size: 16px;
+    }
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .cta {
+      appearance: none;
+      border: 1px solid rgba(150, 230, 255, 0.35);
+      background: linear-gradient(180deg, rgba(104, 216, 255, 0.28), rgba(38, 115, 162, 0.28));
+      color: #f4fbff;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .cta.secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(235, 244, 255, 0.9);
+    }
+    #toast {
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      padding: 12px 18px;
+      font-size: 15px;
+      color: #fef8ff;
+      opacity: 0;
+      transition: opacity 160ms ease;
+    }
+    #toast.visible { opacity: 1; }
+    .accent { color: #7fe1ff; }
+    @media (max-width: 820px) {
+      #topbar {
+        top: 12px;
+        left: 12px;
+        min-width: 0;
+        width: calc(100% - 24px);
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 14px;
+      }
+      .stat {
+        min-width: 0;
+        flex: 1 1 0;
+      }
+      .value { font-size: 20px; }
+      #message {
+        min-width: 0;
+        width: calc(100% - 28px);
+        padding: 20px 18px;
+      }
+      #message h1 { font-size: 28px; }
+      #message p { font-size: 15px; }
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hud">
+    <div id="topbar" class="panel">
+      <div class="stat">
+        <div class="label">Lives</div>
+        <div id="livesValue" class="value">3</div>
+      </div>
+      <div class="stat">
+        <div class="label">Traps</div>
+        <div id="trapValue" class="value">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Time</div>
+        <div id="timeValue" class="value">0.0s</div>
+      </div>
+    </div>
+    <div id="message" class="panel">
+      <h1 id="messageTitle">Orb Maze Escape</h1>
+      <p id="messageBody">Tap <strong>Start Game</strong> to begin. On mobile, use your phone's motion to control the orb, avoid traps, and reach the goal beacon.</p>
+      <div class="actions">
+        <button id="startButton" class="cta">Start Game</button>
+        <button id="motionButton" class="cta secondary" hidden>Enable Tilt Control</button>
+      </div>
+    </div>
+    <div id="toast" class="panel">Trap triggered. Respawning…</div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+    import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+    import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+
+    const CELL = 7;
+    const HALF_CELL = CELL / 2;
+    const WALL_HEIGHT = 5;
+    const BALL_RADIUS = 1.1;
+    const FLOOR_Y = 0;
+    const START_LIVES = 3;
+    const ACCELERATION = 18;
+    const FRICTION = 5.5;
+    const MAX_SPEED = 14;
+    const CAMERA_DISTANCE = 21;
+    const CAMERA_PITCH = 0.82;
+    const MAZE = [
+      "###############",
+      "#S....#....T..#",
+      "#.##.#.###.##.#",
+      "#..#.#...#....#",
+      "##.#.###.#.##.#",
+      "#..#...#.#..#.#",
+      "#.###T.#.##.#.#",
+      "#.....##....#.#",
+      "#.#####.####.#.",
+      "#...#...T..#..#",
+      "###.#.#####.#.#",
+      "#...#.....#.#G#",
+      "#.#######.#.#.#",
+      "#..T......#...#",
+      "###############"
+    ];
+
+    const MESSAGE = {
+      ready: {
+        title: "Orb Maze Escape",
+        body: "Tap <strong>Start Game</strong> to begin. On mobile, use your phone's motion to control the orb, avoid traps, and reach the goal beacon."
+      },
+      victory: {
+        title: "Maze Cleared",
+        body: "You reached the goal beacon. Tap <strong>Start Game</strong> to play again."
+      },
+      defeat: {
+        title: "Orb Lost",
+        body: "Too many trap collisions drained the orb. Tap <strong>Start Game</strong> to retry the maze."
+      }
+    };
+
+    const isTouchDevice = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+
+    const state = {
+      mode: "ready",
+      elapsed: 0,
+      trapHits: 0,
+      lives: START_LIVES,
+      respawnTimer: 0,
+      shake: 0,
+      keys: { up: false, down: false, left: false, right: false },
+      pointer: { dragging: false, x: 0, y: 0 },
+      cameraYaw: -0.55,
+      cameraPitch: CAMERA_PITCH,
+      motion: {
+        available: typeof window.DeviceOrientationEvent !== 'undefined',
+        enabled: false,
+        permission: 'unknown',
+        gamma: 0,
+        beta: 0,
+        calibrateGamma: 0,
+        calibrateBeta: 0
+      },
+      debug: false
+    };
+
+    const topbarLives = document.getElementById('livesValue');
+    const topbarTraps = document.getElementById('trapValue');
+    const topbarTime = document.getElementById('timeValue');
+    const message = document.getElementById('message');
+    const messageTitle = document.getElementById('messageTitle');
+    const messageBody = document.getElementById('messageBody');
+    const toast = document.getElementById('toast');
+    const startButton = document.getElementById('startButton');
+    const motionButton = document.getElementById('motionButton');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x86a9c8);
+    scene.fog = new THREE.FogExp2(0x86a9c8, 0.022);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.useLegacyLights = false;
+    document.body.appendChild(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 300);
+    const cameraTarget = new THREE.Vector3();
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+    ssaoPass.kernelRadius = 14;
+    ssaoPass.minDistance = 0.005;
+    ssaoPass.maxDistance = 0.09;
+    composer.addPass(ssaoPass);
+
+    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.38, 0.3, 0.88);
+    composer.addPass(bloomPass);
+
+    const colorGrade = new ShaderPass({
+      uniforms: {
+        tDiffuse: { value: null },
+        brightness: { value: 0.015 },
+        contrast: { value: 1.08 },
+        saturation: { value: 1.12 },
+        vignetteIntensity: { value: 0.22 },
+        vignetteRoundness: { value: 0.82 }
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float brightness, contrast, saturation, vignetteIntensity, vignetteRoundness;
+        varying vec2 vUv;
+        void main() {
+          vec4 color = texture2D(tDiffuse, vUv);
+          color.rgb += brightness;
+          color.rgb = (color.rgb - 0.5) * contrast + 0.5;
+          float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+          color.rgb = mix(vec3(gray), color.rgb, saturation);
+          vec2 uv = vUv * 2.0 - 1.0;
+          float vig = 1.0 - dot(uv * vignetteRoundness, uv * vignetteRoundness);
+          color.rgb *= mix(1.0 - vignetteIntensity, 1.0, clamp(pow(vig, 1.35), 0.0, 1.0));
+          gl_FragColor = color;
+        }
+      `
+    });
+    composer.addPass(colorGrade);
+
+    const fxaaPass = new ShaderPass(FXAAShader);
+    fxaaPass.uniforms.resolution.value.set(1 / window.innerWidth, 1 / window.innerHeight);
+    composer.addPass(fxaaPass);
+
+    const sunLight = new THREE.DirectionalLight(0xfff0dd, 2.45);
+    sunLight.position.set(35, 52, 24);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(4096, 4096);
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 220;
+    sunLight.shadow.camera.left = -80;
+    sunLight.shadow.camera.right = 80;
+    sunLight.shadow.camera.top = 80;
+    sunLight.shadow.camera.bottom = -80;
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.normalBias = 0.02;
+    scene.add(sunLight);
+
+    const fillLight = new THREE.DirectionalLight(0x8ba9cc, 0.62);
+    fillLight.position.set(-30, 18, -16);
+    scene.add(fillLight);
+
+    const hemiLight = new THREE.HemisphereLight(0x9fd8ff, 0x48643a, 0.52);
+    scene.add(hemiLight);
+
+    const ambientLight = new THREE.AmbientLight(0x202a35, 0.4);
+    scene.add(ambientLight);
+
+    const mazeGroup = new THREE.Group();
+    scene.add(mazeGroup);
+
+    const wallBoxes = [];
+    const trapZones = [];
+    let startPosition = new THREE.Vector3();
+    let goalPosition = new THREE.Vector3();
+
+    const worldWidth = MAZE[0].length * CELL;
+    const worldDepth = MAZE.length * CELL;
+    const originX = -worldWidth / 2 + HALF_CELL;
+    const originZ = -worldDepth / 2 + HALF_CELL;
+
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x5d708d,
+      metalness: 0.18,
+      roughness: 0.78
+    });
+    const floor = new THREE.Mesh(
+      new THREE.BoxGeometry(worldWidth + 8, 1.5, worldDepth + 8),
+      floorMaterial
+    );
+    floor.position.set(0, -0.8, 0);
+    floor.receiveShadow = true;
+    mazeGroup.add(floor);
+
+    const wallMaterial = new THREE.MeshStandardMaterial({
+      color: 0x7a93ac,
+      metalness: 0.28,
+      roughness: 0.42
+    });
+    const wallTopMaterial = new THREE.MeshStandardMaterial({
+      color: 0xa7bfda,
+      metalness: 0.18,
+      roughness: 0.33
+    });
+    const trapRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3d1320,
+      emissive: 0xff4564,
+      emissiveIntensity: 0.9,
+      metalness: 0.2,
+      roughness: 0.4
+    });
+    const goalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x66d7ff,
+      emissive: 0x7ff2ff,
+      emissiveIntensity: 1.3,
+      metalness: 0.45,
+      roughness: 0.18
+    });
+
+    function cellToWorld(col, row) {
+      return new THREE.Vector3(originX + col * CELL, FLOOR_Y, originZ + row * CELL);
+    }
+
+    function addWall(col, row) {
+      const pos = cellToWorld(col, row);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(CELL, WALL_HEIGHT, CELL), wallMaterial);
+      base.position.set(pos.x, WALL_HEIGHT / 2, pos.z);
+      base.castShadow = true;
+      base.receiveShadow = true;
+      mazeGroup.add(base);
+
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(CELL * 0.92, 0.8, CELL * 0.92), wallTopMaterial);
+      cap.position.set(pos.x, WALL_HEIGHT + 0.35, pos.z);
+      cap.castShadow = true;
+      cap.receiveShadow = true;
+      mazeGroup.add(cap);
+
+      wallBoxes.push(new THREE.Box3().setFromCenterAndSize(
+        new THREE.Vector3(pos.x, WALL_HEIGHT / 2, pos.z),
+        new THREE.Vector3(CELL, WALL_HEIGHT, CELL)
+      ));
+    }
+
+    function addTrap(col, row) {
+      const pos = cellToWorld(col, row);
+      const pit = new THREE.Mesh(
+        new THREE.CylinderGeometry(CELL * 0.42, CELL * 0.48, 0.6, 28, 1, true),
+        trapRingMaterial
+      );
+      pit.position.set(pos.x, 0.18, pos.z);
+      pit.castShadow = true;
+      pit.receiveShadow = true;
+      mazeGroup.add(pit);
+
+      const core = new THREE.Mesh(
+        new THREE.CylinderGeometry(CELL * 0.29, CELL * 0.34, 0.3, 22),
+        new THREE.MeshStandardMaterial({
+          color: 0x29030a,
+          emissive: 0xff294c,
+          emissiveIntensity: 2.1,
+          roughness: 0.25
+        })
+      );
+      core.position.set(pos.x, 0.08, pos.z);
+      mazeGroup.add(core);
+
+      trapZones.push({ center: new THREE.Vector3(pos.x, 0, pos.z), radius: CELL * 0.33 });
+    }
+
+    function addGoal(col, row) {
+      const pos = cellToWorld(col, row);
+      goalPosition = pos.clone();
+
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(CELL * 0.42, CELL * 0.48, 0.6, 24), goalMaterial);
+      pad.position.set(pos.x, 0.3, pos.z);
+      pad.castShadow = true;
+      pad.receiveShadow = true;
+      mazeGroup.add(pad);
+
+      const beacon = new THREE.Mesh(
+        new THREE.TorusGeometry(CELL * 0.24, 0.16, 12, 24),
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          emissive: 0x90ffff,
+          emissiveIntensity: 2.2,
+          metalness: 0.2,
+          roughness: 0.1
+        })
+      );
+      beacon.rotation.x = Math.PI / 2;
+      beacon.position.set(pos.x, 1.35, pos.z);
+      mazeGroup.add(beacon);
+
+      goalPulse = beacon;
+    }
+
+    let goalPulse = null;
+    for (let row = 0; row < MAZE.length; row++) {
+      for (let col = 0; col < MAZE[row].length; col++) {
+        const tile = MAZE[row][col];
+        if (tile === '#') addWall(col, row);
+        if (tile === 'T') addTrap(col, row);
+        if (tile === 'S') startPosition = cellToWorld(col, row).add(new THREE.Vector3(0, BALL_RADIUS + 0.2, 0));
+        if (tile === 'G') addGoal(col, row);
+      }
+    }
+
+    const orbMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xe4f8ff,
+      metalness: 0.08,
+      roughness: 0.07,
+      transmission: 0.28,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      emissive: 0x4fc9ff,
+      emissiveIntensity: 0.38
+    });
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(BALL_RADIUS, 40, 40), orbMaterial);
+    orb.castShadow = true;
+    orb.receiveShadow = true;
+    orb.position.copy(startPosition);
+    scene.add(orb);
+
+    const orbInner = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(BALL_RADIUS * 0.38, 0),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0x74ecff,
+        emissiveIntensity: 1.4,
+        roughness: 0.2,
+        metalness: 0.0
+      })
+    );
+    orb.add(orbInner);
+
+    const velocity = new THREE.Vector3();
+    const previousPosition = new THREE.Vector3().copy(startPosition);
+    const clock = new THREE.Clock();
+
+    function updateMessage(mode) {
+      const payload = MESSAGE[mode];
+      if (!payload) {
+        message.classList.remove('visible');
+        return;
+      }
+      messageTitle.textContent = payload.title;
+      messageBody.innerHTML = payload.body;
+      message.classList.add('visible');
+    }
+
+    function showToast(text, duration = 1200) {
+      toast.textContent = text;
+      toast.classList.add('visible');
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => toast.classList.remove('visible'), duration);
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      if (mode === 'running') {
+        message.classList.remove('visible');
+      } else {
+        updateMessage(mode);
+      }
+    }
+
+    function respawnOrb() {
+      orb.position.copy(startPosition);
+      velocity.set(0, 0, 0);
+      state.respawnTimer = 0.9;
+    }
+
+    function restartGame() {
+      state.elapsed = 0;
+      state.trapHits = 0;
+      state.lives = START_LIVES;
+      state.shake = 0;
+      state.motion.calibrateGamma = state.motion.gamma;
+      state.motion.calibrateBeta = state.motion.beta;
+      topbarLives.textContent = state.lives;
+      topbarTraps.textContent = state.trapHits;
+      topbarTime.textContent = '0.0s';
+      respawnOrb();
+      setMode('running');
+    }
+
+    function updateHUD() {
+      topbarLives.textContent = String(state.lives);
+      topbarTraps.textContent = String(state.trapHits);
+      topbarTime.textContent = `${state.elapsed.toFixed(1)}s`;
+    }
+
+    function updateActionButtons() {
+      const showMotion = isTouchDevice && state.motion.available && !state.motion.enabled;
+      motionButton.hidden = !showMotion;
+      startButton.textContent = state.mode === 'running' ? 'Resume' : 'Start Game';
+    }
+
+    async function enableMotionControls() {
+      if (!state.motion.available) {
+        showToast('Tilt controls are not available on this device.', 1600);
+        return false;
+      }
+      try {
+        if (typeof DeviceOrientationEvent?.requestPermission === 'function') {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          state.motion.permission = permission;
+          if (permission !== 'granted') {
+            showToast('Motion access was denied.', 1600);
+            return false;
+          }
+        }
+        state.motion.enabled = true;
+        state.motion.permission = 'granted';
+        state.motion.calibrateGamma = state.motion.gamma;
+        state.motion.calibrateBeta = state.motion.beta;
+        showToast('Tilt control enabled. Keep phone level to calibrate.', 1800);
+        updateActionButtons();
+        return true;
+      } catch (error) {
+        showToast('Unable to enable motion controls.', 1600);
+        return false;
+      }
+    }
+
+    function handleOrientation(event) {
+      if (typeof event.gamma === 'number') state.motion.gamma = event.gamma;
+      if (typeof event.beta === 'number') state.motion.beta = event.beta;
+    }
+
+    function getMotionVector() {
+      const gamma = THREE.MathUtils.clamp((state.motion.gamma - state.motion.calibrateGamma) / 18, -1, 1);
+      const beta = THREE.MathUtils.clamp((state.motion.beta - state.motion.calibrateBeta) / 18, -1, 1);
+      return new THREE.Vector2(gamma, beta);
+    }
+
+    function updateCamera(delta) {
+      const desired = new THREE.Vector3(
+        orb.position.x + Math.sin(state.cameraYaw) * Math.cos(state.cameraPitch) * CAMERA_DISTANCE,
+        orb.position.y + Math.sin(state.cameraPitch) * CAMERA_DISTANCE + 3.5,
+        orb.position.z + Math.cos(state.cameraYaw) * Math.cos(state.cameraPitch) * CAMERA_DISTANCE
+      );
+      camera.position.lerp(desired, 5.5 * delta);
+      cameraTarget.lerp(orb.position.clone().add(new THREE.Vector3(0, 1.1, 0)), 8 * delta);
+      camera.lookAt(cameraTarget);
+
+      if (state.shake > 0) {
+        camera.position.x += (Math.random() - 0.5) * state.shake;
+        camera.position.y += (Math.random() - 0.5) * state.shake;
+        state.shake *= 0.88;
+      }
+    }
+
+    function updateMovement(delta) {
+      const forward = new THREE.Vector3(Math.sin(state.cameraYaw), 0, Math.cos(state.cameraYaw));
+      const right = new THREE.Vector3(forward.z, 0, -forward.x);
+      const move = new THREE.Vector3();
+      if (state.motion.enabled && isTouchDevice) {
+        const tilt = getMotionVector();
+        move.addScaledVector(right, tilt.x);
+        move.addScaledVector(forward, tilt.y);
+      } else {
+        if (state.keys.up) move.add(forward);
+        if (state.keys.down) move.sub(forward);
+        if (state.keys.left) move.sub(right);
+        if (state.keys.right) move.add(right);
+      }
+      if (move.lengthSq() > 0) {
+        move.normalize().multiplyScalar(ACCELERATION * delta);
+        velocity.add(move);
+      }
+      velocity.multiplyScalar(Math.max(0, 1 - FRICTION * delta));
+      if (velocity.length() > MAX_SPEED) velocity.setLength(MAX_SPEED);
+
+      previousPosition.copy(orb.position);
+      orb.position.addScaledVector(velocity, delta);
+
+      const ballBox = new THREE.Box3().setFromCenterAndSize(
+        orb.position.clone(),
+        new THREE.Vector3(BALL_RADIUS * 1.85, BALL_RADIUS * 1.85, BALL_RADIUS * 1.85)
+      );
+      for (const wall of wallBoxes) {
+        if (ballBox.intersectsBox(wall)) {
+          orb.position.copy(previousPosition);
+          velocity.multiplyScalar(-0.15);
+          break;
+        }
+      }
+
+      const boundsX = worldWidth / 2 - CELL;
+      const boundsZ = worldDepth / 2 - CELL;
+      orb.position.x = THREE.MathUtils.clamp(orb.position.x, -boundsX, boundsX);
+      orb.position.z = THREE.MathUtils.clamp(orb.position.z, -boundsZ, boundsZ);
+
+      const spinAxis = new THREE.Vector3(velocity.z, 0, -velocity.x);
+      if (spinAxis.lengthSq() > 0.0001) {
+        spinAxis.normalize();
+        orb.rotateOnWorldAxis(spinAxis, velocity.length() * delta * 0.55);
+      }
+    }
+
+    function updateGameplay(delta) {
+      if (state.mode !== 'running') return;
+      if (state.respawnTimer > 0) {
+        state.respawnTimer -= delta;
+        return;
+      }
+
+      state.elapsed += delta;
+      updateMovement(delta);
+
+      for (const trap of trapZones) {
+        const dist = trap.center.distanceTo(new THREE.Vector3(orb.position.x, 0, orb.position.z));
+        if (dist < trap.radius) {
+          state.trapHits += 1;
+          state.lives -= 1;
+          state.shake = 0.5;
+          updateHUD();
+          if (state.lives <= 0) {
+            setMode('defeat');
+            showToast('The orb shattered in the trap field.', 1600);
+          } else {
+            showToast('Trap triggered. Respawning…');
+            respawnOrb();
+          }
+          return;
+        }
+      }
+
+      const goalDist = goalPosition.distanceTo(new THREE.Vector3(orb.position.x, FLOOR_Y, orb.position.z));
+      if (goalDist < CELL * 0.36) {
+        setMode('victory');
+        showToast('Goal reached. Maze complete!', 1800);
+      }
+    }
+
+    function animateGoal(time) {
+      if (!goalPulse) return;
+      goalPulse.scale.setScalar(1 + Math.sin(time * 0.0038) * 0.12);
+      goalPulse.rotation.z += 0.01;
+    }
+
+    function render() {
+      requestAnimationFrame(render);
+      const delta = Math.min(clock.getDelta(), 0.033);
+      updateCamera(delta);
+      updateGameplay(delta);
+      updateHUD();
+      animateGoal(performance.now());
+      composer.render();
+    }
+
+    function onKeyChange(code, pressed) {
+      if (code === 'KeyW' || code === 'ArrowUp') state.keys.up = pressed;
+      if (code === 'KeyS' || code === 'ArrowDown') state.keys.down = pressed;
+      if (code === 'KeyA' || code === 'ArrowLeft') state.keys.left = pressed;
+      if (code === 'KeyD' || code === 'ArrowRight') state.keys.right = pressed;
+      if (pressed && code === 'Space' && state.mode === 'ready') restartGame();
+      if (pressed && code === 'KeyR' && (state.mode === 'victory' || state.mode === 'defeat')) restartGame();
+    }
+
+    window.addEventListener('keydown', (event) => onKeyChange(event.code, true));
+    window.addEventListener('keyup', (event) => onKeyChange(event.code, false));
+    window.addEventListener('mousedown', (event) => {
+      if (event.button === 0 || event.button === 2) state.pointer.dragging = true;
+    });
+    window.addEventListener('mouseup', () => { state.pointer.dragging = false; });
+    window.addEventListener('mousemove', (event) => {
+      if (!state.pointer.dragging) return;
+      state.cameraYaw -= event.movementX * 0.004;
+      state.cameraPitch = THREE.MathUtils.clamp(state.cameraPitch + event.movementY * 0.004, 0.28, 1.2);
+    });
+    window.addEventListener('touchstart', (event) => {
+      state.pointer.dragging = true;
+      const touch = event.touches[0];
+      if (touch) {
+        state.pointer.x = touch.clientX;
+        state.pointer.y = touch.clientY;
+      }
+    }, { passive: true });
+    window.addEventListener('touchend', () => { state.pointer.dragging = false; }, { passive: true });
+    window.addEventListener('touchmove', (event) => {
+      if (!state.pointer.dragging) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      const dx = touch.clientX - state.pointer.x;
+      const dy = touch.clientY - state.pointer.y;
+      state.pointer.x = touch.clientX;
+      state.pointer.y = touch.clientY;
+      state.cameraYaw -= dx * 0.008;
+      state.cameraPitch = THREE.MathUtils.clamp(state.cameraPitch + dy * 0.008, 0.28, 1.2);
+    }, { passive: true });
+    window.addEventListener('contextmenu', (event) => event.preventDefault());
+    window.addEventListener('deviceorientation', handleOrientation, true);
+
+    startButton.addEventListener('click', async () => {
+      if (isTouchDevice && state.motion.available && !state.motion.enabled) {
+        await enableMotionControls();
+      }
+      if (state.mode !== 'running') restartGame();
+    });
+    motionButton.addEventListener('click', enableMotionControls);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
+      fxaaPass.uniforms.resolution.value.set(1 / window.innerWidth, 1 / window.innerHeight);
+    });
+
+    window.render_game_to_text = () => JSON.stringify({
+      mode: state.mode,
+      lives: state.lives,
+      trapHits: state.trapHits,
+      elapsed: Number(state.elapsed.toFixed(2)),
+      orb: {
+        x: Number(orb.position.x.toFixed(2)),
+        y: Number(orb.position.y.toFixed(2)),
+        z: Number(orb.position.z.toFixed(2))
+      }
+    }, null, 2);
+
+    window.advanceTime = (ms) => {
+      const steps = Math.max(1, Math.floor(ms / 16));
+      const delta = ms / 1000 / steps;
+      for (let i = 0; i < steps; i++) {
+        updateCamera(delta);
+        updateGameplay(delta);
+      }
+      updateHUD();
+    };
+
+    updateActionButtons();
+    updateMessage('ready');
+    updateHUD();
+    render();
+  </script>
+</body>
+</html>
