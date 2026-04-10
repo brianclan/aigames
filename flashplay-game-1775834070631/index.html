@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>猫咪接鱼</title>
+<style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#87d7ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:none}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block}
+#ui{position:fixed;inset:0;pointer-events:none;color:#fff}
+#topbar{position:absolute;left:0;top:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 12px) 14px 10px 14px;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,.35);font-size:18px}
+#tip{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);background:rgba(0,0,0,.28);padding:8px 14px;border-radius:999px;font-size:13px;backdrop-filter:blur(6px);white-space:nowrap}
+#panel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;pointer-events:auto}
+#card{width:min(88vw,420px);background:rgba(9,33,54,.78);border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:24px 20px;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.28);color:#fff}
+#title{font-size:30px;font-weight:900;letter-spacing:1px;margin-bottom:10px}
+#desc{font-size:15px;line-height:1.6;opacity:.95;margin-bottom:18px}
+#btn{display:inline-block;border:none;background:linear-gradient(180deg,#ffd85e,#ff9f1c);color:#3b2200;font-size:20px;font-weight:900;padding:14px 26px;border-radius:16px;box-shadow:0 8px 0 rgba(166,91,0,.55);cursor:pointer}
+#btn:active{transform:translateY(4px);box-shadow:0 4px 0 rgba(166,91,0,.55)}
+.small{margin-top:14px;font-size:12px;opacity:.85}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui">
+  <div id="topbar"><div id="score">得分 0</div><div id="life">爱心 3</div></div>
+  <div id="tip">按住屏幕左右拖动小猫</div>
+  <div id="panel">
+    <div id="card">
+      <div id="title">猫咪接鱼</div>
+      <div id="desc">海边的小鱼从天而降，接住它们加分，碰到罐头和杂物会掉爱心，看看你能坚持多久。</div>
+      <button id="btn">开始游戏</button>
+      <div class="small" id="sub">支持触摸与鼠标，竖屏体验最佳</div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const canvas=document.getElementById('game');
+  const ctx=canvas.getContext('2d');
+  const scoreEl=document.getElementById('score');
+  const lifeEl=document.getElementById('life');
+  const panel=document.getElementById('panel');
+  const btn=document.getElementById('btn');
+  const desc=document.getElementById('desc');
+  const sub=document.getElementById('sub');
+  const tip=document.getElementById('tip');
+
+  let w=0,h=0,dpr=1;
+  function resize(){
+    dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+    w=window.innerWidth;
+    h=window.innerHeight;
+    canvas.width=Math.floor(w*dpr);
+    canvas.height=Math.floor(h*dpr);
+    canvas.style.width=w+'px';
+    canvas.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize',resize,{passive:true});
+  resize();
+
+  const game={
+    running:false,
+    over:false,
+    score:0,
+    life:3,
+    spawnTimer:0,
+    speed:1,
+    time:0,
+    pointerX:null,
+    cat:{x:0,y:0,w:78,h:52,targetX:0},
+    items:[],
+    clouds:[],
+    splashes:[],
+    last:0
+  };
+
+  function reset(){
+    game.running=true;
+    game.over=false;
+    game.score=0;
+    game.life=3;
+    game.spawnTimer=0;
+    game.speed=1;
+    game.time=0;
+    game.items=[];
+    game.splashes=[];
+    game.clouds=[];
+    game.cat.w=Math.min(88,w*0.22);
+    game.cat.h=game.cat.w*0.66;
+    game.cat.x=w*0.5;
+    game.cat.targetX=game.cat.x;
+    game.cat.y=h-92;
+    for(let i=0;i<5;i++){
+      game.clouds.push({x:Math.random()*w,y:40+Math.random()*h*0.22,s:0.7+Math.random()*1.1,v:0.15+Math.random()*0.25});
+    }
+    updateHud();
+    tip.textContent='按住屏幕左右拖动小猫';
+  }
+
+  function updateHud(){
+    scoreEl.textContent='得分 '+game.score;
+    lifeEl.textContent='爱心 '+game.life;
+  }
+
+  function spawnItem(){
+    const r=Math.random();
+    const bad=r<0.22;
+    const golden=!bad && Math.random()<0.12;
+    const size=bad?(28+Math.random()*10):(golden?24+Math.random()*8:26+Math.random()*10);
+    game.items.push({
+      type:bad?'bad':(golden?'gold':'fish'),
+      x:24+Math.random()*(w-48),
+      y:-30,
+      size,
+      vx:(Math.random()-0.5)*0.5,
+      vy:(2.7+Math.random()*1.3)*game.speed,
+      rot:Math.random()*Math.PI*2,
+      spin:(Math.random()-0.5)*0.06
+    });
+  }
+
+  function addSplash(x,y,color){
+    for(let i=0;i<8;i++){
+      game.splashes.push({x,y,vx:(Math.random()-0.5)*3,vy:-Math.random()*2.4-0.6,life:18+Math.random()*12,color});
+    }
+  }
+
+  function setPointer(clientX){
+    game.pointerX=Math.max(0,Math.min(w,clientX));
+    game.cat.targetX=game.pointerX;
+  }
+
+  window.addEventListener('pointerdown',e=>{ setPointer(e.clientX); if(!game.running&&game.over) showStart('再玩一次','海风里又有好多鱼，准备好继续接鱼了吗？'); },{passive:true});
+  window.addEventListener('pointermove',e=>{ if(e.buttons||e.pointerType==='touch') setPointer(e.clientX); },{passive:true});
+  window.addEventListener('pointerup',()=>{ game.pointerX=null; },{passive:true});
+  window.addEventListener('mousemove',e=>{ if(e.buttons) setPointer(e.clientX); },{passive:true});
+  window.addEventListener('keydown',e=>{
+    if(e.key==='ArrowLeft') game.cat.targetX-=36;
+    if(e.key==='ArrowRight') game.cat.targetX+=36;
+    if((e.key==='Enter'||e.key===' ')&&!game.running){ startGame(); }
+  });
+
+  function startGame(){
+    panel.classList.add('hidden');
+    reset();
+  }
+
+  function showStart(buttonText,text){
+    panel.classList.remove('hidden');
+    btn.textContent=buttonText;
+    desc.textContent=text;
+    sub.textContent=game.over?'最终得分 '+game.score+' 分':'支持触摸与鼠标，竖屏体验最佳';
+  }
+
+  btn.addEventListener('click',startGame);
+
+  function drawSky(){
+    const g=ctx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'#7ed6ff');
+    g.addColorStop(0.58,'#b9ecff');
+    g.addColorStop(0.581,'#4fb4e8');
+    g.addColorStop(1,'#1a83c7');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,w,h);
+
+    ctx.fillStyle='rgba(255,255,255,0.16)';
+    ctx.beginPath();
+    ctx.arc(w*0.82,h*0.16,42,0,Math.PI*2);
+    ctx.fill();
+
+    game.clouds.forEach(c=>{
+      c.x+=c.v;
+      if(c.x-c.s*60>w) c.x=-c.s*70;
+      drawCloud(c.x,c.y,c.s);
+    });
+  }
+
+  function drawCloud(x,y,s){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.scale(s,s);
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(0,0,18,0,Math.PI*2);
+    ctx.arc(20,-6,22,0,Math.PI*2);
+    ctx.arc(44,0,18,0,Math.PI*2);
+    ctx.fillRect(0,0,44,18);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSea(){
+    const top=h*0.58;
+    ctx.fillStyle='#2ea7df';
+    ctx.fillRect(0,top,w,h-top);
+    for(let i=0;i<3;i++){
+      const y=top+14+i*18;
+      ctx.beginPath();
+      for(let x=0;x<=w+20;x+=20){
+        const yy=y+Math.sin((x*0.03)+(performance.now()*0.002+i))*3;
+        if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy);
+      }
+      ctx.strokeStyle=i===0?'rgba(255,255,255,0.4)':'rgba(255,255,255,0.2)';
+      ctx.lineWidth=2;
+      ctx.stroke();
+    }
+    ctx.fillStyle='#f0c87a';
+    ctx.beginPath();
+    ctx.moveTo(0,h);
+    ctx.lineTo(0,h*0.76);
+    ctx.quadraticCurveTo(w*0.25,h*0.69,w*0.5,h*0.77);
+    ctx.quadraticCurveTo(w*0.76,h*0.84,w,h*0.74);
+    ctx.lineTo(w,h);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawCat(cat){
+    const x=cat.x,y=cat.y,wc=cat.w,hc=cat.h;
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.fillStyle='#ffb347';
+    roundRect(-wc*0.36,-hc*0.08,wc*0.72,hc*0.62,18,true);
+    ctx.beginPath();
+    ctx.arc(0,-hc*0.18,wc*0.28,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-wc*0.18,-hc*0.34); ctx.lineTo(-wc*0.06,-hc*0.58); ctx.lineTo(wc*0.02,-hc*0.3); ctx.closePath();
+    ctx.moveTo(wc*0.18,-hc*0.34); ctx.lineTo(wc*0.06,-hc*0.58); ctx.lineTo(-wc*0.02,-hc*0.3); ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle='#fff2d8';
+    ctx.beginPath();
+    ctx.ellipse(0,-hc*0.1,wc*0.18,hc*0.14,0,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle='#2a2a2a';
+    ctx.beginPath();
+    ctx.arc(-wc*0.09,-hc*0.2,2.8,0,Math.PI*2);
+    ctx.arc(wc*0.09,-hc*0.2,2.8,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0,-hc*0.14); ctx.lineTo(-4,-hc*0.1); ctx.lineTo(4,-hc*0.1); ctx.closePath();
+    ctx.fillStyle='#ff7b94';
+    ctx.fill();
+
+    ctx.strokeStyle='#8b4a18';
+    ctx.lineWidth=2;
+    for(let i=-1;i<=1;i+=2){
+      ctx.beginPath(); ctx.moveTo(i*6,-hc*0.12); ctx.lineTo(i*16,-hc*0.14); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i*6,-hc*0.08); ctx.lineTo(i*16,-hc*0.05); ctx.stroke();
+    }
+
+    ctx.strokeStyle='#ffb347';
+    ctx.lineWidth=6;
+    ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(wc*0.34,hc*0.08);
+    ctx.quadraticCurveTo(wc*0.52,-hc*0.04,wc*0.5,-hc*0.22);
+    ctx.stroke();
+
+    ctx.strokeStyle='#8b4a18';
+    ctx.lineWidth=4;
+    for(let i=-1;i<=1;i+=2){
+      ctx.beginPath(); ctx.moveTo(i*wc*0.18,hc*0.22); ctx.lineTo(i*wc*0.16,hc*0.42); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function roundRect(x,y,w,h,r,fill){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    if(fill) ctx.fill(); else ctx.stroke();
+  }
+
+  function drawFish(it){
+    ctx.save();
+    ctx.translate(it.x,it.y);
+    ctx.rotate(it.rot);
+    const s=it.size;
+    if(it.type==='bad'){
+      ctx.fillStyle='#a8b3bf';
+      roundRect(-s*0.34,-s*0.42,s*0.68,s*0.84,8,true);
+      ctx.fillStyle='#d7dee6';
+      ctx.fillRect(-s*0.16,-s*0.26,s*0.32,s*0.08);
+      ctx.fillStyle='#ff5b5b';
+      ctx.fillRect(-s*0.18,-s*0.05,s*0.36,s*0.08);
+      ctx.fillStyle='#6a7988';
+      ctx.fillRect(-s*0.12,s*0.18,s*0.24,s*0.08);
+    }else{
+      ctx.fillStyle=it.type==='gold'?'#ffd34d':'#7fdaff';
+      ctx.beginPath();
+      ctx.ellipse(0,0,s*0.34,s*0.2,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-s*0.3,0); ctx.lineTo(-s*0.56,-s*0.16); ctx.lineTo(-s*0.56,s*0.16); ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle=it.type==='gold'?'#ffefac':'#dff8ff';
+      ctx.beginPath();
+      ctx.arc(s*0.16,-s*0.04,s*0.04,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle='#223';
+      ctx.beginPath();
+      ctx.arc(s*0.18,-s*0.05,s*0.02+1,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function loseLife(){
+    game.life--;
+    updateHud();
+    tip.textContent='小心杂物';
+    if(game.life<=0){
+      game.running=false;
+      game.over=true;
+      showStart('重新开始','小猫今天收工啦，再来一局刷新你的最高分。');
+    }
+  }
+
+  function update(dt){
+    if(!game.running) return;
+    game.time+=dt;
+    game.speed=1+Math.min(1.8,game.time/18);
+    game.spawnTimer-=dt;
+    if(game.spawnTimer<=0){
+      spawnItem();
+      game.spawnTimer=Math.max(0.22,0.7-(game.speed-1)*0.18)*(0.8+Math.random()*0.45);
+    }
+
+    const minX=game.cat.w*0.4;
+    const maxX=w-game.cat.w*0.4;
+    game.cat.targetX=Math.max(minX,Math.min(maxX,game.cat.targetX));
+    game.cat.x+=(game.cat.targetX-game.cat.x)*Math.min(1,dt*10);
+
+    for(let i=game.items.length-1;i>=0;i--){
+      const it=game.items[i];
+      it.x+=it.vx*60*dt;
+      it.y+=it.vy*60*dt;
+      it.rot+=it.spin*60*dt;
+
+      const catchY=game.cat.y-game.cat.h*0.18;
+      const dx=Math.abs(it.x-game.cat.x);
+      const dy=Math.abs(it.y-catchY);
+      if(dx<game.cat.w*0.42+it.size*0.22 && dy<game.cat.h*0.25+it.size*0.22){
+        if(it.type==='bad'){
+          addSplash(it.x,it.y,'#c9d2db');
+          loseLife();
+        }else{
+          const add=it.type==='gold'?3:1;
+          game.score+=add;
+          updateHud();
+          addSplash(it.x,it.y,it.type==='gold'?'#ffd34d':'#7fdaff');
+          tip.textContent=it.type==='gold'?'金鱼 +3':'接住小鱼 +1';
+        }
+        game.items.splice(i,1);
+        continue;
+      }
+      if(it.y>h+40){
+        if(it.type!=='bad'){
+          tip.textContent='别让鱼掉进海里';
+        }
+        game.items.splice(i,1);
+      }
+    }
+
+    for(let i=game.splashes.length-1;i>=0;i--){
+      const p=game.splashes[i];
+      p.x+=p.vx;
+      p.y+=p.vy;
+      p.vy+=0.08;
+      p.life-=1;
+      if(p.life<=0) game.splashes.splice(i,1);
+    }
+  }
+
+  function render(){
+    ctx.clearRect(0,0,w,h);
+    drawSky();
+    drawSea();
+    game.items.forEach(drawFish);
+    game.splashes.forEach(p=>{
+      ctx.globalAlpha=Math.max(0,p.life/30);
+      ctx.fillStyle=p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,3.2,0,Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha=1;
+    });
+    drawCat(game.cat);
+  }
+
+  function loop(ts){
+    if(!game.last) game.last=ts;
+    const dt=Math.min(0.033,(ts-game.last)/1000);
+    game.last=ts;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  showStart('开始游戏','海边的小鱼从天而降，接住它们加分，碰到罐头和杂物会掉爱心，看看你能坚持多久。');
+})();
+</script>
+</body>
+</html>
