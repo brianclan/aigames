@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Crab Runner</title>
+<style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#1a1630;font-family:Arial,Helvetica,sans-serif;touch-action:manipulation}
+body{display:flex}
+#game{width:100vw;height:100vh;display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+(function(){
+  const canvas=document.getElementById('game');
+  const ctx=canvas.getContext('2d');
+
+  let vw=0,vh=0,dpr=1;
+  function resize(){
+    dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+    vw=window.innerWidth;
+    vh=window.innerHeight;
+    canvas.width=Math.floor(vw*dpr);
+    canvas.height=Math.floor(vh*dpr);
+    canvas.style.width=vw+'px';
+    canvas.style.height=vh+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  resize();
+  window.addEventListener('resize',resize);
+
+  const GROUND_H=92;
+  const FLOOR_Y=()=>vh-GROUND_H;
+  const laneSpeedBase=300;
+  let time=0;
+  let score=0;
+  let coins=0;
+  let best=0;
+  let gameOver=false;
+  let started=false;
+  let shake=0;
+  let flash=0;
+  let spawnTimer=0;
+  let coinTimer=0;
+  let particles=[];
+  let bombs=[];
+  let pickups=[];
+  let touchDown=false;
+
+  const crab={
+    x:76,
+    y:0,
+    w:44,
+    h:28,
+    vy:0,
+    onGround:true,
+    anim:0,
+    blink:0
+  };
+
+  function reset(){
+    time=0;score=0;coins=0;gameOver=false;started=false;shake=0;flash=0;spawnTimer=0.9;coinTimer=0.5;
+    particles=[];bombs=[];pickups=[];
+    crab.y=FLOOR_Y()-crab.h+4;
+    crab.vy=0;
+    crab.onGround=true;
+    crab.anim=0;
+    crab.blink=0;
+  }
+  reset();
+
+  function jump(){
+    if(gameOver){reset();started=true;return;}
+    started=true;
+    if(crab.onGround){
+      crab.vy=-540;
+      crab.onGround=false;
+      for(let i=0;i<8;i++) particles.push({x:crab.x+12+Math.random()*20,y:crab.y+crab.h-2,vx:-40+Math.random()*80,vy:-20-Math.random()*80,life:0.35,size:4+Math.random()*4,color:'#f7d27c'});
+    }
+  }
+
+  function press(e){e.preventDefault();touchDown=true;jump();}
+  function release(e){if(e)e.preventDefault();touchDown=false;}
+  window.addEventListener('pointerdown',press,{passive:false});
+  window.addEventListener('pointerup',release,{passive:false});
+  window.addEventListener('pointercancel',release,{passive:false});
+  window.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW'){jump();}});
+
+  function aabb(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+
+  function spawnBomb(){
+    const size=28+Math.random()*10;
+    bombs.push({x:vw+20,y:FLOOR_Y()-size+8,w:size,h:size,speed:laneSpeedBase+time*10+Math.random()*70,pulse:Math.random()*6});
+  }
+
+  function spawnCoin(){
+    const size=18;
+    const jumpy=Math.random()<0.55;
+    pickups.push({x:vw+20,y:(jumpy?FLOOR_Y()-90-Math.random()*84:FLOOR_Y()-36),w:size,h:size,speed:laneSpeedBase+time*10+Math.random()*60,spin:Math.random()*6});
+  }
+
+  function explode(){
+    gameOver=true;
+    best=Math.max(best,coins);
+    shake=16;
+    flash=1;
+    for(let i=0;i<48;i++) particles.push({x:crab.x+crab.w*0.5,y:crab.y+crab.h*0.5,vx:-220+Math.random()*440,vy:-260+Math.random()*420,life:0.9+Math.random()*0.6,size:4+Math.random()*10,color:['#ffef8a','#ff9f43','#ff5e5e','#ffffff'][Math.floor(Math.random()*4)]});
+  }
+
+  function update(dt){
+    if(!started&& !gameOver) return;
+    if(!gameOver){
+      time+=dt;
+      score+=dt*10;
+      crab.anim+=dt*14;
+      crab.blink+=dt;
+      crab.vy+=1180*dt;
+      crab.y+=crab.vy*dt;
+      const groundY=FLOOR_Y()-crab.h+4;
+      if(crab.y>=groundY){crab.y=groundY;crab.vy=0;crab.onGround=true;}
+
+      spawnTimer-=dt;
+      coinTimer-=dt;
+      if(spawnTimer<=0){spawnBomb();spawnTimer=Math.max(0.68,1.35-time*0.02)+Math.random()*0.45;}
+      if(coinTimer<=0){spawnCoin();coinTimer=0.55+Math.random()*0.75;}
+
+      for(let i=bombs.length-1;i>=0;i--){
+        const b=bombs[i];
+        b.x-=b.speed*dt;
+        b.pulse+=dt*8;
+        if(b.x+b.w<-20) bombs.splice(i,1);
+        else if(aabb({x:crab.x+4,y:crab.y+2,w:crab.w-8,h:crab.h-4},b)) explode();
+      }
+
+      for(let i=pickups.length-1;i>=0;i--){
+        const c=pickups[i];
+        c.x-=c.speed*dt;
+        c.spin+=dt*10;
+        if(c.x+c.w<-20) pickups.splice(i,1);
+        else if(aabb({x:crab.x+6,y:crab.y+4,w:crab.w-12,h:crab.h-8},c)){
+          coins++;
+          pickups.splice(i,1);
+          for(let k=0;k<10;k++) particles.push({x:c.x+8,y:c.y+8,vx:-70+Math.random()*140,vy:-100+Math.random()*120,life:0.4+Math.random()*0.3,size:3+Math.random()*4,color:'#ffd95e'});
+        }
+      }
+    }
+
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i];
+      p.life-=dt;
+      p.x+=p.vx*dt;
+      p.y+=p.vy*dt;
+      p.vy+=500*dt;
+      if(p.life<=0) particles.splice(i,1);
+    }
+
+    shake=Math.max(0,shake-dt*24);
+    flash=Math.max(0,flash-dt*2.4);
+  }
+
+  function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
+  function drawPixelCrab(x,y,t){
+    const leg = Math.sin(t)*3;
+    rect(x+8,y+8,28,14,'#ff654f');
+    rect(x+4,y+12,8,8,'#ff654f');
+    rect(x+32,y+12,8,8,'#ff654f');
+    rect(x+10,y+4,8,6,'#ff7f66');
+    rect(x+26,y+4,8,6,'#ff7f66');
+    rect(x+12,y+10,4,4,'#1d0b18');
+    rect(x+28,y+10,4,4,'#1d0b18');
+    rect(x+2,y+6+leg,8,4,'#ff8d61');
+    rect(x+34,y+6-leg,8,4,'#ff8d61');
+    rect(x+8,y+22,5,4,'#ff8d61');
+    rect(x+15,y+23-leg,5,4,'#ff8d61');
+    rect(x+24,y+23+leg,5,4,'#ff8d61');
+    rect(x+31,y+22,5,4,'#ff8d61');
+  }
+
+  function drawBomb(b){
+    const p=Math.sin(b.pulse)*2;
+    rect(b.x+6,b.y+4,Math.max(8,b.w-12),Math.max(8,b.h-10),'#24242c');
+    rect(b.x+10,b.y,8,6,'#3b3b48');
+    rect(b.x+b.w-18,b.y,8,6,'#3b3b48');
+    rect(b.x+b.w/2-2,b.y-8,4,10,'#ffcf5a');
+    rect(b.x+b.w/2-1,b.y-12,2,4,'#fff4aa');
+    rect(b.x+7,b.y+b.h-8,4,4,'#6e7080');
+    rect(b.x+b.w-11,b.y+b.h-8,4,4,'#6e7080');
+    rect(b.x+b.w/2-4,b.y+b.h/2-4,8,8, p>0?'#ff6b57':'#ffb347');
+  }
+
+  function drawCoin(c){
+    const s=Math.max(0.35,Math.abs(Math.sin(c.spin)));
+    const w=c.w*s;
+    const x=c.x+(c.w-w)/2;
+    rect(x,c.y,w,c.h,'#ffd54f');
+    rect(x+2,c.y+2,Math.max(2,w-4),Math.max(2,c.h-4),'#fff09a');
+    if(w>8) rect(x+w/2-2,c.y+4,4,c.h-8,'#e0a92b');
+  }
+
+  function drawBackground(camShift){
+    const sky=ctx.createLinearGradient(0,0,0,vh);
+    sky.addColorStop(0,'#2b2a68');
+    sky.addColorStop(0.55,'#4a67b8');
+    sky.addColorStop(1,'#6ec3ff');
+    ctx.fillStyle=sky;
+    ctx.fillRect(0,0,vw,vh);
+
+    for(let i=0;i<5;i++){
+      const mx=(((i*180)-(time*18*(i<2?0.4:0.7)))% (vw+240))+vw+120-240;
+      ctx.fillStyle=i%2?'#3f4d8d':'#324175';
+      ctx.beginPath();
+      ctx.moveTo(mx-130,FLOOR_Y());
+      ctx.lineTo(mx-30,120+i*12);
+      ctx.lineTo(mx+60,FLOOR_Y());
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(mx-20,FLOOR_Y());
+      ctx.lineTo(mx+90,150+i*10);
+      ctx.lineTo(mx+180,FLOOR_Y());
+      ctx.fill();
+    }
+
+    for(let i=0;i<3;i++){
+      const y=90+i*40;
+      const speed=8+i*7;
+      const x=((vw+220)-((time*speed+i*130)%(vw+220)))-110;
+      ctx.fillStyle='rgba(255,255,255,0.8)';
+      rect(x,y,44,14,'rgba(255,255,255,0.75)');
+      rect(x+18,y-10,48,16,'rgba(255,255,255,0.8)');
+      rect(x+50,y+2,42,12,'rgba(255,255,255,0.72)');
+    }
+
+    rect(0,FLOOR_Y(),vw,GROUND_H,'#d3b06c');
+    rect(0,FLOOR_Y()+12,vw,GROUND_H-12,'#b88f55');
+    rect(0,FLOOR_Y()+28,vw,GROUND_H-28,'#8a643b');
+
+    const stripeW=28;
+    for(let x=-((time*240)%stripeW);x<vw+stripeW;x+=stripeW){
+      rect(x,FLOOR_Y()+14,14,6,'#e9ca81');
+      rect(x+8,FLOOR_Y()+48,10,6,'#946939');
+    }
+
+    for(let i=0;i<12;i++){
+      const x=(i*90-(time*120)%90);
+      rect(x,FLOOR_Y()-6,14,6,'#7dbb59');
+      rect(x+6,FLOOR_Y()-12,4,8,'#7dbb59');
+    }
+  }
+
+  function drawUI(){
+    ctx.fillStyle='rgba(14,18,36,0.48)';
+    ctx.fillRect(12,12,132,60);
+    ctx.fillRect(vw-106,12,94,60);
+    ctx.fillStyle='#ffffff';
+    ctx.font='bold 15px Arial';
+    ctx.fillText('金币',24,34);
+    ctx.fillText('最高',vw-88,34);
+    ctx.fillStyle='#ffd95e';
+    ctx.font='bold 24px Arial';
+    ctx.fillText(String(coins),24,60);
+    ctx.fillStyle='#9be37c';
+    ctx.fillText(String(best),vw-88,60);
+
+    if(!started&&!gameOver){
+      ctx.fillStyle='rgba(5,8,18,0.34)';
+      ctx.fillRect(24,vh*0.18,vw-48,150);
+      ctx.fillStyle='#ffffff';
+      ctx.textAlign='center';
+      ctx.font='bold 28px Arial';
+      ctx.fillText('Crab Runner',vw/2,vh*0.18+44);
+      ctx.font='20px Arial';
+      ctx.fillText('点击屏幕跳跃',vw/2,vh*0.18+84);
+      ctx.fillText('收集金币，躲开炸弹',vw/2,vh*0.18+114);
+      ctx.font='16px Arial';
+      ctx.fillStyle='#ffd95e';
+      ctx.fillText('碰到炸弹会爆炸结束',vw/2,vh*0.18+138);
+      ctx.textAlign='left';
+    }
+
+    if(gameOver){
+      ctx.fillStyle='rgba(22,10,14,0.58)';
+      ctx.fillRect(22,vh*0.18,vw-44,170);
+      ctx.fillStyle='#ffcf66';
+      ctx.textAlign='center';
+      ctx.font='bold 34px Arial';
+      ctx.fillText('BOOM!',vw/2,vh*0.18+50);
+      ctx.fillStyle='#ffffff';
+      ctx.font='22px Arial';
+      ctx.fillText('本次金币 '+coins,vw/2,vh*0.18+92);
+      ctx.fillText('点击重新开始',vw/2,vh*0.18+130);
+      ctx.font='16px Arial';
+      ctx.fillStyle='#ff8e8e';
+      ctx.fillText('小螃蟹被炸飞了',vw/2,vh*0.18+154);
+      ctx.textAlign='left';
+    }
+  }
+
+  let last=performance.now();
+  function loop(now){
+    let dt=(now-last)/1000;
+    last=now;
+    if(dt>0.033) dt=0.033;
+    update(dt);
+
+    const ox=shake?(-shake/2+Math.random()*shake):0;
+    const oy=shake?(-shake/2+Math.random()*shake):0;
+    ctx.save();
+    ctx.translate(ox,oy);
+    drawBackground();
+
+    for(const c of pickups) drawCoin(c);
+    for(const b of bombs) drawBomb(b);
+    if(!gameOver || particles.length){ drawPixelCrab(crab.x,crab.y,crab.anim); }
+    for(const p of particles){
+      ctx.globalAlpha=Math.max(0,p.life);
+      rect(p.x,p.y,p.size,p.size,p.color);
+      ctx.globalAlpha=1;
+    }
+    drawUI();
+    ctx.restore();
+
+    if(flash>0){
+      ctx.fillStyle='rgba(255,245,220,'+(flash*0.45)+')';
+      ctx.fillRect(0,0,vw,vh);
+    }
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
