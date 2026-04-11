@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>猫咪接鱼</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#80d8ff;font-family:Arial,"Microsoft YaHei",sans-serif;touch-action:none;user-select:none}#game{display:block;width:100vw;height:100vh;background:linear-gradient(#7fd9ff 0%,#d9f7ff 58%,#60c274 58%,#3fa75d 100%)}#tip{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom));text-align:center;color:#17425c;font-weight:700;font-size:14px;pointer-events:none;text-shadow:0 1px 0 rgba(255,255,255,.75)}</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="tip">按住并左右移动小猫接鱼</div>
+<script>
+(function(){
+var canvas=document.getElementById('game');
+var ctx=canvas.getContext('2d');
+var dpr=1,w=0,h=0,ground=0;
+var cat={x:0,y:0,w:76,h:58,target:0};
+var drops=[],score=0,best=Number(localStorage.getItem('catFishBest')||0),lives=3,time=0,last=0,spawn=0,over=false,started=false;
+function resize(){dpr=Math.min(window.devicePixelRatio||1,2);w=innerWidth;h=innerHeight;canvas.width=Math.floor(w*dpr);canvas.height=Math.floor(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);ground=h*.76;cat.w=Math.max(64,Math.min(92,w*.18));cat.h=cat.w*.76;cat.y=ground-cat.h*.22;if(!cat.x){cat.x=w/2;cat.target=cat.x}}
+addEventListener('resize',resize,{passive:true});resize();
+function rand(a,b){return a+Math.random()*(b-a)}
+function spawnDrop(){var bad=Math.random()<Math.min(.22,.08+score*.004);var size=bad?Math.max(24,w*.075):Math.max(28,w*.085);drops.push({x:rand(size,w-size),y:-size,v:rand(130,210)+score*2,size:size,bad:bad,rot:rand(0,6.28),spin:rand(-3,3)})}
+function pointer(x){started=true;cat.target=Math.max(cat.w/2,Math.min(w-cat.w/2,x))}
+canvas.addEventListener('pointerdown',function(e){pointer(e.clientX);canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',function(e){pointer(e.clientX)});
+canvas.addEventListener('click',function(e){if(over)restart();else pointer(e.clientX)});
+function restart(){drops=[];score=0;lives=3;time=0;spawn=0;over=false;started=true;cat.x=w/2;cat.target=cat.x;last=performance.now()}
+function drawCloud(x,y,s){ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(x,y,s*.45,0,7);ctx.arc(x+s*.42,y-s*.1,s*.36,0,7);ctx.arc(x+s*.85,y,s*.48,0,7);ctx.arc(x+s*.3,y+s*.15,s*.35,0,7);ctx.fill()}
+function drawFish(o){ctx.save();ctx.translate(o.x,o.y);ctx.rotate(Math.sin(time*3+o.x)*.18);var s=o.size;ctx.fillStyle='#ff9f1c';ctx.beginPath();ctx.ellipse(0,0,s*.52,s*.3,0,0,7);ctx.fill();ctx.fillStyle='#ffbf3f';ctx.beginPath();ctx.moveTo(-s*.46,0);ctx.lineTo(-s*.85,-s*.28);ctx.lineTo(-s*.78,0);ctx.lineTo(-s*.85,s*.28);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s*.25,-s*.07,s*.08,0,7);ctx.fill();ctx.fillStyle='#17425c';ctx.beginPath();ctx.arc(s*.28,-s*.07,s*.035,0,7);ctx.fill();ctx.strokeStyle='rgba(151,78,0,.35)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s*.08,0,s*.22,-1.1,1.1);ctx.stroke();ctx.restore()}
+function drawSpike(o){ctx.save();ctx.translate(o.x,o.y);ctx.rotate(o.rot);var s=o.size;ctx.fillStyle='#555b66';ctx.beginPath();for(var i=0;i<12;i++){var a=i*Math.PI/6,r=i%2?s*.38:s*.62;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.fillStyle='#2f3540';ctx.beginPath();ctx.arc(0,0,s*.35,0,7);ctx.fill();ctx.restore()}
+function drawCat(){var x=cat.x,y=cat.y,s=cat.w/90;ctx.save();ctx.translate(x,y);ctx.fillStyle='rgba(0,0,0,.16)';ctx.beginPath();ctx.ellipse(0,cat.h*.34,cat.w*.55,cat.h*.12,0,0,7);ctx.fill();ctx.fillStyle='#f6b15d';ctx.beginPath();ctx.ellipse(0,0,cat.w*.43,cat.h*.36,0,0,7);ctx.fill();ctx.beginPath();ctx.moveTo(-cat.w*.32,-cat.h*.22);ctx.lineTo(-cat.w*.21,-cat.h*.55);ctx.lineTo(-cat.w*.08,-cat.h*.2);ctx.moveTo(cat.w*.32,-cat.h*.22);ctx.lineTo(cat.w*.21,-cat.h*.55);ctx.lineTo(cat.w*.08,-cat.h*.2);ctx.fill();ctx.fillStyle='#ffd08a';ctx.beginPath();ctx.moveTo(-cat.w*.25,-cat.h*.24);ctx.lineTo(-cat.w*.2,-cat.h*.42);ctx.lineTo(-cat.w*.12,-cat.h*.22);ctx.moveTo(cat.w*.25,-cat.h*.24);ctx.lineTo(cat.w*.2,-cat.h*.42);ctx.lineTo(cat.w*.12,-cat.h*.22);ctx.fill();ctx.fillStyle='#fff3dc';ctx.beginPath();ctx.ellipse(0,cat.h*.06,cat.w*.23,cat.h*.18,0,0,7);ctx.fill();ctx.fillStyle='#1e2833';ctx.beginPath();ctx.arc(-cat.w*.15,-cat.h*.05,3.2*s,0,7);ctx.arc(cat.w*.15,-cat.h*.05,3.2*s,0,7);ctx.fill();ctx.fillStyle='#e85d75';ctx.beginPath();ctx.moveTo(0,cat.h*.02);ctx.lineTo(-5*s,cat.h*.08);ctx.lineTo(5*s,cat.h*.08);ctx.closePath();ctx.fill();ctx.strokeStyle='#56331e';ctx.lineWidth=1.6*s;ctx.beginPath();ctx.moveTo(-cat.w*.1,cat.h*.1);ctx.quadraticCurveTo(0,cat.h*.17,cat.w*.1,cat.h*.1);ctx.moveTo(-cat.w*.23,cat.h*.04);ctx.lineTo(-cat.w*.43,cat.h*.0);ctx.moveTo(-cat.w*.23,cat.h*.11);ctx.lineTo(-cat.w*.43,cat.h*.13);ctx.moveTo(cat.w*.23,cat.h*.04);ctx.lineTo(cat.w*.43,cat.h*.0);ctx.moveTo(cat.w*.23,cat.h*.11);ctx.lineTo(cat.w*.43,cat.h*.13);ctx.stroke();ctx.restore()}
+function drawHud(){ctx.fillStyle='rgba(255,255,255,.78)';ctx.fillRect(0,0,w,54+Math.max(0,window.visualViewport?0:0));ctx.fillStyle='#17425c';ctx.font='700 18px Arial';ctx.textAlign='left';ctx.fillText('分数 '+score,16,34);ctx.textAlign='center';ctx.fillText('最高 '+best,w/2,34);ctx.textAlign='right';ctx.fillText('生命 '+lives,w-16,34)}
+function drawOverlay(txt,sub){ctx.fillStyle='rgba(9,34,51,.58)';ctx.fillRect(0,0,w,h);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='700 34px Arial';ctx.fillText(txt,w/2,h*.42);ctx.font='700 17px Arial';ctx.fillText(sub,w/2,h*.49);ctx.font='14px Arial';ctx.fillText('点击屏幕开始',w/2,h*.56)}
+function update(dt){if(!started||over)return;time+=dt;cat.x+=(cat.target-cat.x)*Math.min(1,dt*12);spawn-=dt;if(spawn<=0){spawnDrop();spawn=Math.max(.38,.82-score*.012)}for(var i=drops.length-1;i>=0;i--){var o=drops[i];o.y+=o.v*dt;o.rot+=o.spin*dt;var hit=Math.abs(o.x-cat.x)<cat.w*.48+o.size*.3&&Math.abs(o.y-(cat.y-cat.h*.05))<cat.h*.42+o.size*.25;if(hit){drops.splice(i,1);if(o.bad){lives--;if(lives<=0){over=true;best=Math.max(best,score);localStorage.setItem('catFishBest',best)}}else{score++;best=Math.max(best,score)}}else if(o.y>h+o.size){drops.splice(i,1);if(!o.bad){lives--;if(lives<=0){over=true;best=Math.max(best,score);localStorage.setItem('catFishBest',best)}}}}
+}
+function render(){ctx.clearRect(0,0,w,h);ctx.fillStyle='#ffe680';ctx.beginPath();ctx.arc(w*.82,h*.12,34,0,7);ctx.fill();drawCloud(w*.08,h*.14,42);drawCloud(w*.58,h*.2,34);ctx.fillStyle='#7bd16b';ctx.fillRect(0,ground,w,h-ground);ctx.fillStyle='#45a85e';for(var i=0;i<9;i++){ctx.beginPath();ctx.ellipse(i*w/8,ground+24,70,16,0,0,7);ctx.fill()}for(var j=0;j<drops.length;j++){drops[j].bad?drawSpike(drops[j]):drawFish(drops[j])}drawCat();drawHud();if(!started)drawOverlay('猫咪接鱼','接住小鱼，避开刺球');if(over)drawOverlay('游戏结束','本局得分 '+score)}
+function loop(t){var dt=Math.min(.033,(t-last)/1000||0);last=t;update(dt);render();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
