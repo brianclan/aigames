@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MiniMax联调小游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        #score-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 100;
+        }
+        .stat-item {
+            text-align: center;
+            color: #fff;
+        }
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #score-value {
+            color: #ffd700;
+        }
+        #combo-value {
+            color: #ff6b6b;
+        }
+        #time-value {
+            color: #4ecdc4;
+        }
+        #game-area {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .target {
+            position: absolute;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+            animation: pulse 1s infinite;
+        }
+        .target:active {
+            transform: scale(0.9);
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px currentColor; }
+            50% { box-shadow: 0 0 40px currentColor; }
+        }
+        .click-effect {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: ripple 0.6s forwards;
+        }
+        @keyframes ripple {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(3); opacity: 0; }
+        }
+        .score-popup {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffd700;
+            pointer-events: none;
+            animation: floatUp 1s forwards;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-80px) scale(1.5); opacity: 0; }
+        }
+        #start-screen, #end-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+        .screen-title {
+            font-size: 32px;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ffd700, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .screen-subtitle {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+            max-width: 280px;
+            line-height: 1.6;
+        }
+        .final-score {
+            font-size: 64px;
+            font-weight: bold;
+            color: #ffd700;
+            margin: 20px 0;
+        }
+        .btn {
+            padding: 15px 40px;
+            font-size: 18px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: #fff;
+        }
+        .btn-primary:active {
+            transform: scale(0.95);
+        }
+        .stats-summary {
+            display: flex;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: rgba(255,255,255,0.1);
+            padding: 15px 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .stat-box-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        .stat-box-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="score-panel">
+            <div class="stat-item">
+                <div class="stat-label">得分</div>
+                <div class="stat-value" id="score-value">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">连击</div>
+                <div class="stat-value" id="combo-value">x1</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">剩余时间</div>
+                <div class="stat-value" id="time-value">30</div>
+            </div>
+        </div>
+        <div id="game-area"></div>
+        
+        <div id="start-screen">
+            <div class="screen-title">MiniMax联调小游戏</div>
+            <div class="screen-subtitle">点击屏幕上出现的目标得分<br>连击越高分数越多<br>目标会移动并逐渐变小，加油！</div>
+            <button class="btn btn-primary" onclick="startGame()">开始游戏</button>
+        </div>
+        
+        <div id="end-screen" class="hidden">
+            <div class="screen-title">游戏结束</div>
+            <div class="final-score" id="final-score">0</div>
+            <div class="stats-summary">
+                <div class="stat-box">
+                    <div class="stat-box-value" id="max-combo">0</div>
+                    <div class="stat-box-label">最高连击</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-box-value" id="hit-rate">0%</div>
+                    <div class="stat-box-label">命中率</div>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="startGame()">再来一次</button>
+        </div>
+    </div>
+
+    <script>
+        const gameArea = document.getElementById('game-area');
+        const scoreDisplay = document.getElementById('score-value');
+        const comboDisplay = document.getElementById('combo-value');
+        const timeDisplay = document.getElementById('time-value');
+        const startScreen = document.getElementById('start-screen');
+        const endScreen = document.getElementById('end-screen');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const maxComboDisplay = document.getElementById('max-combo');
+        const hitRateDisplay = document.getElementById('hit-rate');
+
+        let score = 0;
+        let combo = 1;
+        let maxCombo = 1;
+        let timeLeft = 30;
+        let gameRunning = false;
+        let targets = [];
+        let gameTimer = null;
+        let spawnTimer = null;
+        let totalClicks = 0;
+        let successfulClicks = 0;
+
+        const targetColors = [
+            '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', 
+            '#ffeaa7', '#dfe6e9', '#fd79a8', '#a29bfe',
+            '#00b894', '#e17055', '#74b9ff', '#55efc4'
+        ];
+
+        function startGame() {
+            score = 0;
+            combo = 1;
+            maxCombo = 1;
+            timeLeft = 30;
+            totalClicks = 0;
+            successfulClicks = 0;
+            gameRunning = true;
+            targets = [];
+            
+            scoreDisplay.textContent = '0';
+            comboDisplay.textContent = 'x1';
+            timeDisplay.textContent = '30';
+            
+            gameArea.innerHTML = '';
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+            
+            spawnTarget();
+            spawnTimer = setInterval(spawnTarget, 800);
+        }
+
+        function spawnTarget() {
+            if (!gameRunning) return;
+            
+            const areaRect = gameArea.getBoundingClientRect();
+            const size = Math.max(40, Math.min(70, 70 - (30 - timeLeft) * 0.8));
+            const padding = 20;
+            
+            const x = padding + Math.random() * (areaRect.width - size - padding * 2);
+            const y = padding + Math.random() * (areaRect.height - size - padding * 2);
+            
+            const target = document.createElement('div');
+            target.className = 'target';
+            target.style.width = size + 'px';
+            target.style.height = size + 'px';
+            target.style.left = x + 'px';
+            target.style.top = y + 'px';
+            target.style.background = `radial-gradient(circle at 30% 30%, ${targetColors[Math.floor(Math.random() * targetColors.length)]}, ${targetColors[Math.floor(Math.random() * targetColors.length)]})`;
+            target.style.color = targetColors[Math.floor(Math.random() * targetColors.length)];
+            target.textContent = '+' + (10 * combo);
+            
+            const targetData = {
+                element: target,
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                size: size,
+                life: 3000,
+                spawnTime: Date.now()
+            };
+            
+            targets.push(targetData);
+            gameArea.appendChild(target);
+            
+            target.addEventListener('click', (e) => handleTargetClick(e, targetData));
+            target.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                handleTargetClick(e, targetData);
+            }, { passive: false });
+            
+            setTimeout(() => removeTarget(targetData), 3000);
+        }
+
+        function handleTargetClick(e, targetData) {
+            if (!gameRunning || !targets.includes(targetData)) return;
+            e.stopPropagation();
+            totalClicks++;
+            successfulClicks++;
+            
+            const points = 10 * combo;
+            score += points;
+            scoreDisplay.textContent = score;
+            
+            combo++;
+            if (combo > maxCombo) maxCombo = combo;
+            comboDisplay.textContent = 'x' + combo;
+            
+            const rect = targetData.element.getBoundingClientRect();
+            const gameRect = gameArea.getBoundingClientRect();
+            showScorePopup(rect.left - gameRect.left + rect.width/2, rect.top - gameRect.top, points);
+            showClickEffect(rect.left - gameRect.left + rect.width/2, rect.top - gameRect.top + rect.height/2);
+            
+            removeTarget(targetData);
+        }
+
+        function removeTarget(targetData) {
+            const index = targets.indexOf(targetData);
+            if (index > -1) {
+                targets.splice(index, 1);
+                if (targetData.element.parentNode) {
+                    targetData.element.remove();
+                }
+            }
+        }
+
+        function showScorePopup(x, y, points) {
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = '+' + points;
+            popup.style.left = x + 'px';
+            popup.style.top = y + 'px';
+            gameArea.appendChild(popup);
+            setTimeout(() => popup.remove(), 1000);
+        }
+
+        function showClickEffect(x, y) {
+            const effect = document.createElement('div');
+            effect.className = 'click-effect';
+            effect.style.left = (x - 30) + 'px';
+            effect.style.top = (y - 30) + 'px';
+            effect.style.width = '60px';
+            effect.style.height = '60px';
+            effect.style.border = '3px solid #ffd700';
+            gameArea.appendChild(effect);
+            setTimeout(() => effect.remove(), 600);
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+            
+            const areaRect = gameArea.getBoundingClientRect();
+            
+            targets.forEach(target => {
+                target.x += target.vx;
+                target.y += target.vy;
+                
+                if (target.x <= 0 || target.x >= areaRect.width - target.size) {
+                    target.vx *= -1;
+                    target.x = Math.max(0, Math.min(target.x, areaRect.width - target.size));
+                }
+                if (target.y <= 0 || target.y >= areaRect.height - target.size) {
+                    target.vy *= -1;
+                    target.y = Math.max(0, Math.min(target.y, areaRect.height - target.size));
+                }
+                
+                target.element.style.left = target.x + 'px';
+                target.element.style.top = target.y + 'px';
+            });
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            clearInterval(gameTimer);
+            clearInterval(spawnTimer);
+            
+            targets.forEach(t => t.element.remove());
+            targets = [];
+            
+            finalScoreDisplay.textContent = score;
+            maxComboDisplay.textContent = 'x' + maxCombo;
+            const hitRate = totalClicks > 0 ? Math.round((successfulClicks / totalClicks) * 100) : 0;
+            hitRateDisplay.textContent = hitRate + '%';
+            
+            endScreen.classList.remove('hidden');
+        }
+
+        gameArea.addEventListener('click', (e) => {
+            if (!gameRunning) return;
+            if (e.target === gameArea) {
+                totalClicks++;
+                combo = 1;
+                comboDisplay.textContent = 'x1';
+            }
+        });
+
+        gameArea.addEventListener('touchstart', (e) => {
+            if (!gameRunning) return;
+            if (e.target === gameArea) {
+                totalClicks++;
+                combo = 1;
+                comboDisplay.textContent = 'x1';
+            }
+        }, { passive: true });
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
