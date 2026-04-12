@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cat Catch</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+        .hud-item {
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        #startScreen, #winScreen, #failScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            pointer-events: auto;
+        }
+        #startScreen h1, #winScreen h1, #failScreen h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #ff6b9d;
+        }
+        #startScreen h1 {
+            color: #ff6b9d;
+        }
+        #winScreen h1 {
+            color: #4ecdc4;
+        }
+        #failScreen h1 {
+            color: #ff6b6b;
+        }
+        .subtitle {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            color: #ccc;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #ff6b9d, #c44569);
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2em;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            pointer-events: auto;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover, .btn:active {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 107, 157, 0.5);
+        }
+        .btn.secondary {
+            background: linear-gradient(135deg, #4ecdc4, #2d9a94);
+        }
+        #winScreen .btn {
+            background: linear-gradient(135deg, #4ecdc4, #2d9a94);
+        }
+        #failScreen .btn {
+            background: linear-gradient(135deg, #ff6b6b, #c44569);
+        }
+        .cat-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        #levelIndicator {
+            font-size: 1em;
+            color: #4ecdc4;
+        }
+        #swipeHint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            text-align: center;
+            pointer-events: none;
+        }
+        @media (max-width: 480px) {
+            #startScreen h1, #winScreen h1, #failScreen h1 {
+                font-size: 2em;
+            }
+            .subtitle {
+                font-size: 0.95em;
+            }
+            .btn {
+                padding: 12px 30px;
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="canvas3d"></canvas>
+        <div id="ui">
+            <div id="hud">
+                <div class="hud-item" id="scoreDisplay">Fish: 0/3</div>
+                <div class="hud-item" id="levelIndicator">Level 1</div>
+                <div class="hud-item" id="timerDisplay">Time: 0s</div>
+            </div>
+            <div id="swipeHint">Swipe to move the ball</div>
+            
+            <div id="startScreen">
+                <div class="cat-icon">🐱</div>
+                <h1>Cat Catch</h1>
+                <p class="subtitle">Navigate the maze, collect fish, and reach the goal!</p>
+                <button class="btn" onclick="startGame()">Start Game</button>
+            </div>
+            
+            <div id="winScreen" style="display: none;">
+                <div class="cat-icon">🎉</div>
+                <h1>You Win!</h1>
+                <p class="subtitle" id="winMessage">Great job catching all the fish!</p>
+                <button class="btn" onclick="restartGame()">Play Again</button>
+            </div>
+            
+            <div id="failScreen" style="display: none;">
+                <div class="cat-icon">😿</div>
+                <h1>Time's Up!</h1>
+                <p class="subtitle" id="failMessage">Better luck next time!</p>
+                <button class="btn" onclick="restartGame()">Try Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, ball, goalMarker;
+        let mazeWalls = [];
+        let fish = [];
+        let currentLevel = 1;
+        let score = 0;
+        let totalFish = 3;
+        let gameTime = 0;
+        let maxTime = 60;
+        let isPlaying = false;
+        let ballVelocity = { x: 0, z: 0 };
+        let ballSpeed = 0.15;
+        let friction = 0.92;
+        
+        const mazeLayouts = [
+            {
+                walls: [
+                    [0,0,8,0.5,0.5,8],
+                    [8,0,0.5,0.5,8,8],
+                    [0,8,8,0.5,0.5,8],
+                    [0,0,0.5,0.5,8,0],
+                    [2,0,0.5,0.5,2,3],
+                    [4,1,0.5,0.5,4,4],
+                    [2,2,3,0.5,0.5,2],
+                    [6,2,0.5,0.5,6,5],
+                    [0,4,3,0.5,0.5,4],
+                    [5,4,0.5,0.5,5,6],
+                    [1,5,0.5,0.5,3,5],
+                    [4,5,2.5,0.5,0.5,4],
+                    [0,6,2,0.5,0.5,6],
+                    [3,6,0.5,0.5,3,8],
+                    [5,7,3,0.5,0.5,5],
+                    [7,6,0.5,0.5,7,8]
+                ],
+                ballStart: { x: 0.5, z: 0.5 },
+                goal: { x: 7.5, z: 7.5 },
+                fishPositions: [{x:2,z:1},{x:4,z:4},{x:6,z:6}],
+                time: 60
+            },
+            {
+                walls: [
+                    [0,0,10,0.5,0.5,10],
+                    [10,0,0.5,0.5,10,10],
+                    [0,10,10,0.5,0.5,10],
+                    [0,0,0.5,0.5,10,0],
+                    [2,0,0.5,0.5,2,4],
+                    [4,1,0.5,0.5,4,3],
+                    [0,3,2,0.5,0.5,3],
+                    [6,0,0.5,0.5,6,3],
+                    [3,4,4,0.5,0.5,4],
+                    [8,3,0.5,0.5,8,6],
+                    [0,5,3,0.5,0.5,5],
+                    [4,5,0.5,0.5,4,7],
+                    [2,6,0.5,0.5,2,8],
+                    [5,6,0.5,0.5,5,9],
+                    [7,6,2,0.5,0.5,6],
+                    [0,8,5,0.5,0.5,8],
+                    [6,8,0.5,0.5,6,10],
+                    [8,8,0.5,0.5,8,10]
+                ],
+                ballStart: { x: 0.5, z: 0.5 },
+                goal: { x: 9, z: 9 },
+                fishPositions: [{x:3,z:2},{x:7,z:4},{x:5,z:8}],
+                time: 75
+            },
+            {
+                walls: [
+                    [0,0,12,0.5,0.5,12],
+                    [12,0,0.5,0.5,12,12],
+                    [0,12,12,0.5,0.5,12],
+                    [0,0,0.5,0.5,12,0],
+                    [2,0,0.5,0.5,2,3],
+                    [4,0,0.5,0.5,4,2],
+                    [6,0,0.5,0.5,6,4],
+                    [8,0,0.5,0.5,8,3],
+                    [10,0,0.5,0.5,10,4],
+                    [0,4,5,0.5,0.5,4],
+                    [7,4,0.5,0.5,7,6],
+                    [9,4,0.5,0.5,9,6],
+                    [3,5,0.5,0.5,3,8],
+                    [5,5,4,0.5,0.5,5],
+                    [0,6,2,0.5,0.5,6],
+                    [11,5,0.5,0.5,11,8],
+                    [2,8,0.5,0.5,2,10],
+                    [4,8,4,0.5,0.5,8],
+                    [9,8,0.5,0.5,9,11],
+                    [6,9,0.5,0.5,6,11],
+                    [0,10,6,0.5,0.5,10],
+                    [8,10,2,0.5,0.5,8],
+                    [10,10,0.5,0.5,10,12]
+                ],
+                ballStart: { x: 0.5, z: 0.5 },
+                goal: { x: 11, z: 11 },
+                fishPositions: [{x:5,z:2},{x:10,z:5},{x:5,z:10}],
+                time: 90
+            }
+        ];
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+            scene.fog = new THREE.Fog(0x1a1a2e, 10, 30);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(5, 15, 5);
+            camera.lookAt(5, 0, 5);
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -20;
+            directionalLight.shadow.camera.right = 20;
+            directionalLight.shadow.camera.top = 20;
+            directionalLight.shadow.camera.bottom = -20;
+            scene.add(directionalLight);
+
+            const pointLight = new THREE.PointLight(0xff6b9d, 0.5, 20);
+            pointLight.position.set(5, 5, 5);
+            scene.add(pointLight);
+
+            createFloor();
+            createBall();
+            setupControls();
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createFloor() {
+            const floorGeometry = new THREE.PlaneGeometry(12, 12);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x2d2d44,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            floor.name = 'floor';
+            scene.add(floor);
+
+            const gridHelper = new THREE.GridHelper(12, 24, 0x444466, 0x333355);
+            scene.add(gridHelper);
+        }
+
+        function createBall() {
+            const ballGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+            const ballMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xff6b9d,
+                roughness: 0.3,
+                metalness: 0.7,
+                emissive: 0xff6b9d,
+                emissiveIntensity: 0.2
+            });
+            ball = new THREE.Mesh(ballGeometry, ballMaterial);
+            ball.castShadow = true;
+            ball.position.set(0.5, 0.3, 0.5);
+            ball.name = 'ball';
+            scene.add(ball);
+        }
+
+        function loadLevel(levelIndex) {
+            mazeWalls.forEach(wall => scene.remove(wall));
+            mazeWalls = [];
+            fish.forEach(f => scene.remove(f));
+            fish = [];
+            if (goalMarker) scene.remove(goalMarker);
+
+            const layout = mazeLayouts[levelIndex % mazeLayouts.length];
+            maxTime = layout.time;
+            gameTime = 0;
+
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4ecdc4,
+                roughness: 0.5,
+                metalness: 0.3
+            });
+
+            layout.walls.forEach(w => {
+                const geometry = new THREE.BoxGeometry(w[0], w[1], w[2], w[3], w[4], w[5]);
+                const wallGeometry = new THREE.BoxGeometry(w[2], w[3], w[4]);
+                const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                wall.position.set(w[0] + w[2]/2, w[3]/2, w[4] + w[5]/2);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                wall.userData.isWall = true;
+                wall.userData.bounds = {
+                    minX: w[0],
+                    maxX: w[0] + w[2],
+                    minZ: w[4],
+                    maxZ: w[4] + w[5]
+                };
+                scene.add(wall);
+                mazeWalls.push(wall);
+            });
+
+            const goalGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.1, 32);
+            const goalMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4ecdc4,
+                emissive: 0x4ecdc4,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            goalMarker = new THREE.Mesh(goalGeometry, goalMaterial);
+            goalMarker.position.set(layout.goal.x, 0.05, layout.goal.z);
+            goalMarker.userData.isGoal = true;
+            scene.add(goalMarker);
+
+            const fishGeometry = new THREE.ConeGeometry(0.2, 0.4, 4);
+            fishGeometry.rotateX(Math.PI / 2);
+            const fishMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xffd93d,
+                emissive: 0xffd93d,
+                emissiveIntensity: 0.3
+            });
+
+            layout.fishPositions.forEach((pos, index) => {
+                const fishMesh = new THREE.Mesh(fishGeometry, fishMaterial.clone());
+                fishMesh.position.set(pos.x, 0.3, pos.z);
+                fishMesh.userData.isFish = true;
+                fishMesh.userData.collected = false;
+                fishMesh.userData.floatOffset = index * Math.PI / 3;
+                scene.add(fishMesh);
+                fish.push(fishMesh);
+            });
+
+            totalFish = fish.length;
+            score = 0;
+            updateHUD();
+
+            ball.position.set(layout.ballStart.x, 0.3, layout.ballStart.z);
+            ballVelocity = { x: 0, z: 0 };
+
+            document.getElementById('levelIndicator').textContent = `Level ${levelIndex + 1}`;
+        }
+
+        function setupControls() {
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let isDragging = false;
+
+            const handleStart = (clientX, clientY) => {
+                if (!isPlaying) return;
+                touchStartX = clientX;
+                touchStartY = clientY;
+                isDragging = true;
+            };
+
+            const handleMove = (clientX, clientY) => {
+                if (!isDragging || !isPlaying) return;
+                const deltaX = clientX - touchStartX;
+                const deltaY = clientY - touchStartY;
+                
+                const sensitivity = 0.008;
+                ballVelocity.x += deltaY * sensitivity;
+                ballVelocity.z += deltaX * sensitivity;
+                
+                touchStartX = clientX;
+                touchStartY = clientY;
+            };
+
+            const handleEnd = () => {
+                isDragging = false;
+            };
+
+            document.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                handleStart(touch.clientX, touch.clientY);
+            }, { passive: false });
+
+            document.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                handleMove(touch.clientX, touch.clientY);
+            }, { passive: false });
+
+            document.addEventListener('touchend', handleEnd);
+
+            document.addEventListener('mousedown', (e) => {
+                handleStart(e.clientX, e.clientY);
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                handleMove(e.clientX, e.clientY);
+            });
+
+            document.addEventListener('mouseup', handleEnd);
+
+            document.addEventListener('keydown', (e) => {
+                if (!isPlaying) return;
+                const keySpeed = 0.5;
+                switch(e.key) {
+                    case 'ArrowUp':
+                    case 'w':
+                        ballVelocity.x -= keySpeed;
+                        break;
+                    case 'ArrowDown':
+                    case 's':
+                        ballVelocity.x += keySpeed;
+                        break;
+                    case 'ArrowLeft':
+                    case 'a':
+                        ballVelocity.z -= keySpeed;
+                        break;
+                    case 'ArrowRight':
+                    case 'd':
+                        ballVelocity.z += keySpeed;
+                        break;
+                }
+            });
+        }
+
+        function checkCollision(newX, newZ) {
+            const ballRadius = 0.3;
+            const layout = mazeLayouts[currentLevel % mazeLayouts.length];
+            
+            if (newX - ballRadius < 0 || newX + ballRadius > 12 ||
+                newZ - ballRadius < 0 || newZ + ballRadius > 12) {
+                return true;
+            }
+
+            for (let wall of mazeWalls) {
+                const bounds = wall.userData.bounds;
+                if (newX + ballRadius > bounds.minX && newX - ballRadius < bounds.maxX &&
+                    newZ + ballRadius > bounds.minZ && newZ - ballRadius < bounds.maxZ) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function checkFishCollection() {
+            fish.forEach(fishMesh => {
+                if (!fishMesh.userData.collected) {
+                    const dx = ball.position.x - fishMesh.position.x;
+                    const dz = ball.position.z - fishMesh.position.z;
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+                    if (distance < 0.5) {
+                        fishMesh.userData.collected = true;
+                        scene.remove(fishMesh);
+                        score++;
+                        updateHUD();
+                    }
+                }
+            });
+        }
+
+        function checkGoal() {
+            const layout = mazeLayouts[currentLevel % mazeLayouts.length];
+            const dx = ball.position.x - layout.goal.x;
+            const dz = ball.position.z - layout.goal.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            return distance < 0.5;
+        }
+
+        function updateHUD() {
+            document.getElementById('scoreDisplay').textContent = `Fish: ${score}/${totalFish}`;
+            document.getElementById('timerDisplay').textContent = `Time: ${Math.floor(gameTime)}s`;
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('winScreen').style.display = 'none';
+            document.getElementById('failScreen').style.display = 'none';
+            currentLevel = 1;
+            loadLevel(currentLevel - 1);
+            isPlaying = true;
+        }
+
+        function restartGame() {
+            document.getElementById('winScreen').style.display = 'none';
+            document.getElementById('failScreen').style.display = 'none';
+            currentLevel = 1;
+            loadLevel(currentLevel - 1);
+            isPlaying = true;
+        }
+
+        function nextLevel() {
+            currentLevel++;
+            if (currentLevel > mazeLayouts.length) {
+                showWinScreen();
+            } else {
+                loadLevel(currentLevel - 1);
+                isPlaying = true;
+                document.getElementById('winScreen').style.display = 'none';
+            }
+        }
+
+        function showWinScreen() {
+            isPlaying = false;
+            document.getElementById('winMessage').textContent = 
+                `Amazing! You completed all ${mazeLayouts.length} levels!`;
+            document.getElementById('winScreen').style.display = 'flex';
+        }
+
+        function showFailScreen() {
+            isPlaying = false;
+            document.getElementById('failMessage').textContent = 
+                `Time ran out! Fish collected: ${score}/${totalFish}`;
+            document.getElementById('failScreen').style.display = 'flex';
+        }
+
+        function updateCamera() {
+            const targetX = ball.position.x;
+            const targetZ = ball.position.z;
+            camera.position.x += (targetX - camera.position.x) * 0.05;
+            camera.position.z += (targetZ + 8 - camera.position.z) * 0.05;
+            camera.lookAt(targetX, 0, targetZ);
+        }
+
+        let lastTime = 0;
+        function animate(currentTime) {
+            requestAnimationFrame(animate);
+
+            if (isPlaying) {
+                const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
+                lastTime = currentTime;
+
+                gameTime += deltaTime;
+                updateHUD();
+
+                if (gameTime >= maxTime) {
+                    showFailScreen();
+                    return;
+                }
+
+                ballVelocity.x *= friction;
+                ballVelocity.z *= friction;
+
+                const newX = ball.position.x + ballVelocity.x * ballSpeed;
+                const newZ = ball.position.z + ballVelocity.z * ballSpeed;
+
+                if (!checkCollision(newX, ball.position.z)) {
+                    ball.position.x = newX;
+                } else {
+                    ballVelocity.x *= -0.5;
+                }
+
+                if (!checkCollision(ball.position.x, newZ)) {
+                    ball.position.z = newZ;
+                } else {
+                    ballVelocity.z *= -0.5;
+                }
+
+                ball.rotation.x += ballVelocity.z * ballSpeed * 2;
+                ball.rotation.z -= ballVelocity.x * ballSpeed * 2;
+
+                checkFishCollection();
+
+                fish.forEach((fishMesh, i) => {
+                    if (!fishMesh.userData.collected) {
+                        fishMesh.position.y = 0.3 + Math.sin(currentTime * 0.003 + fishMesh.userData.floatOffset) * 0.1;
+                        fishMesh.rotation.y += 0.02;
+                    }
+                });
+
+                if (goalMarker) {
+                    goalMarker.rotation.y += 0.02;
+                    goalMarker.material.opacity = 0.5 + Math.sin(currentTime * 0.005) * 0.3;
+                }
+
+                updateCamera();
+
+                if (checkGoal() && score >= totalFish) {
+                    if (currentLevel >= mazeLayouts.length) {
+                        showWinScreen();
+                    } else {
+                        isPlaying = false;
+                        document.getElementById('winMessage').textContent = 
+                            `Level ${currentLevel} Complete! Fish: ${score}/${totalFish}`;
+                        document.getElementById('winScreen').style.display = 'flex';
+                        document.getElementById('winScreen').querySelector('.btn').textContent = 'Next Level';
+                        document.getElementById('winScreen').querySelector('.btn').onclick = nextLevel;
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>
