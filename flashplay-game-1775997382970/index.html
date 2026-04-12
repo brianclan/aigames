@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Maze Runner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        #title {
+            color: #00d9ff;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00d9ff;
+        }
+        #levelInfo {
+            color: #aaa;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        #canvas {
+            border: 3px solid #00d9ff;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+        }
+        #controls {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(2, 60px);
+            gap: 5px;
+        }
+        .btn {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(145deg, #2a2a4a, #1a1a3a);
+            border: 2px solid #00d9ff;
+            border-radius: 12px;
+            color: #00d9ff;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        .btn:active {
+            background: linear-gradient(145deg, #00d9ff, #0099cc);
+            color: #1a1a2e;
+            transform: scale(0.95);
+        }
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        #overlay.hidden {
+            display: none;
+        }
+        #overlayTitle {
+            color: #00d9ff;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #00d9ff;
+        }
+        #overlayMessage {
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 0 20px;
+        }
+        #startBtn, #nextBtn {
+            padding: 15px 40px;
+            font-size: 20px;
+            background: linear-gradient(145deg, #00d9ff, #0099cc);
+            border: none;
+            border-radius: 25px;
+            color: #1a1a2e;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 217, 255, 0.4);
+            transition: transform 0.2s;
+        }
+        #startBtn:hover, #nextBtn:hover {
+            transform: scale(1.05);
+        }
+        #instructions {
+            color: #888;
+            font-size: 12px;
+            margin-top: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="header">
+            <div id="title">MAZE RUNNER</div>
+            <div id="levelInfo">Level <span id="levelNum">1</span> / 5</div>
+        </div>
+        <canvas id="canvas"></canvas>
+        <div id="controls">
+            <button class="btn btn-up" data-dir="up">▲</button>
+            <button class="btn btn-left" data-dir="left">◀</button>
+            <button class="btn btn-down" data-dir="down">▼</button>
+            <button class="btn btn-right" data-dir="right">▶</button>
+        </div>
+        <div id="instructions">Use arrow keys, buttons, or swipe to navigate</div>
+    </div>
+
+    <div id="overlay">
+        <div id="overlayTitle">MAZE RUNNER</div>
+        <div id="overlayMessage">Navigate through the maze and reach the green goal. Avoid the walls!</div>
+        <button id="startBtn">START GAME</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const overlayMessage = document.getElementById('overlayMessage');
+        const startBtn = document.getElementById('startBtn');
+        const levelNum = document.getElementById('levelNum');
+
+        let cellSize = 30;
+        let cols, rows;
+        let player = { x: 0, y: 0 };
+        let goal = { x: 0, y: 0 };
+        let maze = [];
+        let currentLevel = 1;
+        const maxLevel = 5;
+        let gameRunning = false;
+
+        const mazeLevels = [
+            {
+                cols: 11,
+                rows: 15,
+                data: [
+                    [1,1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,1,0,0,0,0,0,1],
+                    [1,0,1,0,1,0,1,1,1,0,1],
+                    [1,0,1,0,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,1,0,0,0,1],
+                    [1,1,1,1,1,0,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,1,0,1,0,1],
+                    [1,0,1,0,0,0,0,0,1,0,1],
+                    [1,0,1,0,1,1,1,1,1,0,1],
+                    [1,0,0,0,1,0,0,0,0,0,1],
+                    [1,1,1,0,1,0,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1]
+                ],
+                start: {x: 1, y: 1},
+                goal: {x: 9, y: 13}
+            },
+            {
+                cols: 13,
+                rows: 17,
+                data: [
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,1,0,0,0,1,0,0,0,1],
+                    [1,0,1,0,1,0,1,0,1,0,1,0,1],
+                    [1,0,1,0,0,0,1,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,1,0,1,0,1],
+                    [1,1,1,0,1,1,1,0,1,0,1,0,1],
+                    [1,0,0,0,1,0,0,0,1,0,0,0,1],
+                    [1,0,1,1,1,0,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,1,0,0,0,0,0,1],
+                    [1,1,1,1,1,0,1,0,1,1,1,1,1],
+                    [1,0,0,0,1,0,1,0,0,0,0,0,1],
+                    [1,0,1,0,1,0,1,1,1,1,1,0,1],
+                    [1,0,1,0,0,0,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1]
+                ],
+                start: {x: 1, y: 1},
+                goal: {x: 11, y: 15}
+            },
+            {
+                cols: 15,
+                rows: 19,
+                data: [
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,1,0,1,0,0,0,0,0,1],
+                    [1,0,1,1,1,0,1,0,1,0,1,1,1,0,1],
+                    [1,0,1,0,0,0,0,0,0,0,0,0,1,0,1],
+                    [1,0,1,0,1,1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+                    [1,1,1,0,1,0,1,1,1,0,1,0,1,1,1],
+                    [1,0,0,0,0,0,1,0,1,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,1,0,1,0,0,0,0,0,1],
+                    [1,1,1,0,1,0,1,1,1,0,1,0,1,1,1],
+                    [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+                    [1,0,1,1,1,1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,1,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                ],
+                start: {x: 1, y: 1},
+                goal: {x: 13, y: 17}
+            },
+            {
+                cols: 17,
+                rows: 21,
+                data: [
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1],
+                    [1,0,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1],
+                    [1,0,1,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,1],
+                    [1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1],
+                    [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+                    [1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,1],
+                    [1,0,1,1,1,1,1,1,1,0,1,0,1,0,1,0,1],
+                    [1,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,1],
+                    [1,0,1,0,1,1,1,0,1,1,1,1,1,1,1,0,1],
+                    [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,0,1,0,1,1,1,1,1,1,1,0,1,1,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+                    [1,0,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                ],
+                start: {x: 1, y: 1},
+                goal: {x: 15, y: 19}
+            },
+            {
+                cols: 19,
+                rows: 23,
+                data: [
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1],
+                    [1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1],
+                    [1,0,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+                    [1,1,1,0,1,0,1,1,1,1,1,1,1,0,1,0,1,1,1],
+                    [1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1],
+                    [1,0,1,1,1,0,1,1,1,0,1,0,1,1,1,1,1,1,1],
+                    [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+                    [1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+                ],
+                start: {x: 1, y: 1},
+                goal: {x: 17, y: 21}
+            }
+        ];
+
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            const maxWidth = window.innerWidth - 20;
+            const maxHeight = window.innerHeight - 200;
+            
+            const level = mazeLevels[currentLevel - 1];
+            cols = level.cols;
+            rows = level.rows;
+            
+            const cellW = Math.floor(maxWidth / cols);
+            const cellH = Math.floor(maxHeight / rows);
+            cellSize = Math.min(cellW, cellH, 35);
+            
+            canvas.width = cols * cellSize;
+            canvas.height = rows * cellSize;
+        }
+
+        function loadLevel(level) {
+            currentLevel = level;
+            levelNum.textContent = level;
+            const levelData = mazeLevels[level - 1];
+            maze = levelData.data;
+            player.x = levelData.start.x;
+            player.y = levelData.start.y;
+            goal.x = levelData.goal.x;
+            goal.y = levelData.goal.y;
+            resizeCanvas();
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const px = x * cellSize;
+                    const py = y * cellSize;
+                    
+                    if (maze[y][x] === 1) {
+                        ctx.fillStyle = '#2d2d4a';
+                        ctx.fillRect(px, py, cellSize, cellSize);
+                        ctx.strokeStyle = '#3d3d5a';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(px + 0.5, py + 0.5, cellSize - 1, cellSize - 1);
+                    } else {
+                        ctx.fillStyle = '#4a4a6a';
+                        ctx.fillRect(px, py, cellSize, cellSize);
+                    }
+                }
+            }
+            
+            const goalPx = goal.x * cellSize;
+            const goalPy = goal.y * cellSize;
+            const gradient = ctx.createRadialGradient(
+                goalPx + cellSize/2, goalPy + cellSize/2, 0,
+                goalPx + cellSize/2, goalPy + cellSize/2, cellSize/2
+            );
+            gradient.addColorStop(0, '#00ff88');
+            gradient.addColorStop(1, '#00aa55');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(goalPx + 2, goalPy + 2, cellSize - 4, cellSize - 4);
+            
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(goalPx + cellSize/2, goalPy + cellSize/2, cellSize/6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            const playerPx = player.x * cellSize;
+            const playerPy = player.y * cellSize;
+            const playerGradient = ctx.createRadialGradient(
+                playerPx + cellSize/2, playerPy + cellSize/2, 0,
+                playerPx + cellSize/2, playerPy + cellSize/2, cellSize/2
+            );
+            playerGradient.addColorStop(0, '#ff6b6b');
+            playerGradient.addColorStop(1, '#cc4444');
+            ctx.fillStyle = playerGradient;
+            ctx.beginPath();
+            ctx.arc(playerPx + cellSize/2, playerPy + cellSize/2, cellSize/3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(playerPx + cellSize/2 - 3, playerPy + cellSize/2 - 3, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function movePlayer(dx, dy) {
+            if (!gameRunning) return;
+            
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+            
+            if (newX >= 0 && newX < cols && newY >= 0 && newY < rows) {
+                if (maze[newY][newX] === 0) {
+                    player.x = newX;
+                    player.y = newY;
+                    draw();
+                    
+                    if (player.x === goal.x && player.y === goal.y) {
+                        gameRunning = false;
+                        if (currentLevel < maxLevel) {
+                            showOverlay('LEVEL COMPLETE!', 'You reached the goal! Ready for the next challenge?', 'NEXT LEVEL');
+                        } else {
+                            showOverlay('VICTORY!', 'Congratulations! You have completed all maze levels! You are a true maze master!', 'PLAY AGAIN');
+                        }
+                    }
+                }
+            }
+        }
+
+        function showOverlay(title, message, buttonText) {
+            overlayTitle.textContent = title;
+            overlayMessage.textContent = message;
+            startBtn.textContent = buttonText;
+            overlay.classList.remove('hidden');
+        }
+
+        function startGame() {
+            if (startBtn.textContent === 'PLAY AGAIN') {
+                currentLevel = 0;
+            }
+            loadLevel(currentLevel + 1);
+            overlay.classList.add('hidden');
+            gameRunning = true;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp': movePlayer(0, -1); e.preventDefault(); break;
+                case 'ArrowDown': movePlayer(0, 1); e.preventDefault(); break;
+                case 'ArrowLeft': movePlayer(-1, 0); e.preventDefault(); break;
+                case 'ArrowRight': movePlayer(1, 0); e.preventDefault(); break;
+            }
+        });
+
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const dir = btn.dataset.dir;
+                switch(dir) {
+                    case 'up': movePlayer(0, -1); break;
+                    case 'down': movePlayer(0, 1); break;
+                    case 'left': movePlayer(-1, 0); break;
+                    case 'right': movePlayer(1, 0); break;
+                }
+            });
+            btn.addEventListener('click', () => {
+                const dir = btn.dataset.dir;
+                switch(dir) {
+                    case 'up': movePlayer(0, -1); break;
+                    case 'down': movePlayer(0, 1); break;
+                    case 'left': movePlayer(-1, 0); break;
+                    case 'right': movePlayer(1, 0); break;
+                }
+            });
+        });
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            const minSwipe = 30;
+            
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (dx > minSwipe) movePlayer(1, 0);
+                else if (dx < -minSwipe) movePlayer(-1, 0);
+            } else {
+                if (dy > minSwipe) movePlayer(0, 1);
+                else if (dy < -minSwipe) movePlayer(0, -1);
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        startBtn.addEventListener('click', startGame);
+
+        window.addEventListener('resize', () => {
+            if (gameRunning) {
+                resizeCanvas();
+                draw();
+            }
+        });
+
+        loadLevel(1);
+    </script>
+</body>
+</html>
