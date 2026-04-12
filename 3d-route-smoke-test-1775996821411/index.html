@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>3D Route Smoke Test</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI','Meiryo',sans-serif}
+#c{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#title{position:absolute;top:16px;left:50%;transform:translateX(-50%);color:#00ffcc;font-size:18px;font-weight:bold;text-shadow:0 0 8px #00ffcc;white-space:nowrap;letter-spacing:1px}
+#panel{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.65);border:1px solid rgba(0,255,204,0.4);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:200px}
+#panel .row{display:flex;align-items:center;gap:12px;width:100%;justify-content:center}
+#panel label{color:#fff;font-size:12px;white-space:nowrap}
+#panel span{color:#00ffcc;font-size:14px;font-weight:bold;min-width:60px;text-align:center}
+#resetBtn{pointer-events:all;background:rgba(0,255,204,0.15);border:1px solid #00ffcc;color:#00ffcc;padding:8px 20px;border-radius:6px;font-size:13px;cursor:pointer;transition:background 0.2s,box-shadow 0.2s;font-family:inherit}
+#resetBtn:hover,#resetBtn:active{background:rgba(0,255,204,0.35);box-shadow:0 0 12px rgba(0,255,204,0.5)}
+#hint{position:absolute;top:50px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:11px;text-align:center;white-space:nowrap}
+#cubeCount{position:absolute;top:16px;right:16px;background:rgba(0,0,0,0.65);border:1px solid rgba(0,255,204,0.4);border-radius:8px;padding:8px 14px;color:#00ffcc;font-size:12px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+<div id="title">3D Route Smoke Test</div>
+<div id="hint">画面をタップ／クリックでキューブを追加</div>
+<div id="cubeCount">キューブ: <span id="countVal">1</span></div>
+<div id="panel">
+<div class="row">
+<label>跳ねる力</label>
+<span id="bounceVal">0.75</span>
+</div>
+<div class="row">
+<label>速さ</label>
+<span id="speedVal">1.0</span>
+</div>
+<div class="row">
+<button id="resetBtn">リセット</button>
+</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  var canvas=document.getElementById('c');
+  var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+  var scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x08080f);
+  scene.fog=new THREE.FogExp2(0x08080f,0.035);
+
+  var camera=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.1,1000);
+  camera.position.set(0,6,14);
+  camera.lookAt(0,2,0);
+
+  // lights
+  var ambient=new THREE.AmbientLight(0x222244,0.8);
+  scene.add(ambient);
+  var dirLight=new THREE.DirectionalLight(0xffffff,1.2);
+  dirLight.position.set(8,16,8);
+  dirLight.castShadow=true;
+  dirLight.shadow.mapSize.set(1024,1024);
+  dirLight.shadow.camera.near=0.1;
+  dirLight.shadow.camera.far=50;
+  dirLight.shadow.camera.left=-20;
+  dirLight.shadow.camera.right=20;
+  dirLight.shadow.camera.top=20;
+  dirLight.shadow.camera.bottom=-20;
+  scene.add(dirLight);
+  var pointLight=new THREE.PointLight(0x00ffcc,1,30);
+  pointLight.position.set(-5,8,-5);
+  scene.add(pointLight);
+
+  // floor
+  var floorGeo=new THREE.PlaneGeometry(40,40);
+  var floorMat=new THREE.MeshStandardMaterial({color:0x0a0a1a,roughness:0.9,metalness:0.1});
+  var floor=new THREE.Mesh(floorGeo,floorMat);
+  floor.rotation.x=-Math.PI/2;
+  floor.receiveShadow=true;
+  scene.add(floor);
+
+  // grid
+  var grid=new THREE.GridHelper(40,40,0x003322,0x001a11);
+  grid.position.y=0.01;
+  scene.add(grid);
+
+  // cubes array
+  var cubes=[];
+  var maxCubes=20;
+  var globalSpeed=1.0;
+  var globalBounce=0.75;
+
+  function createCube(x,y,z){
+    var size=0.6+Math.random()*0.6;
+    var geo=new THREE.BoxGeometry(size,size,size);
+    var hue=Math.random();
+    var color=new THREE.Color().setHSL(hue,0.7,0.55);
+    var mat=new THREE.MeshStandardMaterial({color:color,roughness:0.3,metalness:0.5,emissive:color,emissiveIntensity:0.15});
+    var mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(x,y,z);
+    mesh.castShadow=true;
+    mesh.receiveShadow=true;
+    scene.add(mesh);
+
+    var vy=(1.5+Math.random()*2)*globalSpeed;
+    var vx=(Math.random()-0.5)*2*globalSpeed;
+    var vz=(Math.random()-0.5)*2*globalSpeed;
+    var gravity=-12*globalSpeed;
+    var bounce=globalBounce;
+    var rotX=Math.random()*5;
+    var rotZ=Math.random()*5;
+    var last=performance.now();
+
+    cubes.push({mesh:mesh,vy:vy,vx:vx,vz:vz,gravity:gravity,bounce:bounce,rotX:rotX,rotZ:rotZ,last:last,size:size,mat:mat,hue:hue});
+    document.getElementById('countVal').textContent=cubes.length;
+  }
+
+  createCube(0,6,0);
+
+  function updateCubes(dt){
+    var floorY=0;
+    for(var i=0;i<cubes.length;i++){
+      var c=cubes[i];
+      c.vy+=c.gravity*dt;
+      c.mesh.position.x+=c.vx*dt;
+      c.mesh.position.y+=c.vy*dt;
+      c.mesh.position.z+=c.vz*dt;
+      c.mesh.rotation.x+=c.rotX*dt;
+      c.mesh.rotation.z+=c.rotZ*dt;
+
+      if(c.mesh.position.y-c.size/2<floorY){
+        c.mesh.position.y=floorY+c.size/2;
+        c.vy=-c.vy*c.bounce;
+        c.vx*=0.98;
+        c.vz*=0.98;
+        c.rotX*=0.95;
+        c.rotZ*=0.95;
+        if(Math.abs(c.vy)<0.2){c.vy=-(2+Math.random()*3)*globalSpeed;}
+      }
+
+      var bound=15;
+      if(c.mesh.position.x>bound){c.mesh.position.x=bound;c.vx=-Math.abs(c.vx);}
+      if(c.mesh.position.x<-bound){c.mesh.position.x=-bound;c.vx=Math.abs(c.vx);}
+      if(c.mesh.position.z>bound){c.mesh.position.z=bound;c.vz=-Math.abs(c.vz);}
+      if(c.mesh.position.z<-bound){c.mesh.position.z=-bound;c.vz=Math.abs(c.vz);}
+
+      var pulse=1+0.1*Math.sin(performance.now()*0.003+i);
+      c.mat.emissiveIntensity=0.1+0.2*pulse;
+    }
+  }
+
+  // orbit controls (manual)
+  var isDragging=false;
+  var lastX=0,lastY=0;
+  var camTheta=0;
+  var camPhi=0.9;
+  var camRadius=16;
+
+  function updateCamera(){
+    camera.position.x=camRadius*Math.sin(camTheta)*Math.cos(camPhi);
+    camera.position.y=camRadius*Math.sin(camPhi)+2;
+    camera.position.z=camRadius*Math.cos(camTheta)*Math.cos(camPhi);
+    camera.lookAt(0,2,0);
+  }
+  updateCamera();
+
+  canvas.addEventListener('mousedown',function(e){isDragging=true;lastX=e.clientX;lastY=e.clientY;});
+  canvas.addEventListener('mousemove',function(e){
+    if(!isDragging)return;
+    var dx=e.clientX-lastX;
+    var dy=e.clientY-lastY;
+    camTheta-=dx*0.005;
+    camPhi+=dy*0.005;
+    camPhi=Math.max(0.1,Math.min(Math.PI/2-0.1,camPhi));
+    lastX=e.clientX;lastY=e.clientY;
+    updateCamera();
+  });
+  canvas.addEventListener('mouseup',function(){isDragging=false;});
+  canvas.addEventListener('mouseleave',function(){isDragging=false;});
+
+  canvas.addEventListener('touchstart',function(e){isDragging=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;},{passive:true});
+  canvas.addEventListener('touchmove',function(e){
+    if(!isDragging)return;
+    var dx=e.touches[0].clientX-lastX;
+    var dy=e.touches[0].clientY-lastY;
+    camTheta-=dx*0.005;
+    camPhi+=dy*0.005;
+    camPhi=Math.max(0.1,Math.min(Math.PI/2-0.1,camPhi));
+    lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;
+    updateCamera();
+  },{passive:true});
+  canvas.addEventListener('touchend',function(){isDragging=false;},{passive:true});
+
+  // add cube on tap
+  canvas.addEventListener('click',function(e){
+    if(cubes.length<maxCubes){
+      createCube((Math.random()-0.5)*6,(6+Math.random()*4),(Math.random()-0.5)*6);
+    }
+  });
+  canvas.addEventListener('touchend',function(e){
+    e.preventDefault();
+    if(cubes.length<maxCubes){
+      createCube((Math.random()-0.5)*6,(6+Math.random()*4),(Math.random()-0.5)*6);
+    }
+  },{passive:false});
+
+  // reset
+  document.getElementById('resetBtn').addEventListener('click',function(){
+    for(var i=0;i<cubes.length;i++){scene.remove(cubes[i].mesh);}
+    cubes=[];
+    createCube(0,6,0);
+    camTheta=0;camPhi=0.9;camRadius=16;updateCamera();
+  });
+
+  // anim
+  var lastTime=performance.now();
+  function animate(){
+    requestAnimationFrame(animate);
+    var now=performance.now();
+    var dt=Math.min((now-lastTime)/1000,0.05);
+    lastTime=now;
+    updateCubes(dt);
+    renderer.render(scene,camera);
+  }
+  animate();
+
+  // resize
+  window.addEventListener('resize',function(){
+    camera.aspect=window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth,window.innerHeight);
+  });
+})();
+</script>
+</body>
+</html>
