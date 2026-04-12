@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>App Flow 3D Cube Tap</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;background:#0a0a1a;touch-action: manipulation}
+#game-container{position:fixed;top:0;left:0;width:100%;height:100%;perspective:800px;background:linear-gradient(135deg,#0a0a1a 0%,#1a1a3a 100%)}
+#scene{position:absolute;width:100%;height:100%;transform-style:preserve-3d;transition:transform 0.1s}
+.cube{position:absolute;width:60px;height:60px;transform-style:preserve-3d;cursor:pointer;transition:transform 0.3s,opacity 0.3s}
+.cube.hit{opacity:0;pointer-events:none}
+.cube > div{position:absolute;width:60px;height:60px;backface-visibility:visible;border:2px solid rgba(255,255,255,0.3)}
+.cube .front{background:rgba(var(--c),0.7);transform:translateZ(30px)}
+.cube .back{background:rgba(var(--c),0.5);transform:rotateY(180deg) translateZ(30px)}
+.cube .right{background:rgba(var(--c),0.6);transform:rotateY(90deg) translateZ(30px)}
+.cube .left{background:rgba(var(--c),0.6);transform:rotateY(-90deg) translateZ(30px)}
+.cube .top{background:rgba(var(--c),0.8);transform:rotateX(90deg) translateZ(30px)}
+.cube .bottom{background:rgba(var(--c),0.4);transform:rotateX(-90deg) translateZ(30px)}
+@keyframes spin{from{transform:rotateX(0deg) rotateY(0deg)}to{transform:rotateX(360deg) rotateY(360deg)}}
+@keyframes spinReverse{from{transform:rotateX(0deg) rotateY(0deg)}to{transform:rotateX(-360deg) rotateY(-360deg)}}
+.cube.spinning{animation:spin 4s linear infinite}
+.cube.spinningReverse{animation:spinReverse 5s linear infinite}
+#hud{position:fixed;top:0;left:0;width:100%;padding:15px;display:flex;justify-content:space-between;align-items:center;color:#fff;z-index:100;background:linear-gradient(180deg,rgba(0,0,0,0.5) 0%,transparent 100%)}
+#score{font-size:24px;font-weight:bold;text-shadow:0 0 10px rgba(100,200,255,0.5)}
+#timer{font-size:20px}
+#timer.warning{color:#ff6b6b;animation:pulse 0.5s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+#start-screen,#end-screen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(10,10,26,0.95);z-index:200;color:#fff;text-align:center;padding:20px}
+#end-screen{display:none}
+h1{font-size:28px;margin-bottom:10px;text-shadow:0 0 20px rgba(100,200,255,0.8)}
+.subtitle{font-size:14px;color:#aaa;margin-bottom:30px}
+.btn{padding:15px 40px;font-size:18px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border:none;border-radius:30px;color:#fff;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;touch-action:manipulation}
+.btn:hover{transform:scale(1.05);box-shadow:0 5px 20px rgba(102,126,234,0.5)}
+.btn:active{transform:scale(0.95)}
+.final-score{font-size:48px;font-weight:bold;margin:20px 0;color:#4ecdc4}
+.high-score{font-size:16px;color:#ffd700;margin-bottom:20px}
+.particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50}
+.particle{position:absolute;width:8px;height:8px;border-radius:50%;pointer-events:none;animation:particleFade 0.6s forwards}
+@keyframes particleFade{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(0) translateY(-50px)}}
+.combo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:36px;font-weight:bold;color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,0.8);pointer-events:none;z-index:150;animation:comboAnim 0.5s forwards}
+@keyframes comboAnim{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{transform:translate(-50%,-50%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) scale(1) translateY(-30px)}}
+.instructions{font-size:13px;color:#888;margin-top:20px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="game-container">
+<div id="scene"></div>
+</div>
+<div id="hud">
+<div id="score">Score: 0</div>
+<div id="timer">60s</div>
+</div>
+<div id="start-screen">
+<h1>App Flow 3D Cube Tap</h1>
+<p class="subtitle">Tap the spinning cubes!</p>
+<button class="btn" id="start-btn">Start Game</button>
+<p class="instructions">Tap rotating 3D cubes to score.<br>Be quick - you have 60 seconds!</p>
+</div>
+<div id="end-screen">
+<h1>Game Over!</h1>
+<p class="final-score" id="final-score">0</p>
+<p class="high-score" id="high-score">Best: 0</p>
+<button class="btn" id="restart-btn">Play Again</button>
+</div>
+<div class="particles" id="particles"></div>
+<script>
+const scene=document.getElementById('scene'),scoreEl=document.getElementById('score'),timerEl=document.getElementById('timer'),startScreen=document.getElementById('start-screen'),endScreen=document.getElementById('end-screen'),finalScoreEl=document.getElementById('final-score'),highScoreEl=document.getElementById('high-score'),particlesContainer=document.getElementById('particles');
+const colors=['255,100,100','100,255,100','100,100,255','255,255,100','255,100,255','100,255,255','255,180,100','180,100,255'];
+let score=0,timeLeft=60,gameActive=false,cubes=[],timerInterval,combo=0,lastHit=0;
+function createCube(){
+const cube=document.createElement('div');
+cube.className='cube spinning';
+const color=colors[Math.floor(Math.random()*colors.length)];
+cube.style.cssText=`--c:${color};left:${10+Math.random()*70}%;top:${10+Math.random()*70}%;animation-duration:${3+Math.random()*3}s`;
+if(Math.random()>0.5)cube.classList.add('spinningReverse');
+const faces=['front','back','right','left','top','bottom'];
+faces.forEach(f=>{const div=document.createElement('div');div.className=f;cube.appendChild(div)});
+cube.addEventListener('click',()=>hitCube(cube));
+cube.addEventListener('touchstart',(e)=>{e.preventDefault();hitCube(cube)},{passive:false});
+scene.appendChild(cube);
+cubes.push(cube);
+}
+function hitCube(cube){
+if(!gameActive||cube.classList.contains('hit'))return;
+cube.classList.add('hit');
+const now=Date.now();
+if(now-lastHit<1000)combo++;else combo=1;
+lastHit=now;
+const points=10*combo;
+score+=points;
+scoreEl.textContent='Score: '+score;
+if(combo>1)showCombo(combo);
+createParticles(cube);
+setTimeout(()=>{
+if(cube.parentNode)cube.parentNode.removeChild(cube);
+cubes=cubes.filter(c=>c!==cube);
+},300);
+}
+function showCombo(c){
+const el=document.createElement('div');
+el.className='combo';
+el.textContent='x'+c+' COMBO!';
+document.body.appendChild(el);
+setTimeout(()=>{if(el.parentNode)el.parentNode.removeChild(el)},500);
+}
+function createParticles(cube){
+const rect=cube.getBoundingClientRect();
+const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+for(let i=0;i<8;i++){
+const p=document.createElement('div');
+p.className='particle';
+p.style.cssText=`left:${cx}px;top:${cy}px;background:rgb(${colors[Math.floor(Math.random()*colors.length)]});transform:translate(${(Math.random()-0.5)*60}px,(Math.random()-0.5)*60px)`;
+particlesContainer.appendChild(p);
+setTimeout(()=>{if(p.parentNode)p.parentNode.removeChild(p)},600);
+}
+}
+function startGame(){
+score=0;timeLeft=60;combo=0;gameActive=true;
+scoreEl.textContent='Score: 0';
+timerEl.textContent='60s';
+timerEl.classList.remove('warning');
+startScreen.style.display='none';
+endScreen.style.display='none';
+cubes.forEach(c=>{if(c.parentNode)c.parentNode.removeChild(c)});
+cubes=[];
+for(let i=0;i<5;i++)createCube();
+timerInterval=setInterval(update,1000);
+}
+function update(){
+timeLeft--;
+timerEl.textContent=timeLeft+'s';
+if(timeLeft<=10)timerEl.classList.add('warning');
+if(timeLeft%2===0&&cubes.length<8)createCube();
+if(cubes.length<3)createCube();
+if(timeLeft<=0)endGame();
+}
+function endGame(){
+gameActive=false;
+clearInterval(timerInterval);
+finalScoreEl.textContent=score;
+const hs=localStorage.getItem('cubeTapHighScore')||0;
+if(score>hs){localStorage.setItem('cubeTapHighScore',score);highScoreEl.textContent='New Best: '+score}else{highScoreEl.textContent='Best: '+hs}
+endScreen.style.display='flex';
+}
+document.getElementById('start-btn').addEventListener('click',startGame);
+document.getElementById('start-btn').addEventListener('touchstart',(e)=>{e.preventDefault();startGame()},{passive:false});
+document.getElementById('restart-btn').addEventListener('click',startGame);
+document.getElementById('restart-btn').addEventListener('touchstart',(e)=>{e.preventDefault();startGame()},{passive:false});
+highScoreEl.textContent='Best: '+(localStorage.getItem('cubeTapHighScore')||0);
+</script>
+</body>
+</html>
