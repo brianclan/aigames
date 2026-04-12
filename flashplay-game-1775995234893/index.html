@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>3D Maze Runner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            background: #000;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #titleScreen, #winScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            pointer-events: auto;
+            z-index: 100;
+        }
+        #winScreen {
+            display: none;
+            background: linear-gradient(135deg, #0f3460 0%, #1a1a2e 100%);
+        }
+        h1 {
+            font-size: clamp(2rem, 8vw, 4rem);
+            color: #fff;
+            text-shadow: 0 0 20px #00ff88, 0 0 40px #00ff88;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .subtitle {
+            font-size: clamp(0.9rem, 3vw, 1.2rem);
+            color: #aaa;
+            margin-bottom: 40px;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .btn {
+            padding: 15px 50px;
+            font-size: clamp(1rem, 4vw, 1.5rem);
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            border: none;
+            border-radius: 30px;
+            color: #1a1a2e;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
+        }
+        .btn:hover, .btn:active {
+            transform: scale(1.05);
+            box-shadow: 0 8px 30px rgba(0, 255, 136, 0.6);
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            font-size: clamp(0.8rem, 2.5vw, 1rem);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 50;
+        }
+        #timer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #fff;
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 50;
+        }
+        #compass {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            z-index: 50;
+        }
+        #compassArrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(to bottom, #ff4444 50%, #fff 50%);
+            transform-origin: center center;
+            transform: translate(-50%, -50%);
+        }
+        #minimap {
+            position: absolute;
+            bottom: 80px;
+            left: 10px;
+            width: 120px;
+            height: 120px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+            z-index: 50;
+            overflow: hidden;
+        }
+        #minimapCanvas {
+            width: 100%;
+            height: 100%;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            z-index: 50;
+        }
+        .ctrl-btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+            color: #fff;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: background 0.1s;
+        }
+        .ctrl-btn:active {
+            background: rgba(0,255,136,0.5);
+        }
+        #hint {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #00ff88;
+            font-size: clamp(0.7rem, 2.5vw, 1rem);
+            text-align: center;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            z-index: 50;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            z-index: 50;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255,255,255,0.6);
+        }
+        #crosshair::before {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+        #crosshair::after {
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div id="titleScreen">
+            <h1>3D MAZE RUNNER</h1>
+            <p class="subtitle">Find the glowing portal to escape the maze. Use WASD or touch controls to navigate.</p>
+            <button class="btn" onclick="startGame()">START GAME</button>
+        </div>
+        
+        <div id="winScreen">
+            <h1>YOU ESCAPED!</h1>
+            <p class="subtitle">Time: <span id="finalTime">0</span> seconds</p>
+            <button class="btn" onclick="restartGame()">PLAY AGAIN</button>
+        </div>
+        
+        <div id="hud" class="hidden">
+            <div id="levelDisplay">Level 1</div>
+            <div id="steps">Steps: 0</div>
+        </div>
+        
+        <div id="timer" class="hidden">0:00</div>
+        <div id="compass" class="hidden"><div id="compassArrow"></div></div>
+        <div id="minimap" class="hidden"><canvas id="minimapCanvas"></canvas></div>
+        <div id="crosshair" class="hidden"></div>
+        <div id="hint" class="hidden">Find the glowing green portal!</div>
+        
+        <div id="controls" class="hidden">
+            <button class="ctrl-btn" id="btnLeft">◀</button>
+            <button class="ctrl-btn" id="btnForward">▲</button>
+            <button class="ctrl-btn" id="btnBackward">▼</button>
+            <button class="ctrl-btn" id="btnRight">▶</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, maze, player;
+        let mazeData = [];
+        let mazeWidth = 15, mazeHeight = 15;
+        let cellSize = 4;
+        let walls = [];
+        let exitPosition = { x: 0, z: 0 };
+        let exitMesh;
+        let gameRunning = false;
+        let startTime = 0;
+        let steps = 0;
+        let level = 1;
+        
+        const keys = { w: false, a: false, s: false, d: false };
+        let moveSpeed = 0.12;
+        let rotationSpeed = 0.04;
+        let cameraHeight = 1.6;
+        
+        const canvas = document.getElementById('gameCanvas');
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const minimapCtx = minimapCanvas.getContext('2d');
+        
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a15);
+            scene.fog = new THREE.Fog(0x0a0a15, 1, 40);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.y = cameraHeight;
+            
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+            
+            createMaze();
+            setupControls();
+            animate();
+        }
+        
+        function generateMaze(width, height) {
+            const maze = [];
+            for (let y = 0; y < height; y++) {
+                maze[y] = [];
+                for (let x = 0; x < width; x++) {
+                    maze[y][x] = 1;
+                }
+            }
+            
+            function carve(x, y) {
+                maze[y][x] = 0;
+                const directions = [
+                    [0, -2], [0, 2], [-2, 0], [2, 0]
+                ].sort(() => Math.random() - 0.5);
+                
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx > 0 && nx < width - 1 && ny > 0 && ny < height - 1 && maze[ny][nx] === 1) {
+                        maze[y + dy/2][x + dx/2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+            
+            carve(1, 1);
+            maze[1][0] = 0;
+            
+            const exits = [];
+            for (let x = 1; x < width - 1; x++) {
+                if (maze[height - 2][x] === 0) exits.push({ x, y: height - 1 });
+                if (maze[height - 1][x] === 0) exits.push({ x, y: height - 2 });
+            }
+            for (let y = 1; y < height - 1; y++) {
+                if (maze[y][width - 2] === 0) exits.push({ x: width - 1, y });
+                if (maze[y][width - 1] === 0) exits.push({ x: width - 2, y });
+            }
+            
+            if (exits.length > 0) {
+                const exit = exits[Math.floor(Math.random() * exits.length)];
+                maze[exit.y][exit.x] = 0;
+            }
+            
+            return maze;
+        }
+        
+        function createMaze() {
+            walls.forEach(w => scene.remove(w));
+            walls = [];
+            if (exitMesh) scene.remove(exitMesh);
+            
+            mazeData = generateMaze(mazeWidth, mazeHeight);
+            
+            const wallGeo = new THREE.BoxGeometry(cellSize, 3, cellSize);
+            const wallMat = new THREE.MeshStandardMaterial({
+                color: 0x2a2a4a,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            
+            for (let y = 0; y < mazeHeight; y++) {
+                for (let x = 0; x < mazeWidth; x++) {
+                    if (mazeData[y][x] === 1) {
+                        const wall = new THREE.Mesh(wallGeo, wallMat);
+                        wall.position.set(x * cellSize - (mazeWidth * cellSize) / 2 + cellSize/2,
+                                          1.5,
+                                          y * cellSize - (mazeHeight * cellSize) / 2 + cellSize/2);
+                        wall.castShadow = true;
+                        wall.receiveShadow = true;
+                        scene.add(wall);
+                        walls.push(wall);
+                    }
+                }
+            }
+            
+            let foundExit = false;
+            for (let y = 0; y < mazeHeight && !foundExit; y++) {
+                for (let x = 0; x < mazeWidth && !foundExit; x++) {
+                    if (mazeData[y][x] === 0 && (x > mazeWidth - 3 || y > mazeHeight - 3)) {
+                        exitPosition.x = x;
+                        exitPosition.z = y;
+                        foundExit = true;
+                    }
+                }
+            }
+            
+            if (!foundExit) {
+                for (let y = mazeHeight - 2; y > 0; y--) {
+                    for (let x = mazeWidth - 2; x > 0; x--) {
+                        if (mazeData[y][x] === 0) {
+                            exitPosition.x = x;
+                            exitPosition.z = y;
+                            foundExit = true;
+                            break;
+                        }
+                    }
+                    if (foundExit) break;
+                }
+            }
+            
+            const exitGeo = new THREE.CylinderGeometry(0.8, 0.8, 4, 16);
+            const exitMat = new THREE.MeshBasicMaterial({
+                color: 0x00ff88,
+                transparent: true,
+                opacity: 0.7
+            });
+            exitMesh = new THREE.Mesh(exitGeo, exitMat);
+            exitMesh.position.set(
+                exitPosition.x * cellSize - (mazeWidth * cellSize) / 2 + cellSize/2,
+                2,
+                exitPosition.z * cellSize - (mazeHeight * cellSize) / 2 + cellSize/2
+            );
+            scene.add(exitMesh);
+            
+            const exitLight = new THREE.PointLight(0x00ff88, 2, 15);
+            exitLight.position.copy(exitMesh.position);
+            exitMesh.add(exitLight);
+            
+            camera.position.set(
+                1 * cellSize - (mazeWidth * cellSize) / 2 + cellSize/2,
+                cameraHeight,
+                1 * cellSize - (mazeHeight * cellSize) / 2 + cellSize/2
+            );
+            camera.rotation.y = 0;
+            
+            updateMinimap();
+        }
+        
+        function setupControls() {
+            document.addEventListener('keydown', (e) => {
+                if (e.key.toLowerCase() === 'w') keys.w = true;
+                if (e.key.toLowerCase() === 'a') keys.a = true;
+                if (e.key.toLowerCase() === 's') keys.s = true;
+                if (e.key.toLowerCase() === 'd') keys.d = true;
+            });
+            
+            document.addEventListener('keyup', (e) => {
+                if (e.key.toLowerCase() === 'w') keys.w = false;
+                if (e.key.toLowerCase() === 'a') keys.a = false;
+                if (e.key.toLowerCase() === 's') keys.s = false;
+                if (e.key.toLowerCase() === 'd') keys.d = false;
+            });
+            
+            const btnForward = document.getElementById('btnForward');
+            const btnBackward = document.getElementById('btnBackward');
+            const btnLeft = document.getElementById('btnLeft');
+            const btnRight = document.getElementById('btnRight');
+            
+            btnForward.addEventListener('touchstart', (e) => { e.preventDefault(); keys.w = true; });
+            btnForward.addEventListener('touchend', () => keys.w = false);
+            btnForward.addEventListener('mousedown', () => keys.w = true);
+            btnForward.addEventListener('mouseup', () => keys.w = false);
+            
+            btnBackward.addEventListener('touchstart', (e) => { e.preventDefault(); keys.s = true; });
+            btnBackward.addEventListener('touchend', () => keys.s = false);
+            btnBackward.addEventListener('mousedown', () => keys.s = true);
+            btnBackward.addEventListener('mouseup', () => keys.s = false);
+            
+            btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); keys.a = true; });
+            btnLeft.addEventListener('touchend', () => keys.a = false);
+            btnLeft.addEventListener('mousedown', () => keys.a = true);
+            btnLeft.addEventListener('mouseup', () => keys.a = false);
+            
+            btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); keys.d = true; });
+            btnRight.addEventListener('touchend', () => keys.d = false);
+            btnRight.addEventListener('mousedown', () => keys.d = true);
+            btnRight.addEventListener('mouseup', () => keys.d = false);
+            
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+        
+        function checkCollision(x, z) {
+            const worldX = x;
+            const worldZ = z;
+            
+            const margin = 0.5;
+            
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const mx = Math.floor((worldX + dx * cellSize) / cellSize + mazeWidth / 2);
+                    const mz = Math.floor((worldZ + dy * cellSize) / cellSize + mazeHeight / 2);
+                    
+                    if (mx >= 0 && mx < mazeWidth && mz >= 0 && mz < mazeHeight) {
+                        if (mazeData[mz][mx] === 1) {
+                            const wallCenterX = mx * cellSize - (mazeWidth * cellSize) / 2 + cellSize/2;
+                            const wallCenterZ = mz * cellSize - (mazeHeight * cellSize) / 2 + cellSize/2;
+                            
+                            const halfSize = cellSize / 2;
+                            
+                            if (worldX + margin > wallCenterX - halfSize &&
+                                worldX - margin < wallCenterX + halfSize &&
+                                worldZ + margin > wallCenterZ - halfSize &&
+                                worldZ - margin < wallCenterZ + halfSize) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function checkWin() {
+            const exitWorldX = exitPosition.x * cellSize - (mazeWidth * cellSize) / 2 + cellSize/2;
+            const exitWorldZ = exitPosition.z * cellSize - (mazeHeight * cellSize) / 2 + cellSize/2;
+            
+            const dx = camera.position.x - exitWorldX;
+            const dz = camera.position.z - exitWorldZ;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            
+            if (dist < 1.5) {
+                winGame();
+            }
+        }
+        
+        function updateMinimap() {
+            minimapCanvas.width = 120;
+            minimapCanvas.height = 120;
+            
+            const scale = 120 / (mazeWidth * cellSize);
+            const offsetX = 60;
+            const offsetZ = 60;
+            
+            minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            minimapCtx.fillRect(0, 0, 120, 120);
+            
+            for (let y = 0; y < mazeHeight; y++) {
+                for (let x = 0; x < mazeWidth; x++) {
+                    if (mazeData[y][x] === 1) {
+                        const px = (x * cellSize - (mazeWidth * cellSize) / 2 + cellSize/2) * scale + offsetX;
+                        const pz = (y * cellSize - (mazeHeight * cellSize) / 2 + cellSize/2) * scale + offsetZ;
+                        const size = cellSize * scale;
+                        
+                        minimapCtx.fillStyle = '#3a3a5a';
+                        minimapCtx.fillRect(px - size/2, pz - size/2, size, size);
+                    }
+                }
+            }
+            
+            const exitPx = (exitPosition.x * cellSize - (mazeWidth * cellSize) / 2 + cellSize/2) * scale + offsetX;
+            const exitPz = (exitPosition.z * cellSize - (mazeHeight * cellSize) / 2 + cellSize/2) * scale + offsetZ;
+            minimapCtx.fillStyle = '#00ff88';
+            minimapCtx.beginPath();
+            minimapCtx.arc(exitPx, exitPz, 5, 0, Math.PI * 2);
+            minimapCtx.fill();
+        }
+        
+        function drawMinimap() {
+            const scale = 120 / (mazeWidth * cellSize);
+            const offsetX = 60;
+            const offsetZ = 60;
+            
+            const px = camera.position.x * scale + offsetX;
+            const pz = camera.position.z * scale + offsetZ;
+            
+            minimapCtx.fillStyle = '#00ff88';
+            minimapCtx.beginPath();
+            minimapCtx.arc(px, pz, 4, 0, Math.PI * 2);
+            minimapCtx.fill();
+            
+            minimapCtx.strokeStyle = 'rgba(0, 255, 136, 0.5)';
+            minimapCtx.beginPath();
+            minimapCtx.arc(px, pz, 8, -camera.rotation.y - 0.5, -camera.rotation.y + 0.5);
+            minimapCtx.stroke();
+        }
+        
+        function updateTimer() {
+            if (!gameRunning) return;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            document.getElementById('timer').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function updateCompass() {
+            const arrow = document.getElementById('comppassArrow');
+            document.getElementById('compassArrow').style.transform = `translate(-50%, -50%) rotate(${-camera.rotation.y * 180 / Math.PI}deg)`;
+        }
+        
+        function updateSteps() {
+            document.getElementById('steps').textContent = `Steps: ${steps}`;
+        }
+        
+        let lastPos = { x: 0, z: 0 };
+        
+        function update() {
+            if (!gameRunning) return;
+            
+            let moved = false;
+            
+            if (keys.a) {
+                camera.rotation.y += rotationSpeed;
+            }
+            if (keys.d) {
+                camera.rotation.y -= rotationSpeed;
+            }
+            
+            if (keys.w) {
+                const nx = camera.position.x + Math.sin(camera.rotation.y) * moveSpeed;
+                const nz = camera.position.z + Math.cos(camera.rotation.y) * moveSpeed;
+                if (!checkCollision(nx, nz)) {
+                    camera.position.x = nx;
+                    camera.position.z = nz;
+                    moved = true;
+                }
+            }
+            if (keys.s) {
+                const nx = camera.position.x - Math.sin(camera.rotation.y) * moveSpeed;
+                const nz = camera.position.z - Math.cos(camera.rotation.y) * moveSpeed;
+                if (!checkCollision(nx, nz)) {
+                    camera.position.x = nx;
+                    camera.position.z = nz;
+                    moved = true;
+                }
+            }
+            
+            if (moved) {
+                const dx = Math.abs(camera.position.x - lastPos.x);
+                const dz = Math.abs(camera.position.z - lastPos.z);
+                if (dx + dz > 0.5) {
+                    steps++;
+                    lastPos.x = camera.position.x;
+                    lastPos.z = camera.position.z;
+                    updateSteps();
+                }
+            }
+            
+            if (exitMesh) {
+                exitMesh.rotation.y += 0.02;
+                exitMesh.position.y = 2 + Math.sin(Date.now() * 0.003) * 0.3;
+            }
+            
+            checkWin();
+            updateTimer();
+            updateCompass();
+            
+            minimapCtx.clearRect(0, 0, 120, 120);
+            updateMinimap();
+            drawMinimap();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            update();
+            renderer.render(scene, camera);
+        }
+        
+        function startGame() {
+            document.getElementById('titleScreen').style.display = 'none';
+            document.getElementById('winScreen').style.display = 'none';
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('timer').classList.remove('hidden');
+            document.getElementById('compass').classList.remove('hidden');
+            document.getElementById('minimap').classList.remove('hidden');
+            document.getElementById('crosshair').classList.remove('hidden');
+            document.getElementById('hint').classList.remove('hidden');
+            document.getElementById('controls').classList.remove('hidden');
+            
+            gameRunning = true;
+            startTime = Date.now();
+            steps = 0;
+            createMaze();
+            updateSteps();
+        }
+        
+        function winGame() {
+            gameRunning = false;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('finalTime').textContent = elapsed;
+            document.getElementById('winScreen').style.display = 'flex';
+        }
+        
+        function restartGame() {
+            startGame();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
