@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Maze Runner 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            background: #1a1a2e;
+        }
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+        .hud-box {
+            background: rgba(0,0,0,0.6);
+            padding: 10px 15px;
+            border-radius: 10px;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 16px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        .hud-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #aaa;
+            margin-bottom: 2px;
+        }
+        .hud-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        #timer {
+            color: #ff6b6b;
+        }
+        #minimap {
+            position: absolute;
+            bottom: 120px;
+            right: 10px;
+            width: 100px;
+            height: 100px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        #touchControls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            pointer-events: auto;
+        }
+        .joystick-container {
+            width: 120px;
+            height: 120px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 50%;
+            position: relative;
+            border: 3px solid rgba(255,255,255,0.3);
+        }
+        .joystick-knob {
+            width: 50px;
+            height: 50px;
+            background: rgba(78, 205, 196, 0.8);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px rgba(78, 205, 196, 0.5);
+        }
+        #turnLeft, #turnRight {
+            width: 70px;
+            height: 70px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            border: 3px solid rgba(255,255,255,0.3);
+            user-select: none;
+        }
+        #startScreen, #winScreen, #loseScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            pointer-events: auto;
+        }
+        .game-title {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #4ecdc4, #44a3aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .game-subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 30px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #4ecdc4, #44a3aa);
+            color: #1a1a2e;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            pointer-events: auto;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(78, 205, 196, 0.4);
+        }
+        .instructions {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            max-width: 300px;
+        }
+        .win-time {
+            font-size: 48px;
+            color: #4ecdc4;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .hidden {
+            display: none !important;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255,255,255,0.6);
+        }
+        #crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 9px;
+            top: 0;
+        }
+        #crosshair::after {
+            width: 20px;
+            height: 2px;
+            top: 9px;
+            left: 0;
+        }
+        #compass {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 14px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div id="hud">
+            <div class="hud-box">
+                <div class="hud-label">Time</div>
+                <div class="hud-value" id="timer">60</div>
+            </div>
+            <div class="hud-box">
+                <div class="hud-label">Find Exit</div>
+                <div class="hud-value" id="hint">↑</div>
+            </div>
+        </div>
+        <div id="compass">N</div>
+        <canvas id="minimap" width="100" height="100"></canvas>
+        <div id="crosshair"></div>
+        <div id="touchControls">
+            <div id="turnLeft">◀</div>
+            <div class="joystick-container" id="moveJoystick">
+                <div class="joystick-knob" id="moveKnob"></div>
+            </div>
+            <div id="turnRight">▶</div>
+        </div>
+    </div>
+
+    <div id="startScreen">
+        <div class="game-title">MAZE RUNNER 3D</div>
+        <div class="game-subtitle">Find your way out of the labyrinth</div>
+        <button class="btn" id="startBtn">START GAME</button>
+        <div class="instructions">
+            Use WASD or Arrow keys to move<br>
+            On mobile: Use the joystick to move<br>
+            Tap ◀ ▶ to turn<br>
+            Find the green exit before time runs out!
+        </div>
+    </div>
+
+    <div id="winScreen" class="hidden">
+        <div class="game-title">YOU ESCAPED!</div>
+        <div class="win-time" id="finalTime">00:00</div>
+        <div>Time Remaining</div>
+        <button class="btn" id="playAgainBtn">PLAY AGAIN</button>
+    </div>
+
+    <div id="loseScreen" class="hidden">
+        <div class="game-title" style="color: #ff6b6b;">TIME'S UP!</div>
+        <div class="game-subtitle">You didn't escape in time</div>
+        <button class="btn" id="retryBtn">TRY AGAIN</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Game State
+        const game = {
+            running: false,
+            timeLeft: 60,
+            timerInterval: null,
+            mazeSize: 11,
+            cellSize: 4,
+            playerSpeed: 0.12,
+            turnSpeed: 0.04,
+            playerPos: { x: 0, z: 0 },
+            playerAngle: 0,
+            exitPos: { x: 0, z: 0 },
+            maze: [],
+            moveInput: { x: 0, y: 0 },
+            turnInput: 0
+        };
+
+        // Three.js Setup
+        let scene, camera, renderer;
+        let walls = [];
+        let exitMarker;
+
+        function initThree() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+            scene.fog = new THREE.Fog(0x1a1a2e, 1, 35);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.y = 1.6;
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.4);
+            scene.add(ambientLight);
+
+            const playerLight = new THREE.PointLight(0xffffee, 1, 15);
+            playerLight.position.set(0, 1.5, 0);
+            camera.add(playerLight);
+            scene.add(camera);
+
+            // Floor
+            const floorGeometry = new THREE.PlaneGeometry(game.mazeSize * game.cellSize, game.mazeSize * game.cellSize);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x2d2d44,
+                roughness: 0.8
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.set((game.mazeSize * game.cellSize) / 2 - game.cellSize / 2, 0, (game.mazeSize * game.cellSize) / 2 - game.cellSize / 2);
+            scene.add(floor);
+
+            // Ceiling
+            const ceilingGeometry = new THREE.PlaneGeometry(game.mazeSize * game.cellSize, game.mazeSize * game.cellSize);
+            const ceilingMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a1a2e,
+                roughness: 1
+            });
+            const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.set((game.mazeSize * game.cellSize) / 2 - game.cellSize / 2, 3, (game.mazeSize * game.cellSize) / 2 - game.cellSize / 2);
+            scene.add(ceiling);
+
+            window.addEventListener('resize', onResize);
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Maze Generation using Recursive Backtracking
+        function generateMaze() {
+            const size = game.mazeSize;
+            game.maze = [];
+            
+            for (let i = 0; i < size; i++) {
+                game.maze[i] = [];
+                for (let j = 0; j < size; j++) {
+                    game.maze[i][j] = 1; // 1 = wall
+                }
+            }
+
+            function carve(x, y) {
+                game.maze[y][x] = 0;
+                const directions = [
+                    [0, -2], [0, 2], [-2, 0], [2, 0]
+                ].sort(() => Math.random() - 0.5);
+
+                for (const [dx, dy] of directions) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx > 0 && nx < size - 1 && ny > 0 && ny < size - 1 && game.maze[ny][nx] === 1) {
+                        game.maze[y + dy / 2][x + dx / 2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+
+            carve(1, 1);
+
+            // Set start and exit
+            game.playerPos = { x: 1, z: 1 };
+            game.maze[1][1] = 0;
+            
+            // Find exit position (furthest corner)
+            let maxDist = 0;
+            for (let y = 1; y < size - 1; y++) {
+                for (let x = 1; x < size - 1; x++) {
+                    if (game.maze[y][x] === 0) {
+                        const dist = Math.abs(x - 1) + Math.abs(y - 1);
+                        if (dist > maxDist) {
+                            maxDist = dist;
+                            game.exitPos = { x, z: y };
+                        }
+                    }
+                }
+            }
+            game.maze[game.exitPos.z][game.exitPos.x] = 2; // 2 = exit
+        }
+
+        function createMazeGeometry() {
+            // Clear existing walls
+            walls.forEach(wall => scene.remove(wall));
+            walls = [];
+            if (exitMarker) scene.remove(exitMarker);
+
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x4a4a6a,
+                roughness: 0.7,
+                metalness: 0.1
+            });
+
+            const wallHeight = 3;
+
+            for (let y = 0; y < game.mazeSize; y++) {
+                for (let x = 0; x < game.mazeSize; x++) {
+                    if (game.maze[y][x] === 1) {
+                        const wallGeometry = new THREE.BoxGeometry(game.cellSize, wallHeight, game.cellSize);
+                        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                        wall.position.set(x * game.cellSize, wallHeight / 2, y * game.cellSize);
+                        scene.add(wall);
+                        walls.push(wall);
+                    }
+                }
+            }
+
+            // Exit marker (glowing green pillar)
+            const exitGeometry = new THREE.CylinderGeometry(0.3, 0.3, 2.5, 16);
+            const exitMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x00ff88,
+                emissive: 0x00ff88,
+                emissiveIntensity: 0.5
+            });
+            exitMarker = new THREE.Mesh(exitGeometry, exitMaterial);
+            exitMarker.position.set(game.exitPos.x * game.cellSize, 1.25, game.exitPos.z * game.cellSize);
+            scene.add(exitMarker);
+
+            // Exit light
+            const exitLight = new THREE.PointLight(0x00ff88, 2, 10);
+            exitLight.position.copy(exitMarker.position);
+            exitLight.position.y = 2;
+            scene.add(exitLight);
+        }
+
+        function worldToMaze(worldX, worldZ) {
+            return {
+                x: Math.round(worldX / game.cellSize),
+                z: Math.round(worldZ / game.cellSize)
+            };
+        }
+
+        function canMove(newX, newZ) {
+            const mazePos = worldToMaze(newX, newZ);
+            if (mazePos.x < 0 || mazePos.x >= game.mazeSize || mazePos.z < 0 || mazePos.z >= game.mazeSize) {
+                return false;
+            }
+            return game.maze[mazePos.z][mazePos.x] !== 1;
+        }
+
+        function updatePlayer() {
+            if (!game.running) return;
+
+            // Turning
+            game.playerAngle += game.turnInput * game.turnSpeed;
+
+            // Movement
+            let moveX = 0;
+            let moveZ = 0;
+            
+            if (game.moveInput.y < -0.2) {
+                moveX = Math.sin(game.playerAngle) * game.playerSpeed;
+                moveZ = Math.cos(game.playerAngle) * game.playerSpeed;
+            }
+            if (game.moveInput.y > 0.2) {
+                moveX = -Math.sin(game.playerAngle) * game.playerSpeed;
+                moveZ = -Math.cos(game.playerAngle) * game.playerSpeed;
+            }
+            if (game.moveInput.x < -0.2) {
+                moveX = Math.cos(game.playerAngle) * game.playerSpeed * 0.7;
+                moveZ = -Math.sin(game.playerAngle) * game.playerSpeed * 0.7;
+            }
+            if (game.moveInput.x > 0.2) {
+                moveX = -Math.cos(game.playerAngle) * game.playerSpeed * 0.7;
+                moveZ = Math.sin(game.playerAngle) * game.playerSpeed * 0.7;
+            }
+
+            const newX = game.playerPos.x + moveX;
+            const newZ = game.playerPos.z + moveZ;
+
+            // Collision detection
+            const radius = 0.4;
+            if (canMove(newX, game.playerPos.z)) game.playerPos.x = newX;
+            if (canMove(game.playerPos.x, newZ)) game.playerPos.z = newZ;
+
+            // Update camera
+            camera.position.x = game.playerPos.x;
+            camera.position.z = game.playerPos.z;
+            camera.rotation.y = game.playerAngle;
+
+            // Update compass
+            updateCompass();
+
+            // Check win condition
+            const playerMazePos = worldToMaze(game.playerPos.x, game.playerPos.z);
+            if (playerMazePos.x === game.exitPos.x && playerMazePos.z === game.exitPos.z) {
+                winGame();
+            }
+
+            // Animate exit
+            if (exitMarker) {
+                exitMarker.rotation.y += 0.02;
+                exitMarker.position.y = 1.25 + Math.sin(Date.now() * 0.003) * 0.2;
+            }
+        }
+
+        function updateCompass() {
+            const angle = ((game.playerAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+            let direction = 'N';
+            if (angle > Math.PI * 0.25 && angle < Math.PI * 0.75) direction = 'E';
+            else if (angle > Math.PI * 0.75 && angle < Math.PI * 1.25) direction = 'S';
+            else if (angle > Math.PI * 1.25 && angle < Math.PI * 1.75) direction = 'W';
+            document.getElementById('hint').textContent = direction === 'N' ? '↑' : direction === 'S' ? '↓' : direction === 'E' ? '→' : '←';
+            document.getElementById('compass').textContent = direction;
+        }
+
+        function drawMinimap() {
+            const canvas = document.getElementById('minimap');
+            const ctx = canvas.getContext('2d');
+            const size = game.mazeSize;
+            const scale = canvas.width / size;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    if (game.maze[y][x] === 1) {
+                        ctx.fillStyle = '#4a4a6a';
+                        ctx.fillRect(x * scale, y * scale, scale, scale);
+                    } else if (game.maze[y][x] === 2) {
+                        ctx.fillStyle = '#00ff88';
+                        ctx.beginPath();
+                        ctx.arc(x * scale + scale / 2, y * scale + scale / 2, scale / 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Player
+            const playerMaze = worldToMaze(game.playerPos.x, game.playerPos.z);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.beginPath();
+            ctx.arc(playerMaze.x * scale + scale / 2, playerMaze.z * scale + scale / 2, scale / 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Direction indicator
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(playerMaze.x * scale + scale / 2, playerMaze.z * scale + scale / 2);
+            ctx.lineTo(
+                playerMaze.x * scale + scale / 2 + Math.sin(game.playerAngle) * scale,
+                playerMaze.z * scale + scale / 2 + Math.cos(game.playerAngle) * scale
+            );
+            ctx.stroke();
+        }
+
+        function updateTimer() {
+            game.timeLeft--;
+            document.getElementById('timer').textContent = game.timeLeft;
+            if (game.timeLeft <= 10) {
+                document.getElementById('timer').style.color = '#ff6b6b';
+            }
+            if (game.timeLeft <= 0) {
+                loseGame();
+            }
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('winScreen').classList.add('hidden');
+            document.getElementById('loseScreen').classList.add('hidden');
+
+            game.timeLeft = 60;
+            game.playerAngle = 0;
+            document.getElementById('timer').textContent = game.timeLeft;
+            document.getElementById('timer').style.color = '#ff6b6b';
+
+            generateMaze();
+            createMazeGeometry();
+
+            game.playerPos = { x: 1 * game.cellSize, z: 1 * game.cellSize };
+            camera.position.set(game.playerPos.x, 1.6, game.playerPos.z);
+            camera.rotation.set(0, game.playerAngle, 0);
+
+            game.running = true;
+
+            if (game.timerInterval) clearInterval(game.timerInterval);
+            game.timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function winGame() {
+            game.running = false;
+            clearInterval(game.timerInterval);
+            document.getElementById('finalTime').textContent = game.timeLeft + 's';
+            document.getElementById('winScreen').classList.remove('hidden');
+        }
+
+        function loseGame() {
+            game.running = false;
+            clearInterval(game.timerInterval);
+            document.getElementById('loseScreen').classList.remove('hidden');
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePlayer();
+            drawMinimap();
+            renderer.render(scene, camera);
+        }
+
+        // Input Handling
+        const keys = {};
+        document.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+        document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+        function handleKeyboardInput() {
+            game.moveInput.y = 0;
+            game.moveInput.x = 0;
+            game.turnInput = 0;
+
+            if (keys['w'] || keys['arrowup']) game.moveInput.y = -1;
+            if (keys['s'] || keys['arrowdown']) game.moveInput.y = 1;
+            if (keys['a'] || keys['arrowleft']) { game.moveInput.x = -1; game.turnInput = 1; }
+            if (keys['d'] || keys['arrowright']) { game.moveInput.x = 1; game.turnInput = -1; }
+            if (keys['q']) game.turnInput = 1;
+            if (keys['e']) game.turnInput = -1;
+        }
+
+        setInterval(handleKeyboardInput, 16);
+
+        // Touch Controls
+        let moveTouchId = null;
+        let moveStartX = 0, moveStartY = 0;
+        const moveJoystick = document.getElementById('moveJoystick');
+        const moveKnob = document.getElementById('moveKnob');
+        const turnLeft = document.getElementById('turnLeft');
+        const turnRight = document.getElementById('turnRight');
+
+        moveJoystick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            moveTouchId = touch.identifier;
+            moveStartX = touch.clientX;
+            moveStartY = touch.clientY;
+        });
+
+        moveJoystick.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (const touch of e.changedTouches) {
+                if (touch.identifier === moveTouchId) {
+                    const dx = touch.clientX - moveStartX;
+                    const dy = touch.clientY - moveStartY;
+                    const dist = Math.min(Math.sqrt(dx * dx + dy * dy), 40);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    const knobX = Math.cos(angle) * dist;
+                    const knobY = Math.sin(angle) * dist;
+                    moveKnob.style.transform = `translate(calc(-50% + ${knobX}px), calc(-50% + ${knobY}px))`;
+
+                    game.moveInput.x = knobX / 40;
+                    game.moveInput.y = -knobY / 40;
+                }
+            }
+        });
+
+        moveJoystick.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            for (const touch of e.changedTouches) {
+                if (touch.identifier === moveTouchId) {
+                    moveTouchId = null;
+                    moveKnob.style.transform = 'translate(-50%, -50%)';
+                    game.moveInput.x = 0;
+                    game.moveInput.y = 0;
+                }
+            }
+        });
+
+        // Turn buttons
+        let turnIntervalLeft = null;
+        let turnIntervalRight = null;
+
+        turnLeft.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            game.turnInput = 1;
+        });
+        turnLeft.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            game.turnInput = 0;
+        });
+
+        turnRight.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            game.turnInput = -1;
+        });
+        turnRight.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            game.turnInput = 0;
+        });
+
+        // Mouse controls for desktop
+        let mouseDown = false;
+        let lastMouseX = 0;
+
+        document.getElementById('gameCanvas').addEventListener('mousedown', (e) => {
+            mouseDown = true;
+            lastMouseX = e.clientX;
+        });
+
+        document.addEventListener('mouseup', () => {
+            mouseDown = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (mouseDown && game.running) {
+                const dx = e.clientX - lastMouseX;
+                game.playerAngle -= dx * 0.005;
+                lastMouseX = e.clientX;
+            }
+        });
+
+        // Button listeners
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('playAgainBtn').addEventListener('click', startGame);
+        document.getElementById('retryBtn').addEventListener('click', startGame);
+
+        // Initialize
+        initThree();
+        animate();
+    </script>
+</body>
+</html>
