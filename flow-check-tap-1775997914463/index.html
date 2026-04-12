@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Flow Check Tap</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+body{background:#1a1a2e;font-family:'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#game-container{position:relative;width:100%;height:100%;max-width:500px;overflow:hidden}
+#canvas{display:block;width:100%;height:100%}
+#hud{position:absolute;top:0;left:0;right:0;padding:15px;display:flex;justify-content:space-between;align-items:center;color:#fff;font-size:18px;z-index:10}
+#score-box{background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:20px}
+#target-box{background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:20px;display:flex;align-items:center;gap:8px}
+#target-color{width:24px;height:24px;border-radius:50%;border:2px solid #fff}
+#timer-bar{position:absolute;top:60px;left:10px;right:10px;height:6px;background:rgba(255,255,255,0.2);border-radius:3px;z-index:10}
+#timer-fill{height:100%;background:linear-gradient(90deg,#00d9ff,#00ff88);border-radius:3px;transition:width 0.1s linear}
+#menu{position:absolute;inset:0;background:rgba(26,26,46,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100}
+#menu h1{color:#00d9ff;font-size:32px;margin-bottom:10px;text-shadow:0 0 20px #00d9ff}
+#menu p{color:#aaa;margin-bottom:30px;text-align:center;padding:0 30px;line-height:1.5}
+.btn{padding:15px 50px;font-size:20px;background:linear-gradient(135deg,#00d9ff,#00ff88);color:#1a1a2e;border:none;border-radius:30px;cursor:pointer;font-weight:bold;margin:5px;transition:transform 0.2s,box-shadow 0.2s}
+.btn:hover,.btn:active{transform:scale(1.05);box-shadow:0 0 20px rgba(0,217,255,0.5)}
+#result{position:absolute;inset:0;background:rgba(26,26,46,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100}
+#result h2{color:#00ff88;font-size:28px;margin-bottom:10px}
+#final-score{color:#fff;font-size:48px;font-weight:bold;margin-bottom:5px}
+#high-score{color:#ffd700;font-size:20px;margin-bottom:30px}
+#feedback{position:absolute;font-size:24px;font-weight:bold;pointer-events:none;z-index:50;animation:fadeUp 0.6s forwards}
+@keyframes fadeUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-50px) scale(1.2)}}
+</style>
+</head>
+<body>
+<div id="game-container">
+<canvas id="canvas"></canvas>
+<div id="hud">
+<div id="score-box">Score: <span id="score">0</span></div>
+<div id="target-box">Check: <div id="target-color"></div></div>
+</div>
+<div id="timer-bar"><div id="timer-fill"></div></div>
+<div id="menu">
+<h1>Flow Check Tap</h1>
+<p>Tap circles matching the target color!<br>Mistakes cost points. Be quick!</p>
+<button class="btn" id="start-btn">START</button>
+</div>
+<div id="result">
+<h2>GAME OVER</h2>
+<div id="final-score">0</div>
+<div id="high-score">Best: 0</div>
+<button class="btn" id="restart-btn">PLAY AGAIN</button>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const targetColorEl=document.getElementById('target-color');
+const timerFill=document.getElementById('timer-fill');
+const menu=document.getElementById('menu');
+const result=document.getElementById('result');
+const finalScoreEl=document.getElementById('final-score');
+const highScoreEl=document.getElementById('high-score');
+const startBtn=document.getElementById('start-btn');
+const restartBtn=document.getElementById('restart-btn');
+
+const colors=['#ff6b6b','#4ecdc4','#ffe66d','#95e1d3','#f38181','#aa96da','#fcbad3','#a8d8ea'];
+let gameState,radius,circles,score,targetColor,timer,maxTime,highScore,w,h;
+
+function resize(){
+w=canvas.width=canvas.offsetWidth;
+h=canvas.height=canvas.offsetHeight;
+radius=Math.min(w,h)*0.06;
+}
+window.addEventListener('resize',resize);
+resize();
+
+function init(){
+gameState='playing';
+score=0;
+timer=maxTime=8000;
+circles=[];
+highScore=localStorage.getItem('flowCheckHighScore')||0;
+changeTargetColor();
+for(let i=0;i<8;i++) spawnCircle();
+}
+
+function changeTargetColor(){
+const idx=Math.floor(Math.random()*colors.length);
+targetColor=colors[idx];
+targetColorEl.style.background=targetColor;
+}
+
+function spawnCircle(){
+const color=colors[Math.floor(Math.random()*colors.length)];
+const r=radius+Math.random()*radius*0.5;
+const padding=r*2;
+circles.push({
+x:padding+Math.random()*(w-padding*2),
+y:padding*2+Math.random()*(h-padding*3),
+radius:r,
+color,
+vx:(Math.random()-0.5)*2,
+vy:(Math.random()-0.5)*2
+});
+}
+
+function update(dt){
+if(gameState!=='playing')return;
+timer-=dt;
+const ratio=Math.max(0,timer/maxTime);
+timerFill.style.width=(ratio*100)+'%';
+if(timer<=3000&&timer>2000&&Math.random()<0.01)changeTargetColor();
+if(timer<=2000&&Math.random()<0.02)changeTargetColor();
+if(timer<=0){endGame();return;}
+circles.forEach(c=>{
+c.x+=c.vx;
+c.y+=c.vy;
+if(c.x<radius||c.x>w-radius)c.vx*=-1;
+if(c.y<radius*3||c.y>h-radius)c.vy*=-1;
+c.x=Math.max(radius,Math.min(w-radius,c.x));
+c.y=Math.max(radius*3,Math.min(h-radius,c.y));
+});
+while(circles.length<10)spawnCircle();
+}
+
+function draw(){
+ctx.clearRect(0,0,w,h);
+circles.forEach(c=>{
+ctx.beginPath();
+ctx.arc(c.x,c.y,c.radius,0,Math.PI*2);
+ctx.fillStyle=c.color;
+ctx.fill();
+ctx.strokeStyle='rgba(255,255,255,0.3)';
+ctx.lineWidth=2;
+ctx.stroke();
+});
+}
+
+function getPos(e){
+const rect=canvas.getBoundingClientRect();
+const touch=e.touches?e.touches[0]:e;
+return{
+x:(touch.clientX-rect.left)*(w/rect.width),
+y:(touch.clientY-rect.top)*(h/rect.height)
+};
+}
+
+function handleTap(e){
+if(gameState!=='playing')return;
+e.preventDefault();
+const pos=getPos(e);
+let hit=false;
+for(let i=circles.length-1;i>=0;i--){
+const c=circles[i];
+const dx=pos.x-c.x,dy=pos.y-c.y;
+if(dx*dx+dy*dy<c.radius*c.radius){
+hit=true;
+if(c.color===targetColor){
+score+=10;
+showFeedback('+10','#00ff88',pos.x,pos.y);
+playSound(600,0.1);
+circles.splice(i,1);
+spawnCircle();
+spawnCircle();
+if(Math.random()<0.3)changeTargetColor();
+}else{
+score=Math.max(0,score-5);
+showFeedback('-5','#ff6b6b',pos.x,pos.y);
+playSound(200,0.15);
+timer=Math.min(maxTime,timer+500);
+}
+scoreEl.textContent=score;
+break;
+}
+}
+}
+
+function showFeedback(text,color,x,y){
+const el=document.createElement('div');
+el.id='feedback';
+el.textContent=text;
+el.style.color=color;
+el.style.left=x+'px';
+el.style.top=y+'px';
+document.getElementById('game-container').appendChild(el);
+setTimeout(()=>el.remove(),600);
+}
+
+function playSound(freq,dur){
+try{
+const osc=ctx.createOscillator();
+const gain=ctx.createGain();
+osc.connect(gain);
+gain.connect(ctx.destination);
+osc.frequency.value=freq;
+osc.type='sine';
+gain.gain.setValueAtTime(0.3,ctx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+osc.start();
+osc.stop(ctx.currentTime+dur);
+}catch(e){}
+}
+
+function endGame(){
+gameState='ended';
+if(score>highScore){
+highScore=score;
+localStorage.setItem('flowCheckHighScore',highScore);
+}
+finalScoreEl.textContent=score;
+highScoreEl.textContent='Best: '+highScore;
+result.style.display='flex';
+}
+
+function hideResult(){
+result.style.display='none';
+}
+
+let lastTime=0;
+function loop(time){
+const dt=Math.min(time-lastTime,50);
+lastTime=time;
+update(dt);
+draw();
+requestAnimationFrame(loop);
+}
+
+canvas.addEventListener('click',handleTap);
+canvas.addEventListener('touchstart',handleTap,{passive:false});
+startBtn.addEventListener('click',()=>{menu.style.display='none';init();});
+restartBtn.addEventListener('click',()=>{hideResult();init();});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
