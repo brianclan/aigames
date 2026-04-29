@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>IOS URL Check</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e;font-family:system-ui,sans-serif;touch-action:none}
+#game{position:relative;width:100%;height:100%;overflow:hidden}
+.target{position:absolute;width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#e94560,#ff6b6b);cursor:pointer;transition:transform 0.1s;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff}
+.target:hover{transform:scale(1.1)}
+.target:active{transform:scale(0.9)}
+#hud{position:absolute;top:0;left:0;right:0;padding:15px;display:flex;justify-content:space-between;background:rgba(0,0,0,0.5);color:#fff;font-size:18px;font-weight:700}
+#start-screen,#end-screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(26,26,46,0.95);color:#fff;z-index:100}
+#end-screen{display:none}
+h1{font-size:28px;margin-bottom:15px;text-align:center}
+p{font-size:16px;margin-bottom:20px;text-align:center;max-width:280px;line-height:1.4}
+.btn{background:linear-gradient(135deg,#e94560,#ff6b6b);color:#fff;border:none;padding:15px 40px;font-size:18px;font-weight:700;border-radius:25px;cursor:pointer;transition:transform 0.2s}
+.btn:hover{transform:scale(1.05)}
+.btn:active{transform:scale(0.95)}
+#final-score{font-size:48px;font-weight:700;color:#ffd700;margin:10px 0}
+</style>
+</head>
+<body>
+<div id="game">
+<div id="hud">
+<span id="score">Score: 0</span>
+<span id="timer">Time: 30</span>
+</div>
+<div id="start-screen">
+<h1>IOS URL Check</h1>
+<p>Tap the red targets as fast as you can! Score points before time runs out.</p>
+<button class="btn" id="start-btn">Start Game</button>
+</div>
+<div id="end-screen">
+<h1>Game Over!</h1>
+<p>Your Score:</p>
+<div id="final-score">0</div>
+<button class="btn" id="restart-btn">Play Again</button>
+</div>
+</div>
+<script>
+const game={score:0,timeLeft:30,isRunning:false,targetInterval:null,timerInterval:null,maxTargets:5,targets:[]};
+const gameEl=document.getElementById('game');
+const scoreEl=document.getElementById('score');
+const timerEl=document.getElementById('timer');
+const startScreen=document.getElementById('start-screen');
+const endScreen=document.getElementById('end-screen');
+const finalScoreEl=document.getElementById('final-score');
+const startBtn=document.getElementById('start-btn');
+const restartBtn=document.getElementById('restart-btn');
+function createTarget(){
+if(game.targets.length>=game.maxTargets)return;
+const target=document.createElement('div');
+target.className='target';
+const size=50;
+const maxX=window.innerWidth-size-20;
+const maxY=window.innerHeight-size-60;
+const x=Math.random()*maxX+10;
+const y=Math.random()*maxY+60;
+target.style.left=x+'px';
+target.style.top=y+'px';
+target.textContent='✓';
+const id=Date.now()+Math.random();
+target.dataset.id=id;
+const handler=()=>hitTarget(target,id);
+target.addEventListener('click',handler);
+target.addEventListener('touchstart',(e)=>{e.preventDefault();handler()},{passive:false});
+gameEl.appendChild(target);
+game.targets.push({el:target,id});
+setTimeout(()=>removeTarget(id),2000);
+}
+function removeTarget(id){
+const idx=game.targets.findIndex(t=>t.id===id);
+if(idx!==-1){
+game.targets[idx].el.remove();
+game.targets.splice(idx,1);
+}}
+function hitTarget(el,id){
+if(!game.isRunning)return;
+game.score++;
+scoreEl.textContent='Score: '+game.score;
+removeTarget(id);
+}
+function startGame(){
+game.score=0;
+game.timeLeft=30;
+game.isRunning=true;
+game.targets.forEach(t=>t.el.remove());
+game.targets=[];
+scoreEl.textContent='Score: 0';
+timerEl.textContent='Time: 30';
+startScreen.style.display='none';
+endScreen.style.display='none';
+game.targetInterval=setInterval(createTarget,400);
+game.timerInterval=setInterval(()=>{
+game.timeLeft--;
+timerEl.textContent='Time: '+game.timeLeft;
+if(game.timeLeft<=0)endGame();
+},1000);
+}
+function endGame(){
+game.isRunning=false;
+clearInterval(game.targetInterval);
+clearInterval(game.timerInterval);
+game.targets.forEach(t=>t.el.remove());
+game.targets=[];
+finalScoreEl.textContent=game.score;
+endScreen.style.display='flex';
+}
+startBtn.addEventListener('click',startGame);
+restartBtn.addEventListener('click',startGame);
+</script>
+</body>
+</html>
