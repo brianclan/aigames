@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Orbit Heist — thenext.games</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0A0F1E;--surface:#121A2B;--primary:#4DE2C5;--secondary:#7C8CFF;
+  --accent:#FFB84D;--danger:#FF5D73;--text:#EAF2FF;--muted:#93A4C3;
+  --radius:8px;--font:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+html,body{width:100%;height:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-tap-highlight-color:transparent}
+a{color:var(--primary);text-decoration:none}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none}
+
+/* ─── LANDING PAGE ─── */
+#landing{display:flex;flex-direction:column;align-items:center;width:100%}
+.section{width:100%;max-width:900px;margin:0 auto;padding:48px 20px}
+.section-title{font-size:1.6rem;font-weight:700;margin-bottom:16px;text-align:center}
+.section-title span{color:var(--primary)}
+
+/* hero */
+#hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(ellipse at 50% 30%,#182444 0%,var(--bg) 70%);position:relative;overflow:hidden}
+#hero::before{content:'';position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(77,226,197,.12),transparent 70%);top:-60px;right:-80px;pointer-events:none}
+#hero h1{font-size:clamp(2.4rem,6vw,4rem);font-weight:800;letter-spacing:-1px;margin-bottom:12px}
+#hero h1 span{background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#hero p.tagline{max-width:560px;font-size:1.05rem;color:var(--muted);line-height:1.6;margin-bottom:32px}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.btn{padding:14px 28px;border-radius:var(--radius);font-weight:600;font-size:1rem;transition:transform .15s,box-shadow .15s}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:var(--primary);color:var(--bg)}
+.btn-primary:hover{box-shadow:0 0 20px rgba(77,226,197,.35)}
+.btn-outline{border:2px solid var(--primary);color:var(--primary);background:transparent}
+.btn-outline:hover{background:rgba(77,226,197,.08)}
+.btn-sm{padding:10px 18px;font-size:.85rem}
+
+/* how to play */
+#how-to-play{background:var(--surface)}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;margin-top:20px}
+.step{background:var(--bg);padding:20px;border-radius:var(--radius);text-align:center}
+.step .num{font-size:1.8rem;font-weight:800;color:var(--primary);margin-bottom:8px}
+.step p{color:var(--muted);font-size:.92rem;line-height:1.5}
+
+/* features */
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:20px}
+.feature-card{background:var(--surface);border:1px solid rgba(77,226,197,.1);border-radius:var(--radius);padding:20px}
+.feature-card h3{color:var(--primary);margin-bottom:6px;font-size:1rem}
+.feature-card p{color:var(--muted);font-size:.88rem;line-height:1.5}
+
+/* leaderboard preview */
+#leaderboard-section{background:var(--surface)}
+.lb-table{width:100%;border-collapse:collapse;margin-top:16px;font-size:.9rem}
+.lb-table th{text-align:left;color:var(--muted);padding:8px 12px;border-bottom:1px solid rgba(234,242,255,.08)}
+.lb-table td{padding:10px 12px;border-bottom:1px solid rgba(234,242,255,.04)}
+.lb-table tr:hover td{background:rgba(77,226,197,.04)}
+.rank-1{color:var(--accent)}
+.rank-2{color:var(--muted)}
+.rank-3{color:var(--danger)}
+
+/* wallet benefits */
+.wallet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:20px}
+.wallet-card{background:var(--surface);border-radius:var(--radius);padding:20px;border-left:3px solid var(--secondary)}
+.wallet-card h3{font-size:.95rem;margin-bottom:6px}
+.wallet-card p{color:var(--muted);font-size:.86rem;line-height:1.5}
+
+/* faq */
+#faq{background:var(--surface)}
+.faq-item{border-bottom:1px solid rgba(234,242,255,.06);padding:16px 0}
+.faq-q{font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.faq-q::after{content:'+';font-size:1.2rem;color:var(--primary);transition:transform .2s}
+.faq-item.open .faq-q::after{transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s;color:var(--muted);font-size:.9rem;line-height:1.6}
+.faq-item.open .faq-a{max-height:200px;padding-top:10px}
+
+/* footer */
+#footer{text-align:center;padding:32px 20px;font-size:.82rem;color:var(--muted)}
+
+/* ─── GAME SCREEN ─── */
+#game-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:100;flex-direction:column}
+#game-hud{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(18,26,43,.92);font-size:.82rem;z-index:5;flex-shrink:0}
+.hud-item{display:flex;align-items:center;gap:4px}
+.hud-item .label{color:var(--muted)}
+.hud-bar{width:80px;height:6px;background:rgba(234,242,255,.1);border-radius:3px;overflow:hidden}
+.hud-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+.o2-fill{background:var(--primary)}
+.hp-fill{background:var(--danger)}
+.alert-fill{background:var(--accent)}
+#game-canvas-wrap{flex:1;position:relative;overflow:hidden;touch-action:none}
+#game-canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+
+/* touch controls */
+#touch-controls{display:none;position:fixed;bottom:0;left:0;right:0;z-index:10;padding:12px;pointer-events:none}
+.touch-row{display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
+#dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:2px;pointer-events:auto}
+.dpad-btn{background:rgba(77,226,197,.12);border:1px solid rgba(77,226,197,.25);border-radius:8px;color:var(--primary);font-size:1.2rem;display:flex;align-items:center;justify-content:center;pointer-events:auto;-webkit-user-select:none;user-select:none}
+.dpad-btn:active{background:rgba(77,226,197,.3)}
+.dpad-empty{background:transparent;border:none}
+.action-btns{display:flex;gap:8px;pointer-events:auto}
+.action-btn{width:54px;height:54px;border-radius:50%;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;-webkit-user-select:none;user-select:none}
+.action-btn:active{transform:scale(.9)}
+#btn-interact{background:rgba(77,226,197,.18);border:2px solid var(--primary);color:var(--primary)}
+#btn-dash{background:rgba(124,140,255,.18);border:2px solid var(--secondary);color:var(--secondary)}
+
+/* pause overlay */
+#pause-overlay{display:none;position:fixed;inset:0;background:rgba(10,15,30,.88);z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#pause-overlay h2{font-size:1.6rem;color:var(--primary)}
+
+/* run summary */
+#run-summary{display:none;position:fixed;inset:0;background:rgba(10,15,30,.92);z-index:60;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.summary-card{background:var(--surface);border:1px solid rgba(77,226,197,.15);border-radius:12px;padding:28px;max-width:360px;width:100%;text-align:center}
+.summary-card h2{font-size:1.4rem;margin-bottom:16px}
+.summary-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(234,242,255,.06);font-size:.9rem}
+.summary-row .val{color:var(--primary);font-weight:600}
+.summary-total{font-size:1.1rem;font-weight:700;color:var(--accent);margin-top:12px}
+.summary-btns{display:flex;gap:10px;margin-top:20px;justify-content:center}
+
+/* settings panel */
+#settings-panel{display:none;position:fixed;top:0;right:0;width:280px;height:100%;background:var(--surface);z-index:70;padding:24px;box-shadow:-4px 0 20px rgba(0,0,0,.4)}
+#settings-panel h3{margin-bottom:16px;font-size:1.1rem}
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(234,242,255,.06);font-size:.9rem}
+.toggle{width:42px;height:24px;background:rgba(234,242,255,.1);border-radius:12px;position:relative;cursor:pointer;transition:background .2s}
+.toggle.on{background:var(--primary)}
+.toggle::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s}
+.toggle.on::after{left:21px}
+
+/* wallet modal */
+#wallet-modal{display:none;position:fixed;inset:0;background:rgba(10,15,30,.9);z-index:80;align-items:center;justify-content:center;padding:20px}
+.wallet-box{background:var(--surface);border:1px solid rgba(124,140,255,.2);border-radius:12px;padding:28px;max-width:380px;width:100%;text-align:center}
+.wallet-box h2{font-size:1.2rem;margin-bottom:8px}
+.wallet-box p{color:var(--muted);font-size:.88rem;line-height:1.5;margin-bottom:20px}
+.wallet-box .btn{width:100%;margin-bottom:10px}
+
+/* leaderboard overlay */
+#lb-overlay{display:none;position:fixed;inset:0;background:rgba(10,15,30,.92);z-index:55;flex-direction:column;align-items:center;padding:40px 20px}
+#lb-overlay .lb-tabs{display:flex;gap:8px;margin-bottom:16px}
+#lb-overlay .lb-tab{padding:8px 16px;border-radius:var(--radius);font-size:.85rem;font-weight:600;background:rgba(234,242,255,.06);color:var(--muted);cursor:pointer}
+#lb-overlay .lb-tab.active{background:var(--primary);color:var(--bg)}
+#lb-overlay .lb-list{width:100%;max-width:480px}
+
+@media(min-width:768px){
+  #touch-controls{display:none!important}
+}
+@media(max-width:767px){
+  #game-screen.active #touch-controls{display:block}
+  .section{padding:32px 16px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ LANDING PAGE ═══════════ -->
+<div id="landing">
+
+  <!-- Hero -->
+  <section id="hero" class="section">
+    <h1><span>Orbit Heist</span></h1>
+    <p class="tagline">Board drifting freighters, stay off the grid, and extract with the haul before ship security locks you in.</p>
+    <div class="hero-btns">
+      <button class="btn btn-primary" onclick="startGame()">Play Now</button>
+      <button class="btn btn-outline" onclick="showLeaderboard()">View Leaderboard</button>
+    </div>
+  </section>
+
+  <!-- How to Play -->
+  <section id="how-to-play" class="section">
+    <h2 class="section-title">How to <span>Play</span></h2>
+    <div class="steps">
+      <div class="step"><div class="num">01</div><p>Board a drifting freighter and breach the entry point. Your oxygen is already ticking down.</p></div>
+      <div class="step"><div class="num">02</div><p>Sneak past patrol drones, cameras, and laser grids — or disable them with tools you find.</p></div>
+      <div class="step"><div class="num">03</div><p>Loot cargo pods, data cores, and salvage crates. Every second counts against your O₂ supply.</p></div>
+      <div class="step"><div class="num">04</div><p>Reach the extraction point before the alert overwhelms you. Cash in your haul for upgrades.</p></div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="section">
+    <h2 class="section-title">Game <span>Features</span></h2>
+    <div class="features-grid">
+      <div class="feature-card"><h3>🚀 Run-Based Missions</h3><p>Every heist is a new procedurally assembled ship layout. No two runs are the same.</p></div>
+      <div class="feature-card"><h3>🔧 Upgradeable Tools</h3><p>Unlock EMP charges, faster hacking modules, improved cargo scanners, and bigger oxygen tanks.</p></div>
+      <div class="feature-card"><h3>👻 Stealth or Action</h3><p>Sneak past every drone for a stealth bonus, or go loud and race the extraction clock.</p></div>
+      <div class="feature-card"><h3>🏆 Daily Leaderboards</h3><p>Compete on daily and all-time leaderboards. Link your wallet to claim your spot permanently.</p></div>
+      <div class="feature-card"><h3>⚡ Instant Browser Play</h3><p>No download, no install. Play immediately on any device — desktop or mobile landscape.</p></div>
+      <div class="feature-card"><h3>🔗 Optional Wallet Link</h3><p>Play as a guest or connect a wallet to sync progress, submit scores, and unlock profile perks.</p></div>
+    </div>
+  </section>
+
+  <!-- Leaderboard Preview -->
+  <section id="leaderboard-section" class="section">
+    <h2 class="section-title">Top <span>Operators</span></h2>
+    <table class="lb-table">
+      <thead><tr><th>#</th><th>Pilot</th><th>Score</th><th>Runs</th></tr></thead>
+      <tbody>
+        <tr><td class="rank-1">1</td><td>0xAb3…f91</td><td class="rank-1">48,720</td><td>312</td></tr>
+        <tr><td class="rank-2">2</td><td>ghost.eth</td><td>41,390</td><td>287</td></tr>
+        <tr><td class="rank-3">3</td><td>SalvageKing</td><td>38,110</td><td>245</td></tr>
+        <tr><td>4</td><td>0x91c…d04</td><td>35,880</td><td>198</td></tr>
+        <tr><td>5</td><td>NullDrift</td><td>33,450</td><td>176</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Wallet Benefits -->
+  <section id="wallet-benefits" class="section">
+    <h2 class="section-title">Why <span>Connect</span> a Wallet?</h2>
+    <div class="wallet-grid">
+      <div class="wallet-card"><h3>📊 Persistent Leaderboard</h3><p>Submit your scores on-chain identity. Your rank follows you across devices and sessions.</p></div>
+      <div class="wallet-card"><h3>☁️ Cloud Sync</h3><p>Your progression, upgrades, and stats sync to your wallet-linked profile automatically.</p></div>
+      <div class="wallet-card"><h3>🎖️ Exclusive Profile Perks</h3><p>Wallet-linked pilots unlock cosmetic badges and profile customisation options.</p></div>
+      <div class="wallet-card"><h3>🔒 No Fees, No Transactions</h3><p>Linking is a simple signature — no gas, no cost. Just verify you own the address.</p></div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="section">
+    <h2 class="section-title"><span>FAQ</span></h2>
+    <div class="faq-list">
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Do I need a wallet to play?<span></span></div><div class="faq-a">No. You can play as a guest with full access to the game. A wallet is only needed to submit leaderboard scores, sync progress across devices, and claim profile perks.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Does connecting a wallet cost anything?<span></span></div><div class="faq-a">Linking your wallet requires signing a message — no gas fee, no transaction. It simply verifies you own the address.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What devices are supported?<span></span></div><div class="faq-a">Orbit Heist runs in any modern browser. It's optimised for desktop but works in mobile landscape mode with on-screen touch controls.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How does scoring work?<span></span></div><div class="faq-a">Your run score combines cargo value extracted, time remaining, a stealth bonus for avoiding detection, and a zero-damage bonus. Higher-risk contracts offer bigger multipliers.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Is my guest progress saved?<span></span></div><div class="faq-a">Yes — guest progress is saved to your browser's local storage. If you connect a wallet later, your stats carry over to your linked profile.</div></div>
+    </div>
+  </section>
+
+  <footer id="footer">© 2026 thenext.games — Orbit Heist. All rights reserved.</footer>
+</div>
+
+<!-- ═══════════ GAME UI ═══════════ -->
+<div id="game-screen">
+  <div id="game-hud">
+    <div class="hud-item"><span class="label">O₂</span><div class="hud-bar"><div class="hud-bar-fill o2-fill" id="hud-o2" style="width:100%"></div></div></div>
+    <div class="hud-item"><span class="label">HP</span><div class="hud-bar"><div class="hud-bar-fill hp-fill" id="hud-hp" style="width:100%"></div></div></div>
+    <div class="hud-item"><span class="label">🔔</span><div class="hud-bar"><div class="hud-bar-fill alert-fill" id="hud-alert" style="width:0%"></div></div></div>
+    <div class="hud-item"><span class="label">💰</span><span id="hud-cargo">0</span></div>
+    <div class="hud-item">
+      <button class="btn btn-sm btn-outline" onclick="togglePause()" style="padding:6px 10px;font-size:.75rem">⏸</button>
+      <button class="btn btn-sm btn-outline" onclick="toggleSettings()" style="padding:6px 10px;font-size:.75rem">⚙</button>
+      <button class="btn btn-sm btn-outline" onclick="toggleMute()" id="mute-btn" style="padding:6px 10px;font-size:.75rem">🔊</button>
+    </div>
+  </div>
+  <div id="game-canvas-wrap"><canvas id="game-canvas"></canvas></div>
+  <div id="touch-controls">
+    <div class="touch-row">
+      <div id="dpad">
+        <div class="dpad-empty"></div>
+        <button class="dpad-btn" data-dir="up">▲</button>
+        <div class="dpad-empty"></div>
+        <button class="dpad-btn" data-dir="left">◀</button>
+        <div class="dpad-empty"></div>
+        <button class="dpad-btn" data-dir="right">▶</button>
+        <div class="dpad-empty"></div>
+        <button class="dpad-btn" data-dir="down">▼</button>
+        <div class="dpad-empty"></div>
+      </div>
+      <div class="action-btns">
+        <button class="action-btn" id="btn-interact">ACT</button>
+        <button class="action-btn" id="btn-dash">DASH</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pause Overlay -->
+<div id="pause-overlay">
+  <h2>Paused</h2>
+  <button class="btn btn-primary" onclick="togglePause()">Resume</button>
+  <button class="btn btn-outline" onclick="quitToMenu()">Quit to Menu</button>
+</div>
+
+<!-- Run Summary -->
+<div id="run-summary">
+  <div class="summary-card">
+    <h2 id="summary-title">Run Complete</h2>
+    <div id="summary-rows"></div>
+    <div class="summary-total" id="summary-total"></div>
+    <p id="summary-wallet-hint" style="color:var(--muted);font-size:.8rem;margin-top:8px;display:none">Connect your wallet to submit this run to the leaderboard.</p>
+    <div class="summary-btns">
+      <button class="btn btn-primary" onclick="startGame()">Play Again</button>
+      <button class="btn btn-outline" onclick="quitToMenu()">Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Leaderboard Overlay -->
+<div id="lb-overlay">
+  <h2 class="section-title" style="margin-bottom:16px">Leaderboard</h2>
+  <div class="lb-tabs">
+    <div class="lb-tab active" onclick="switchLbTab(this,'daily')">Daily</div>
+    <div class="lb-tab" onclick="switchLbTab(this,'alltime')">All-Time</div>
+  </div>
+  <div class="lb-list" id="lb-list"></div>
+  <button class="btn btn-outline" style="margin-top:20px" onclick="hideLb()">Close</button>
+</div>
+
+<!-- Settings Panel -->
+<div id="settings-panel">
+  <h3>Settings</h3>
+  <div class="setting-row"><span>Sound</span><div class="toggle on" id="toggle-sound" onclick="toggleSettingRow(this,'sound')"></div></div>
+  <div class="setting-row"><span>Music</span><div class="toggle on" id="toggle-music" onclick="toggleSettingRow(this,'music')"></div></div>
+  <div class="setting-row"><span>Touch Controls</span><div class="toggle on" id="toggle-touch" onclick="toggleSettingRow(this,'touch')"></div></div>
+  <div class="setting-row"><span>Screen Shake</span><div class="toggle on" id="toggle-shake" onclick="toggleSettingRow(this,'shake')"></div></div>
+  <button class="btn btn-outline btn-sm" style="margin-top:20px;width:100%" onclick="toggleSettings()">Close</button>
+</div>
+
+<!-- Wallet Modal -->
+<div id="wallet-modal">
+  <div class="wallet-box">
+    <h2>Verify your pilot ID</h2>
+    <p>Sign a message to link this game profile to your wallet. No gas fee and no transaction.</p>
+    <button class="btn btn-primary" onclick="connectWallet()">Connect Wallet</button>
+    <button class="btn btn-outline" onclick="playAsGuest()">Play as Guest</button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   ORBIT HEIST — Single-file HTML5 Canvas Game
+   thenext.games · 2026
+   ═══════════════════════════════════════════ */
+
+// ─── CONFIG ───
+const C = {
+  TILE: 28,
+  ROOM_W: 20, ROOM_H: 14,
+  FPS: 60,
+  O2_MAX: 100, O2_DRAIN: 0.045,
+  HP_MAX: 100,
+  ALERT_MAX: 100, ALERT_RATE: 0.35, ALERT_DECAY: 0.05,
+  DASH_CD: 1.5, DASH_DIST: 4,
+  PLAYER_SPEED: 2.4,
+  DRONE_SPEED: 1.1,
+  COLORS: {
+    bg:'#0A0F1E',floor:'#151E30',wall:'#1E2A42',door:'#4DE2C5',
+    player:'#4DE2C5',drone:'#FF5D73',camera:'#FFB84D',laser:'#FF5D73',
+    loot:'#FFB84D',extract:'#7C8CFF',oxygenPickup:'#4DE2C5',
+    fov:'rgba(255,93,115,.06)',hacked:'#3a3a5c'
+  }
+};
+
+// ─── STATE ───
+let state = null;
+let paused = false;
+let muted = false;
+let settings = { sound:true, music:true, touch:true, shake:true };
+let walletLinked = false;
+let walletAddr = '';
+let guestProfile = JSON.parse(localStorage.getItem('oh_profile')||'null') || { bestScore:0, totalRuns:0, totalCargo:0 };
+
+// ─── AUDIO (lightweight synth) ───
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let actx = null;
+function ensureAudio(){ if(!actx) actx = new AudioCtx(); }
+function playTone(freq,dur,type='square',vol=.08){
+  if(muted||!settings.sound) return;
+  ensureAudio();
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.type=type;o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,actx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur);
+  o.connect(g);g.connect(actx.destination);
+  o.start();o.stop(actx.currentTime+dur);
+}
+function sfx(name){
+  const m={
+    pickup:()=>playTone(880,.12,'sine',.1),
+    dash:()=>playTone(220,.08,'sawtooth',.06),
+    hit:()=>playTone(110,.2,'sawtooth',.12),
+    alarm:()=>playTone(660,.3,'square',.07),
+    door:()=>playTone(440,.15,'triangle',.06),
+    extract:()=>{playTone(523,.15,'sine',.1);setTimeout(()=>playTone(659,.15,'sine',.1),100);setTimeout(()=>playTone(784,.2,'sine',.1),200);}
+  };
+  if(m[name]) m[name]();
+}
+
+// ─── MAP GENERATION ───
+function generateMap(){
+  const W=C.ROOM_W, H=C.ROOM_H;
+  // create rooms grid: 3 rooms wide, 2 tall
+  const rooms=[];
+  const totalW=W*3+4, totalH=H*2+3;
+  const grid=[];
+  for(let y=0;y<totalH;y++){grid[y]=[];for(let x=0;x<totalW;x++) grid[y][x]=1;}
+
+  // carve rooms
+  for(let ry=0;ry<2;ry++) for(let rx=0;rx<3;rx++){
+    const ox=1+rx*(W+1), oy=1+ry*(H+1);
+    const room={x:ox,y:oy,w:W,h:H,type:['cargo_bay','server_room','reactor','maintenance','airlock','bridge'][ry*3+rx]};
+    rooms.push(room);
+    for(let dy=0;dy<H;dy++) for(let dx=0;dx<W;dx++) grid[oy+dy][ox+dx]=0;
+  }
+
+  // carve doors between adjacent rooms
+  const doors=[];
+  for(let i=0;i<rooms.length;i++) for(let j=i+1;j<rooms.length;j++){
+    const a=rooms[i],b=rooms[j];
+    // horizontal neighbor
+    if(a.y===b.y && Math.abs(a.x+a.w-b.x)<=2){
+      const dy=a.y+Math.floor(a.h/2);
+      const dx=Math.min(a.x+a.w,b.x);
+      for(let xx=a.x+a.w;xx<b.x;xx++) grid[dy][xx]=0;
+      doors.push({x:dx-1,y:dy});
+    }
+    // vertical neighbor
+    if(a.x===b.x && Math.abs(a.y+a.h-b.y)<=2){
+      const dx=a.x+Math.floor(a.w/2);
+      const dy=Math.min(a.y+a.h,b.y);
+      for(let yy=a.y+a.h;yy<b.y;yy++) grid[yy][dx]=0;
+      doors.push({x:dx,y:dy-1});
+    }
+  }
+
+  // place entities
+  const drones=[], cameras=[], lasers=[], loot=[], oxygenPacks=[];
+  const extract={x:rooms[5].x+Math.floor(rooms[5].w/2), y:rooms[5].y+Math.floor(rooms[5].h/2)};
+  const playerStart={x:rooms[0].x+2, y:rooms[0].y+2};
+
+  for(let i=1;i<rooms.length;i++){
+    const r=rooms[i];
+    // drone per room
+    drones.push({x:r.x+3+Math.floor(Math.random()*(r.w-6)),y:r.y+2+Math.floor(Math.random()*(r.h-4)),
+      dx:(Math.random()>.5?1:-1),dy:0,patrol:'h',steps:0,maxSteps:r.w-4,alive:true});
+    // camera
+    if(i%2===0) cameras.push({x:r.x+1,y:r.y+1,angle:0,sweep:1,range:5,active:true});
+    // laser
+    if(i>=3) lasers.push({x:r.x+Math.floor(r.w/2),y:r.y+1,len:r.h-2,dir:'v',on:true,timer:0,cycle:3});
+    // loot
+    const lootCount=2+Math.floor(Math.random()*2);
+    for(let l=0;l<lootCount;l++){
+      const kind=['credits','data_core','salvage'][Math.floor(Math.random()*3)];
+      const val=kind==='data_core'?500:kind==='credits'?200:300;
+      loot.push({x:r.x+2+Math.floor(Math.random()*(r.w-4)),y:r.y+2+Math.floor(Math.random()*(r.h-4)),kind,value:val,taken:false});
+    }
+    // oxygen canister
+    if(Math.random()>.4) oxygenPacks.push({x:r.x+Math.floor(r.w/2)+Math.floor(Math.random()*3),y:r.y+Math.floor(r.h/2),taken:false});
+  }
+
+  return {grid,rooms,doors,drones,cameras,lasers,loot,oxygenPacks,extract,playerStart,totalW,totalH};
+}
+
+// ─── GAME INIT ───
+function initState(){
+  const map=generateMap();
+  return {
+    map,
+    player:{x:map.playerStart.x,y:map.playerStart.y,facing:0,hp:C.HP_MAX,dashCd:0},
+    o2:C.O2_MAX,
+    alert:0,
+    cargo:0,
+    cargoItems:[],
+    stealthClean:true,
+    damageTaken:false,
+    time:0,
+    running:true,
+    won:false,
+    shakeTimer:0
+  };
+}
+
+// ─── INPUT ───
+const keys={};
+let touchDirs={up:false,down:false,left:false,right:false};
+let touchAct=false, touchDash=false;
+
+document.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  if(e.key==='Escape') togglePause();
+  if(e.key===' ') e.preventDefault();
+});
+document.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+// dpad touch
+document.querySelectorAll('.dpad-btn').forEach(b=>{
+  const d=b.dataset.dir;
+  b.addEventListener('touchstart',e=>{e.preventDefault();touchDirs[d]=true},{passive:false});
+  b.addEventListener('touchend',e=>{e.preventDefault();touchDirs[d]=false},{passive:false});
+  b.addEventListener('touchcancel',()=>touchDirs[d]=false);
+});
+// action btns
+const interactBtn=document.getElementById('btn-interact');
+const dashBtn=document.getElementById('btn-dash');
+if(interactBtn){
+  interactBtn.addEventListener('touchstart',e=>{e.preventDefault();touchAct=true},{passive:false});
+  interactBtn.addEventListener('touchend',e=>{e.preventDefault();touchAct=false},{passive:false});
+}
+if(dashBtn){
+  dashBtn.addEventListener('touchstart',e=>{e.preventDefault();touchDash=true},{passive:false});
+  dashBtn.addEventListener('touchend',e=>{e.preventDefault();touchDash=false},{passive:false});
+}
+
+function getInput(){
+  return {
+    up: keys['w']||keys['arrowup']||touchDirs.up,
+    down: keys['s']||keys['arrowdown']||touchDirs.down,
+    left: keys['a']||keys['arrowleft']||touchDirs.left,
+    right: keys['d']||keys['arrowright']||touchDirs.right,
+    interact: keys['e']||touchAct,
+    dash: keys[' ']||touchDash
+  };
+}
+
+// ─── GAME LOGIC ───
+function update(dt){
+  if(!state||!state.running||paused) return;
+  const s=state, p=s.player, m=s.map;
+  s.time+=dt;
+  if(s.shakeTimer>0) s.shakeTimer-=dt;
+
+  // input
+  const inp=getInput();
+  let dx=0,dy=0;
+  if(inp.left) dx-=1;
+  if(inp.right) dx+=1;
+  if(inp.up) dy-=1;
+  if(inp.down) dy+=1;
+  if(dx&&dy){dx*=.707;dy*=.707;}
+  if(dx||dy) p.facing=Math.atan2(dy,dx);
+
+  // dash
+  if(inp.dash && p.dashCd<=0 && (dx||dy)){
+    dx*=C.DASH_DIST; dy*=C.DASH_DIST;
+    p.dashCd=C.DASH_CD;
+    sfx('dash');
+  }
+  p.dashCd=Math.max(0,p.dashCd-dt);
+
+  // move with collision
+  const spd=C.PLAYER_SPEED*dt;
+  const nx=p.x+dx*spd, ny=p.y+dy*spd;
+  if(!isWall(m.grid,nx,p.y,m.totalW,m.totalH)) p.x=nx;
+  if(!isWall(m.grid,p.x,ny,m.totalW,m.totalH)) p.y=ny;
+
+  // oxygen
+  s.o2=Math.max(0,s.o2-C.O2_DRAIN*dt*60);
+  if(s.o2<=0) return endRun(false,'Oxygen depleted');
+
+  // hp
+  if(p.hp<=0) return endRun(false,'Hull breach — eliminated');
+
+  // interact with doors
+  if(inp.interact){
+    m.doors.forEach(d=>{
+      if(dist(p.x,p.y,d.x,d.y)<2) sfx('door');
+    });
+  }
+
+  // loot pickup
+  m.loot.forEach(l=>{
+    if(!l.taken && dist(p.x,p.y,l.x,l.y)<1.2){
+      l.taken=true;
+      s.cargo+=l.value;
+      s.cargoItems.push(l.kind);
+      sfx('pickup');
+    }
+  });
+
+  // oxygen pickup
+  m.oxygenPacks.forEach(o=>{
+    if(!o.taken && dist(p.x,p.y,o.x,o.y)<1.2){
+      o.taken=true;
+      s.o2=Math.min(C.O2_MAX,s.o2+25);
+      sfx('pickup');
+    }
+  });
+
+  // extraction
+  if(dist(p.x,p.y,m.extract.x,m.extract.y)<1.5){
+    sfx('extract');
+    return endRun(true,'Extraction successful');
+  }
+
+  // drones AI
+  m.drones.forEach(dr=>{
+    if(!dr.alive) return;
+    dr.steps++;
+    if(dr.steps>=dr.maxSteps*10){dr.dx*=-1;dr.steps=0;}
+    const ndx=dr.x+dr.dx*C.DRONE_SPEED*dt;
+    if(!isWall(m.grid,ndx,dr.y,m.totalW,m.totalH)) dr.x=ndx;
+    else {dr.dx*=-1;dr.steps=0;}
+    // detect player
+    if(dist(p.x,p.y,dr.x,dr.y)<3){
+      s.alert=Math.min(C.ALERT_MAX,s.alert+C.ALERT_RATE*dt*60);
+      s.stealthClean=false;
+      if(dist(p.x,p.y,dr.x,dr.y)<1.3){
+        p.hp-=15*dt;
+        s.damageTaken=true;
+        if(settings.shake) s.shakeTimer=.15;
+        sfx('hit');
+      }
+    }
+  });
+
+  // cameras
+  m.cameras.forEach(cam=>{
+    if(!cam.active) return;
+    cam.angle+=cam.sweep*dt*.5;
+    if(cam.angle>Math.PI/2||cam.angle<-Math.PI/2) cam.sweep*=-1;
+    const a=Math.atan2(p.y-cam.y,p.x-cam.x);
+    if(dist(p.x,p.y,cam.x,cam.y)<cam.range && Math.abs(angleDiff(a,cam.angle))<.5){
+      s.alert=Math.min(C.ALERT_MAX,s.alert+C.ALERT_RATE*0.5*dt*60);
+      s.stealthClean=false;
+    }
+  });
+
+  // lasers toggle
+  m.lasers.forEach(l=>{
+    l.timer+=dt;
+    if(l.timer>=l.cycle){l.timer=0;l.on=!l.on;}
+    if(l.on){
+      for(let i=0;i<l.len;i++){
+        const lx=l.dir==='v'?l.x:l.x+i;
+        const ly=l.dir==='v'?l.y+i:l.y;
+        if(Math.abs(p.x-lx)<.8 && Math.abs(p.y-ly)<.8){
+          p.hp-=20*dt;
+          s.damageTaken=true;
+          if(settings.shake) s.shakeTimer=.15;
+          sfx('hit');
+        }
+      }
+    }
+  });
+
+  // alert decay
+  s.alert=Math.max(0,s.alert-C.ALERT_DECAY*dt*60);
+  if(s.alert>=C.ALERT_MAX){
+    sfx('alarm');
+    // boost drones
+    m.drones.forEach(d=>d.maxSteps=999);
+  }
+
+  // hud
+  document.getElementById('hud-o2').style.width=(s.o2/C.O2_MAX*100)+'%';
+  document.getElementById('hud-hp').style.width=(p.hp/C.HP_MAX*100)+'%';
+  document.getElementById('hud-alert').style.width=(s.alert/C.ALERT_MAX*100)+'%';
+  document.getElementById('hud-cargo').textContent=s.cargo.toLocaleString();
+}
+
+function isWall(grid,x,y,w,h){
+  const gx=Math.floor(x),gy=Math.floor(y);
+  if(gx<0||gy<0||gx>=w||gy>=h) return true;
+  return grid[gy][gx]===1;
+}
+function dist(ax,ay,bx,by){return Math.hypot(bx-ax,by-ay);}
+function angleDiff(a,b){let d=a-b;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return d;}
+
+// ─── RENDER ───
+let canvas,ctx;
+function render(){
+  if(!state||!canvas) return;
+  const s=state, m=s.map, p=s.player, T=C.TILE;
+  const cw=canvas.width, ch=canvas.height;
+
+  // camera offset — center on player
+  let ox=cw/2-p.x*T, oy=ch/2-p.y*T;
+  if(s.shakeTimer>0){ox+=Math.random()*4-2;oy+=Math.random()*4-2;}
+
+  ctx.fillStyle=C.COLORS.bg;
+  ctx.fillRect(0,0,cw,ch);
+
+  // visible range
+  const x0=Math.max(0,Math.floor(-ox/T)-1), y0=Math.max(0,Math.floor(-oy/T)-1);
+  const x1=Math.min(m.totalW,Math.ceil((cw-ox)/T)+1), y1=Math.min(m.totalH,Math.ceil((ch-oy)/T)+1);
+
+  // tiles
+  for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){
+    const sx=x*T+ox, sy=y*T+oy;
+    if(m.grid[y][x]===1){
+      ctx.fillStyle=C.COLORS.wall;
+      ctx.fillRect(sx,sy,T,T);
+      ctx.fillStyle='rgba(0,0,0,.2)';
+      ctx.fillRect(sx,sy+T-2,T,2);
+    } else {
+      ctx.fillStyle=C.COLORS.floor;
+      ctx.fillRect(sx,sy,T,T);
+      // subtle grid
+      ctx.strokeStyle='rgba(234,242,255,.02)';
+      ctx.strokeRect(sx,sy,T,T);
+    }
+  }
+
+  // doors
+  m.doors.forEach(d=>{
+    ctx.fillStyle=C.COLORS.door;
+    ctx.globalAlpha=.6;
+    ctx.fillRect(d.x*T+ox+4,d.y*T+oy+2,T-8,T-4);
+    ctx.globalAlpha=1;
+  });
+
+  // lasers
+  m.lasers.forEach(l=>{
+    if(!l.on) return;
+    ctx.strokeStyle=C.COLORS.laser;
+    ctx.lineWidth=2;
+    ctx.globalAlpha=.7+Math.sin(Date.now()*.01)*.3;
+    ctx.beginPath();
+    if(l.dir==='v'){
+      ctx.moveTo(l.x*T+ox+T/2,l.y*T+oy);
+      ctx.lineTo(l.x*T+ox+T/2,(l.y+l.len)*T+oy);
+    }
+    ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.lineWidth=1;
+  });
+
+  // loot
+  m.loot.forEach(l=>{
+    if(l.taken) return;
+    ctx.fillStyle=C.COLORS.loot;
+    const lx=l.x*T+ox, ly=l.y*T+oy;
+    const bob=Math.sin(Date.now()*.003+l.x)*2;
+    ctx.beginPath();
+    ctx.arc(lx+T/2,ly+T/2+bob,5,0,Math.PI*2);
+    ctx.fill();
+    // icon hint
+    ctx.fillStyle='rgba(0,0,0,.5)';ctx.font='8px sans-serif';ctx.textAlign='center';
+    ctx.fillText(l.kind==='credits'?'$':l.kind==='data_core'?'D':'S',lx+T/2,ly+T/2+bob+3);
+  });
+
+  // oxygen packs
+  m.oxygenPacks.forEach(o=>{
+    if(o.taken) return;
+    ctx.fillStyle=C.COLORS.oxygenPickup;
+    ctx.globalAlpha=.7;
+    ctx.fillRect(o.x*T+ox+6,o.y*T+oy+6,T-12,T-12);
+    ctx.globalAlpha=1;
+    ctx.fillStyle='#000';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+    ctx.fillText('O₂',o.x*T+ox+T/2,o.y*T+oy+T/2+3);
+  });
+
+  // extraction point
+  ctx.fillStyle=C.COLORS.extract;
+  ctx.globalAlpha=.4+Math.sin(Date.now()*.005)*.3;
+  ctx.fillRect(m.extract.x*T+ox-4,m.extract.y*T+oy-4,T+8,T+8);
+  ctx.globalAlpha=1;
+  ctx.strokeStyle=C.COLORS.extract;
+  ctx.lineWidth=2;
+  ctx.strokeRect(m.extract.x*T+ox-4,m.extract.y*T+oy-4,T+8,T+8);
+  ctx.lineWidth=1;
+  ctx.fillStyle='#fff';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+  ctx.fillText('EXIT',m.extract.x*T+ox+T/2,m.extract.y*T+oy+T/2+3);
+
+  // cameras
+  m.cameras.forEach(cam=>{
+    if(!cam.active) return;
+    ctx.fillStyle=C.COLORS.camera;
+    ctx.beginPath();
+    ctx.arc(cam.x*T+ox+T/2,cam.y*T+oy+T/2,4,0,Math.PI*2);
+    ctx.fill();
+    // fov cone
+    ctx.fillStyle=C.COLORS.fov;
+    ctx.beginPath();
+    const cx=cam.x*T+ox+T/2,cy=cam.y*T+oy+T/2;
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,cam.range*T,cam.angle-.4,cam.angle+.4);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // drones
+  m.drones.forEach(dr=>{
+    if(!dr.alive) return;
+    ctx.fillStyle=C.COLORS.drone;
+    const dx=dr.x*T+ox,dy=dr.y*T+oy;
+    ctx.beginPath();
+    ctx.moveTo(dx+T/2,dy+2);
+    ctx.lineTo(dx+T-4,dy+T-2);
+    ctx.lineTo(dx+4,dy+T-2);
+    ctx.closePath();
+    ctx.fill();
+    // glow
+    ctx.fillStyle='rgba(255,93,115,.15)';
+    ctx.beginPath();ctx.arc(dx+T/2,dy+T/2,T,0,Math.PI*2);ctx.fill();
+  });
+
+  // player
+  const px=p.x*T+ox, py=p.y*T+oy;
+  ctx.fillStyle=C.COLORS.player;
+  ctx.beginPath();
+  ctx.arc(px+T/2,py+T/2,T/2-2,0,Math.PI*2);
+  ctx.fill();
+  // facing indicator
+  ctx.strokeStyle='#fff';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(px+T/2,py+T/2);
+  ctx.lineTo(px+T/2+Math.cos(p.facing)*10,py+T/2+Math.sin(p.facing)*10);
+  ctx.stroke();
+  ctx.lineWidth=1;
+
+  // dash cooldown indicator
+  if(p.dashCd>0){
+    ctx.strokeStyle='rgba(124,140,255,.5)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(px+T/2,py+T/2,T/2+2,-Math.PI/2,-Math.PI/2+(1-p.dashCd/C.DASH_CD)*Math.PI*2);
+    ctx.stroke();
+    ctx.lineWidth=1;
+  }
+
+  // room labels
+  m.rooms.forEach(r=>{
+    ctx.fillStyle='rgba(234,242,255,.08)';
+    ctx.font='9px sans-serif';ctx.textAlign='center';
+    ctx.fillText(r.type.replace('_',' ').toUpperCase(),r.x*T+ox+r.w*T/2,r.y*T+oy+12);
+  });
+}
+
+// ─── GAME LOOP ───
+let lastTime=0, animId=null;
+function gameLoop(ts){
+  if(!lastTime) lastTime=ts;
+  const dt=Math.min((ts-lastTime)/1000,.05);
+  lastTime=ts;
+  update(dt);
+  render();
+  animId=requestAnimationFrame(gameLoop);
+}
+
+function resizeCanvas(){
+  if(!canvas) return;
+  const wrap=document.getElementById('game-canvas-wrap');
+  canvas.width=wrap.clientWidth;
+  canvas.height=wrap.clientHeight;
+}
+
+// ─── RUN LIFECYCLE ───
+function startGame(){
+  hideAllOverlays();
+  document.getElementById('landing').style.display='none';
+  const gs=document.getElementById('game-screen');
+  gs.style.display='flex';
+  gs.classList.add('active');
+  canvas=document.getElementById('game-canvas');
+  ctx=canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize',resizeCanvas);
+  state=initState();
+  paused=false;
+  lastTime=0;
+  if(animId) cancelAnimationFrame(animId);
+  animId=requestAnimationFrame(gameLoop);
+  // show touch on mobile
+  if(window.innerWidth<768 && settings.touch) document.getElementById('touch-controls').style.display='block';
+}
+
+function endRun(won,reason){
+  state.running=false;
+  state.won=won;
+  const s=state;
+  const timeBonus=Math.max(0,Math.floor(s.o2*10));
+  const stealthBonus=s.stealthClean?1500:0;
+  const dmgBonus=s.damageTaken?0:800;
+  const total=s.cargo+timeBonus+stealthBonus+dmgBonus;
+
+  // update profile
+  guestProfile.totalRuns++;
+  guestProfile.totalCargo+=s.cargo;
+  if(total>guestProfile.bestScore) guestProfile.bestScore=total;
+  localStorage.setItem('oh_profile',JSON.stringify(guestProfile));
+
+  // build summary
+  const rows=document.getElementById('summary-rows');
+  rows.innerHTML='';
+  const addRow=(l,v)=>{rows.innerHTML+=`<div class="summary-row"><span>${l}</span><span class="val">${v}</span></div>`;};
+  addRow('Cargo Extracted',s.cargo.toLocaleString());
+  addRow('O₂ Time Bonus',timeBonus.toLocaleString());
+  addRow('Stealth Bonus',stealthBonus.toLocaleString());
+  addRow('No-Damage Bonus',dmgBonus.toLocaleString());
+  document.getElementById('summary-total').textContent='Total: '+total.toLocaleString();
+  document.getElementById('summary-title').textContent=won?'Extraction Successful':'Run Failed';
+  document.getElementById('summary-title').style.color=won?'var(--primary)':'var(--danger)';
+
+  const hint=document.getElementById('summary-wallet-hint');
+  hint.style.display=walletLinked?'none':'block';
+
+  document.getElementById('run-summary').style.display='flex';
+}
+
+function quitToMenu(){
+  hideAllOverlays();
+  if(animId){cancelAnimationFrame(animId);animId=null;}
+  document.getElementById('game-screen').style.display='none';
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('landing').style.display='flex';
+  state=null;
+}
+
+// ─── UI HELPERS ───
+function hideAllOverlays(){
+  ['pause-overlay','run-summary','lb-overlay','settings-panel','wallet-modal'].forEach(id=>
+    document.getElementById(id).style.display='none');
+}
+
+function togglePause(){
+  if(!state) return;
+  paused=!paused;
+  document.getElementById('pause-overlay').style.display=paused?'flex':'none';
+}
+
+function toggleMute(){
+  muted=!muted;
+  document.getElementById('mute-btn').textContent=muted?'🔇':'🔊';
+}
+
+function toggleSettings(){
+  const p=document.getElementById('settings-panel');
+  p.style.display=p.style.display==='block'?'none':'block';
+}
+
+function toggleSettingRow(el,key){
+  settings[key]=!settings[key];
+  el.classList.toggle('on',settings[key]);
+  if(key==='touch'){
+    const tc=document.getElementById('touch-controls');
+    if(tc) tc.style.display=settings.touch&&window.innerWidth<768?'block':'none';
+  }
+}
+
+function toggleFaq(el){
+  el.parentElement.classList.toggle('open');
+}
+
+// ─── LEADERBOARD ───
+const mockLb={
+  daily:[
+    {rank:1,name:'0xAb3…f91',score:12480,runs:8},
+    {rank:2,name:'ghost.eth',score:11200,runs:6},
+    {rank:3,name:'SalvageKing',score:9870,runs:5},
+    {rank:4,name:'NullDrift',score:8640,runs:7},
+    {rank:5,name:'0x91c…d04',score:7320,runs:4},
+  ],
+  alltime:[
+    {rank:1,name:'0xAb3…f91',score:48720,runs:312},
+    {rank:2,name:'ghost.eth',score:41390,runs:287},
+    {rank:3,name:'SalvageKing',score:38110,runs:245},
+    {rank:4,name:'0x91c…d04',score:35880,runs:198},
+    {rank:5,name:'NullDrift',score:33450,runs:176},
+  ]
+};
+
+function showLeaderboard(){
+  document.getElementById('lb-overlay').style.display='flex';
+  renderLb('daily');
+}
+function hideLb(){document.getElementById('lb-overlay').style.display='none';}
+function switchLbTab(el,tab){
+  document.querySelectorAll('#lb-overlay .lb-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderLb(tab);
+}
+function renderLb(tab){
+  const list=document.getElementById('lb-list');
+  const data=mockLb[tab]||mockLb.daily;
+  list.innerHTML=`<table class="lb-table"><thead><tr><th>#</th><th>Pilot</th><th>Score</th><th>Runs</th></tr></thead><tbody>`+
+    data.map(r=>`<tr><td class="${r.rank<=3?'rank-'+r.rank:''}">${r.rank}</td><td>${r.name}</td><td>${r.score.toLocaleString()}</td><td>${r.runs}</td></tr>`).join('')+
+    `</tbody></table>`;
+}
+
+// ─── WALLET (placeholder/mock) ───
+function showWalletModal(){document.getElementById('wallet-modal').style.display='flex';}
+function connectWallet(){
+  // In production: integrate Reown/WalletConnect with project ID from env
+  walletLinked=true;
+  walletAddr='0x7a3B…c42F';
+  document.getElementById('wallet-modal').style.display='none';
+  alert('Wallet linked (demo): '+walletAddr);
+}
+function playAsGuest(){document.getElementById('wallet-modal').style.display='none';}
+
+// ─── INIT ───
+window.addEventListener('DOMContentLoaded',()=>{
+  // smooth scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({behavior:'smooth'});
+  }));
+});
+</script>
+</body>
+</html>
