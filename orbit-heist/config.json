@@ -1,0 +1,55 @@
+{
+  "title": "Orbit Heist",
+  "tagline": "Jack derelict freighters, dodge patrol drones, and extract before the air runs out.",
+  "genre": ["arcade", "top-down", "stealth", "space"],
+  "platform": "web",
+  "age_rating": "13+",
+  "session_length_minutes": "3-8",
+  "wallet_linked_config": {
+    "project_id_env_key": "NEXT_PUBLIC_REOWN_PROJECT_ID",
+    "default_chain_id": 8453,
+    "supported_chain_ids": [8453, 84532, 42161],
+    "wallet_connect_required_for": [
+      "submitting leaderboard scores",
+      "claiming wallet-bound rewards",
+      "saving cloud profile"
+    ],
+    "guest_mode_enabled": true,
+    "display_wallet_short_address": true,
+    "sign_message_on_first_link": true,
+    "sign_message_purpose": "Link gameplay profile to wallet ownership without initiating a transaction",
+    "network_switch_prompt": true,
+    "preferred_wallet_ui": "modal",
+    "profile_fields": [
+      "walletAddress",
+      "displayName",
+      "bestScore",
+      "totalRuns",
+      "highestValueExtracted",
+      "currentStreak"
+    ]
+  },
+  "ui_copy": {
+    "connect_cta": "Connect Wallet",
+    "guest_cta": "Play as Guest",
+    "linked_state_label": "Wallet Linked",
+    "signature_prompt_title": "Verify your pilot ID",
+    "signature_prompt_body": "Sign a message to link this game profile to your wallet. No gas fee and no transaction.",
+    "wrong_network_message": "Switch network to continue with wallet features.",
+    "score_submit_requires_wallet": "Connect your wallet to submit this run to the leaderboard."
+  },
+  "save_strategy": {
+    "guest": "localStorage",
+    "wallet_linked": "remote profile sync plus local cache"
+  },
+  "visual_theme": {
+    "background": "#0A0F1E",
+    "surface": "#121A2B",
+    "primary": "#4DE2C5",
+    "secondary": "#7C8CFF",
+    "accent": "#FFB84D",
+    "danger": "#FF5D73",
+    "text": "#EAF2FF",
+    "muted_text": "#93A4C3"
+  }
+}
