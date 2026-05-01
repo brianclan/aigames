@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Neon Drift</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a12;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+"use strict";
+const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
+
+/* ── Audio helper (lightweight arcade bleeps via WebAudio) ── */
+let audioCtx=null;
+function initAudio(){if(!audioCtx)try{audioCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+function beep(freq,dur,type,vol){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=type||"square";o.frequency.value=freq;
+  g.gain.value=vol||.12;
+  o.connect(g);g.connect(audioCtx.destination);
+  o.start();g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);
+  o.stop(audioCtx.currentTime+dur);
+}
+function sfxCheckpoint(){beep(880,.08,"sine",.15);setTimeout(()=>beep(1320,.1,"sine",.12),60)}
+function sfxCrash(){beep(120,.25,"sawtooth",.18);beep(80,.35,"square",.1)}
+function sfxBoost(){beep(660,.06,"triangle",.1);setTimeout(()=>beep(990,.08,"triangle",.1),40)}
+function sfxNearMiss(){beep(1600,.04,"sine",.06)}
+
+/* ── Resize ── */
+function resize(){canvas.width=canvas.clientWidth*devicePixelRatio;canvas.height=canvas.clientHeight*devicePixelRatio}
+window.addEventListener("resize",resize);resize();
+
+/* ── Track generation ── */
+// Track is a sequence of segments, each with a center-x offset and width.
+// We store absolute world-y positions going downward (player moves "up" visually).
+
+const SEG_H=6; // world units per segment
+const TRACK_W_BASE=220;
+const TRACK_W_MIN=100;
+const VISIBLE_SEGS=120;
+let segments=[];
+let nextSegY=0;
+let trackSeed=1;
+function seedRand(){trackSeed=(trackSeed*16807+0)%2147483647;return(trackSeed-1)/2147483646}
+
+function genSegment(y){
+  const prev=segments.length?segments[segments.length-1]:null;
+  const cx=prev?prev.cx:0;
+  const difficulty=Math.min(y/8000,1);
+  const turnStrength=3+difficulty*6;
+  const drift=(seedRand()-.5)*turnStrength;
+  const newCx=cx+drift;
+  const w=TRACK_W_BASE-difficulty*(TRACK_W_BASE-TRACK_W_MIN)*(0.4+seedRand()*0.6);
+  // checkpoint every ~35 segments
+  const isCheckpoint=segments.length>0&&segments.length%35===0;
+  // moving obstacle
+  const hasObstacle=!isCheckpoint&&seedRand()<0.03+difficulty*0.12;
+  return{y,cx:newCx,w,isCheckpoint,hasObstacle,obstaclePhase:seedRand()*Math.PI*2,passed:false,cpCollected:false};
+}
+
+function ensureSegments(playerY){
+  while(nextSegY<playerY+VISIBLE_SEGS*SEG_H+200){
+    segments.push(genSegment(nextSegY));
+    nextSegY+=SEG_H;
+  }
+  // prune far behind
+  while(segments.length>VISIBLE_SEGS*3&&segments[0].y<playerY-600){segments.shift()}
+}
+
+/* ── Player state ── */
+let player,score,multiplier,alive,gameTime,boostTimer,showRestart,hiScore=0;
+let nearMissCooldown=0;
+
+function resetGame(){
+  segments=[];nextSegY=0;trackSeed=Date.now()%2147483647||1;
+  player={x:0,y:0,vx:0,speed:180,baseSpeed:180,angle:0,trail:[]};
+  score=0;multiplier=1;alive=true;gameTime=0;boostTimer=0;showRestart=false;
+  nearMissCooldown=0;
+  ensureSegments(0);
+  initAudio();
+}
+resetGame();
+
+/* ── Input ── */
+const keys={};
+let touchL=false,touchR=false,touchBrake=false;
+window.addEventListener("keydown",e=>{keys[e.key]=true;if(e.key==="r"||e.key==="R"){if(!alive)resetGame()}});
+window.addEventListener("keyup",e=>{keys[e.key]=false});
+
+// Touch: left third=steer left, right third=steer right, bottom center=brake
+canvas.addEventListener("touchstart",e=>{e.preventDefault();handleTouches(e.touches)},{passive:false});
+canvas.addEventListener("touchmove",e=>{e.preventDefault();handleTouches(e.touches)},{passive:false});
+canvas.addEventListener("touchend",e=>{e.preventDefault();handleTouches(e.touches);if(!alive&&e.changedTouches.length)resetGame()},{passive:false});
+canvas.addEventListener("touchcancel",e=>{touchL=touchR=touchBrake=false});
+
+function handleTouches(touches){
+  touchL=false;touchR=false;touchBrake=false;
+  const w=canvas.clientWidth,h=canvas.clientHeight;
+  for(let i=0;i<touches.length;i++){
+    const tx=touches[i].clientX/w,ty=touches[i].clientY/h;
+    if(ty>0.75&&tx>0.3&&tx<0.7){touchBrake=true}
+    else if(tx<0.4){touchL=true}
+    else if(tx>0.6){touchR=true}
+  }
+}
+
+function steerLeft(){return keys["ArrowLeft"]||keys["a"]||keys["A"]||touchL}
+function steerRight(){return keys["ArrowRight"]||keys["d"]||keys["D"]||touchR}
+function braking(){return keys["ArrowDown"]||keys["s"]||keys["S"]||touchBrake}
+
+/* ── Segment lookup ── */
+function getSegAtY(wy){
+  // binary-ish search
+  let idx=Math.floor((wy-segments[0].y)/SEG_H);
+  idx=Math.max(0,Math.min(segments.length-2,idx));
+  return idx;
+}
+function lerpSeg(wy){
+  const i=getSegAtY(wy);
+  const s0=segments[i],s1=segments[Math.min(i+1,segments.length-1)];
+  const t=Math.max(0,Math.min(1,(wy-s0.y)/SEG_H));
+  return{cx:s0.cx+(s1.cx-s0.cx)*t,w:s0.w+(s1.w-s0.w)*t,seg:s0,segIdx:i};
+}
+
+/* ── Update ── */
+let lastTime=0;
+function update(dt){
+  if(!alive)return;
+  gameTime+=dt;
+  const difficulty=Math.min(gameTime/90,1); // ramp over 90s
+
+  // steering
+  const steerForce=320+difficulty*80;
+  if(steerLeft()) player.vx-=steerForce*dt;
+  if(steerRight()) player.vx+=steerForce*dt;
+
+  // drift friction (lower = more drift)
+  const friction=braking()?3.5:5.5-difficulty*1.5;
+  player.vx*=Math.pow(0.5,dt*friction);
+
+  // speed
+  const targetSpeed=braking()?player.baseSpeed*0.55:player.baseSpeed+difficulty*120;
+  if(boostTimer>0){
+    player.speed+=(targetSpeed+180-player.speed)*dt*3;
+    boostTimer-=dt;
+    if(boostTimer<=0)boostTimer=0;
+  } else {
+    player.speed+=(targetSpeed-player.speed)*dt*2;
+  }
+  player.baseSpeed=180+difficulty*100;
+
+  // move
+  player.x+=player.vx*dt;
+  player.y+=player.speed*dt;
+
+  // visual angle for car
+  player.angle=player.vx*0.003;
+
+  // trail
+  player.trail.push({x:player.x,y:player.y});
+  if(player.trail.length>40)player.trail.shift();
+
+  ensureSegments(player.y);
+
+  // collision check
+  const info=lerpSeg(player.y);
+  const halfW=info.w/2;
+  const distFromCenter=player.x-info.cx;
+  const edgeDist=halfW-Math.abs(distFromCenter);
+
+  if(edgeDist<0){
+    // crash
+    alive=false;
+    showRestart=true;
+    if(score>hiScore)hiScore=score;
+    sfxCrash();
+    return;
+  }
+
+  // near-miss scoring
+  nearMissCooldown-=dt;
+  if(edgeDist<12&&nearMissCooldown<=0){
+    score+=25*multiplier;
+    nearMissCooldown=0.3;
+    sfxNearMiss();
+  }
+
+  // checkpoint & obstacle checks (scan nearby segments)
+  const si=getSegAtY(player.y);
+  for(let j=Math.max(0,si-2);j<=Math.min(segments.length-1,si+2);j++){
+    const seg=segments[j];
+    if(seg.isCheckpoint&&!seg.cpCollected&&Math.abs(seg.y-player.y)<SEG_H*1.5){
+      seg.cpCollected=true;
+      multiplier++;
+      boostTimer=1.2;
+      score+=100*multiplier;
+      sfxCheckpoint();sfxBoost();
+    }
+    if(seg.hasObstacle&&!seg.passed&&Math.abs(seg.y-player.y)<SEG_H*2){
+      // moving obstacle oscillates across track
+      const osc=Math.sin(gameTime*2.5+seg.obstaclePhase);
+      const info2=lerpSeg(seg.y);
+      const obsX=info2.cx+osc*(info2.w*0.35);
+      const dx=player.x-obsX,dy=player.y-seg.y;
+      if(Math.sqrt(dx*dx+dy*dy)<14){
+        alive=false;showRestart=true;
+        if(score>hiScore)hiScore=score;
+        sfxCrash();return;
+      }
+    }
+    if(seg.y<player.y-SEG_H*3){
+      if(!seg.passed){
+        seg.passed=true;
+        // reset multiplier on missed checkpoint
+        if(seg.isCheckpoint&&!seg.cpCollected)multiplier=1;
+      }
+    }
+  }
+
+  // passive score
+  score+=player.speed*dt*0.1*multiplier;
+  score=Math.floor(score);
+}
+
+/* ── Render ── */
+function worldToScreen(wx,wy){
+  const cw=canvas.width,ch=canvas.height;
+  const scale=Math.min(cw,ch)/420;
+  const sx=cw/2+(wx-player.x)*scale;
+  const sy=ch*0.75-(wy-player.y)*scale;
+  return{x:sx,y:sy,s:scale};
+}
+
+function render(){
+  const cw=canvas.width,ch=canvas.height;
+  ctx.fillStyle="#0a0a12";ctx.fillRect(0,0,cw,ch);
+
+  const scale=Math.min(cw,ch)/420;
+
+  // draw track segments
+  const viewTop=player.y+ch/(scale*2);
+  const viewBot=player.y-ch/(scale);
+  const iStart=Math.max(0,getSegAtY(viewBot)-2);
+  const iEnd=Math.min(segments.length-1,getSegAtY(viewTop)+2);
+
+  // track fill + edges
+  ctx.lineWidth=2*scale;
+  for(let i=iStart;i<iEnd;i++){
+    const s0=segments[i],s1=segments[Math.min(i+1,segments.length-1)];
+    const p0l=worldToScreen(s0.cx-s0.w/2,s0.y);
+    const p0r=worldToScreen(s0.cx+s0.w/2,s0.y);
+    const p1l=worldToScreen(s1.cx-s1.w/2,s1.y);
+    const p1r=worldToScreen(s1.cx+s1.w/2,s1.y);
+
+    // track surface
+    ctx.beginPath();
+    ctx.moveTo(p0l.x,p0l.y);ctx.lineTo(p1l.x,p1l.y);
+    ctx.lineTo(p1r.x,p1r.y);ctx.lineTo(p0r.x,p0r.y);
+    ctx.closePath();
+    ctx.fillStyle="rgba(15,15,30,0.95)";ctx.fill();
+
+    // neon edges
+    const edgeColor=s0.isCheckpoint?"#0ff":"#f0f";
+    const edgeColorR=s0.isCheckpoint?"#0ff":"#80f";
+    ctx.beginPath();ctx.moveTo(p0l.x,p0l.y);ctx.lineTo(p1l.x,p1l.y);
+    ctx.strokeStyle=edgeColor;ctx.lineWidth=2.5*scale;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(p0r.x,p0r.y);ctx.lineTo(p1r.x,p1r.y);
+    ctx.strokeStyle=edgeColorR;ctx.lineWidth=2.5*scale;ctx.stroke();
+
+    // glow
+    ctx.beginPath();ctx.moveTo(p0l.x,p0l.y);ctx.lineTo(p1l.x,p1l.y);
+    ctx.strokeStyle="rgba(255,0,255,0.15)";ctx.lineWidth=10*scale;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(p0r.x,p0r.y);ctx.lineTo(p1r.x,p1r.y);
+    ctx.strokeStyle="rgba(128,0,255,0.15)";ctx.lineWidth=10*scale;ctx.stroke();
+
+    // checkpoint line
+    if(s0.isCheckpoint){
+      ctx.beginPath();ctx.moveTo(p0l.x,p0l.y);ctx.lineTo(p0r.x,p0r.y);
+      ctx.strokeStyle=s0.cpCollected?"rgba(0,255,200,0.25)":"#0ff";
+      ctx.lineWidth=s0.cpCollected?1*scale:3*scale;
+      ctx.setLineDash(s0.cpCollected?[]:[8*scale,6*scale]);
+      ctx.stroke();ctx.setLineDash([]);
+    }
+
+    // moving obstacle
+    if(s0.hasObstacle){
+      const osc=Math.sin(gameTime*2.5+s0.obstaclePhase);
+      const info2=lerpSeg(s0.y);
+      const obsX=info2.cx+osc*(info2.w*0.35);
+      const op=worldToScreen(obsX,s0.y);
+      const r=10*scale;
+      ctx.beginPath();ctx.arc(op.x,op.y,r,0,Math.PI*2);
+      ctx.fillStyle="#f44";ctx.fill();
+      ctx.beginPath();ctx.arc(op.x,op.y,r+4*scale,0,Math.PI*2);
+      ctx.strokeStyle="rgba(255,60,60,0.4)";ctx.lineWidth=4*scale;ctx.stroke();
+    }
+  }
+
+  // player trail
+  if(player.trail.length>1){
+    ctx.beginPath();
+    const t0=worldToScreen(player.trail[0].x,player.trail[0].y);
+    ctx.moveTo(t0.x,t0.y);
+    for(let i=1;i<player.trail.length;i++){
+      const tp=worldToScreen(player.trail[i].x,player.trail[i].y);
+      ctx.lineTo(tp.x,tp.y);
+    }
+    ctx.strokeStyle=boostTimer>0?"rgba(0,255,255,0.6)":"rgba(255,0,255,0.4)";
+    ctx.lineWidth=4*scale;ctx.stroke();
+  }
+
+  // player car
+  const pp=worldToScreen(player.x,player.y);
+  ctx.save();
+  ctx.translate(pp.x,pp.y);
+  ctx.rotate(-player.angle);
+  const cs=scale;
+  // car body
+  ctx.beginPath();
+  ctx.moveTo(0,-14*cs);
+  ctx.lineTo(-8*cs,10*cs);
+  ctx.lineTo(0,6*cs);
+  ctx.lineTo(8*cs,10*cs);
+  ctx.closePath();
+  const glow=boostTimer>0?"#0ff":"#f0f";
+  ctx.fillStyle=glow;ctx.fill();
+  ctx.shadowColor=glow;ctx.shadowBlur=20*cs;
+  ctx.fill();ctx.shadowBlur=0;
+  // cockpit
+  ctx.beginPath();ctx.arc(0,-2*cs,3*cs,0,Math.PI*2);
+  ctx.fillStyle="#fff";ctx.fill();
+  ctx.restore();
+
+  // HUD
+  const fontSize=Math.max(14,Math.floor(16*cw/400));
+  ctx.font=`bold ${fontSize}px monospace`;
+  ctx.textAlign="left";
+  ctx.fillStyle="#fff";
+  const pad=12*devicePixelRatio;
+
+  ctx.fillText(`SCORE ${score}`,pad,pad+fontSize);
+  ctx.fillStyle=multiplier>1?"#0ff":"#aaa";
+  ctx.fillText(`x${multiplier}`,pad,pad+fontSize*2.2);
+  ctx.fillStyle="#f0f";
+  ctx.fillText(`${Math.floor(player.speed)} km/h`,pad,pad+fontSize*3.4);
+
+  if(hiScore>0){
+    ctx.textAlign="right";ctx.fillStyle="#888";
+    ctx.fillText(`HI ${hiScore}`,cw-pad,pad+fontSize);
+  }
+
+  // boost indicator
+  if(boostTimer>0){
+    ctx.textAlign="center";ctx.fillStyle="#0ff";
+    ctx.font=`bold ${Math.floor(fontSize*1.3)}px monospace`;
+    ctx.fillText("BOOST",cw/2,pad+fontSize);
+  }
+
+  // death screen
+  if(!alive){
+    ctx.fillStyle="rgba(0,0,0,0.65)";ctx.fillRect(0,0,cw,ch);
+    ctx.textAlign="center";ctx.fillStyle="#f44";
+    ctx.font=`bold ${Math.floor(fontSize*2.5)}px monospace`;
+    ctx.fillText("CRASHED",cw/2,ch/2-fontSize*2);
+    ctx.fillStyle="#fff";ctx.font=`bold ${fontSize*1.2}px monospace`;
+    ctx.fillText(`Score: ${score}`,cw/2,ch/2);
+    if(score>=hiScore&&hiScore>0){
+      ctx.fillStyle="#ff0";ctx.fillText("NEW HIGH SCORE!",cw/2,ch/2+fontSize*1.6);
+    }
+    ctx.fillStyle="#aaa";ctx.font=`${fontSize}px monospace`;
+    ctx.fillText("Press R or tap to restart",cw/2,ch/2+fontSize*3.5);
+  }
+
+  // touch hints (only on touch devices, first few seconds)
+  if("ontouchstart"in window&&alive&&gameTime<5){
+    ctx.globalAlpha=Math.max(0,1-gameTime/5);
+    ctx.textAlign="center";ctx.fillStyle="#666";ctx.font=`${Math.floor(fontSize*0.8)}px monospace`;
+    ctx.fillText("← TAP LEFT",cw*0.2,ch*0.5);
+    ctx.fillText("TAP RIGHT →",cw*0.8,ch*0.5);
+    ctx.fillText("BRAKE ▼",cw*0.5,ch*0.88);
+    ctx.globalAlpha=1;
+  }
+}
+
+/* ── Game loop ── */
+function loop(ts){
+  const dt=Math.min((ts-(lastTime||ts))/1000,0.05);
+  lastTime=ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
