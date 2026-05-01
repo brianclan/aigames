@@ -1,0 +1,23 @@
+{
+  "title": "Vault Drifter",
+  "slug": "vault-drifter",
+  "embed": {
+    "wallet_mode": "deeplink",
+    "provider": "telegram",
+    "connect_label": "Continue with Telegram",
+    "deeplink": {
+      "scheme": "tg://resolve",
+      "params": {
+        "domain": "thenextgamesbot",
+        "startapp": "vault_drifter_live"
+      }
+    },
+    "fallback": {
+      "type": "url",
+      "target": "https://t.me/thenextgames"
+    },
+    "return_behavior": "resume_session",
+    "required_before_play": false,
+    "required_before_claim": true
+  }
+}
