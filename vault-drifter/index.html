@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Vault Drifter</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0D0F14;font-family:'Courier New',monospace;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block;margin:0 auto}
+#ui-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;flex-direction:column;align-items:center}
+.btn{pointer-events:auto;border:2px solid #C9A227;background:rgba(13,15,20,0.85);color:#F4F1E8;font-family:'Courier New',monospace;font-size:16px;padding:12px 32px;border-radius:6px;cursor:pointer;letter-spacing:1px;transition:background 0.2s}
+.btn:active{background:#C9A227;color:#0D0F14}
+.btn-accent{border-color:#52E3D4;color:#52E3D4}
+.btn-accent:active{background:#52E3D4;color:#0D0F14}
+#start-screen,#game-over-screen,#tutorial-screen,#connect-modal{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,15,20,0.92);pointer-events:auto;z-index:10}
+#start-screen h1{color:#C9A227;font-size:28px;margin-bottom:8px;letter-spacing:3px}
+#start-screen .subtitle{color:#52E3D4;font-size:12px;margin-bottom:30px;letter-spacing:2px}
+#game-over-screen h2{color:#FF6B6B;font-size:24px;margin-bottom:16px;letter-spacing:2px}
+#game-over-screen .stat{color:#F4F1E8;font-size:16px;margin:4px 0}
+#game-over-screen .stat span{color:#C9A227}
+#game-over-screen .reward{color:#52E3D4;font-size:18px;margin:12px 0 20px}
+#tutorial-screen .step{color:#F4F1E8;font-size:15px;margin:8px 20px;text-align:center;line-height:1.5}
+#tutorial-screen .step-num{color:#C9A227;font-weight:bold}
+#connect-modal{z-index:20}
+#connect-modal .modal-box{background:#0D0F14;border:2px solid #C9A227;border-radius:10px;padding:24px;margin:0 20px;max-width:320px;text-align:center}
+#connect-modal h3{color:#C9A227;font-size:18px;margin-bottom:10px}
+#connect-modal p{color:#F4F1E8;font-size:13px;line-height:1.5;margin-bottom:16px}
+.disclaimer{color:#52E3D4;font-size:10px;margin-top:12px;opacity:0.7}
+.hidden{display:none!important}
+#hud{position:absolute;top:0;left:0;width:100%;padding:10px 16px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:5}
+#hud .hud-left,#hud .hud-right{display:flex;flex-direction:column;gap:4px}
+.hud-val{color:#F4F1E8;font-size:13px;letter-spacing:1px}
+.hud-val span{color:#C9A227}
+#overload-bar{width:100px;height:8px;background:#1a1c24;border:1px solid #C9A227;border-radius:4px;overflow:hidden;margin-top:2px}
+#overload-fill{height:100%;width:0%;background:linear-gradient(90deg,#C9A227,#FF6B6B);transition:width 0.15s}
+#dash-indicator{color:#52E3D4;font-size:12px;margin-top:2px}
+#dash-radial{width:28px;height:28px;border-radius:50%;border:2px solid #52E3D4;position:relative;display:inline-block;vertical-align:middle;margin-right:6px}
+#dash-radial svg{position:absolute;top:-2px;left:-2px}
+#bank-prompt{position:absolute;bottom:15%;left:50%;transform:translateX(-50%);color:#C9A227;font-size:14px;letter-spacing:1px;opacity:0;transition:opacity 0.3s;text-shadow:0 0 10px rgba(201,162,39,0.5);pointer-events:none;z-index:5}
+</style>
+</head>
+<body>
+
+<canvas id="gc"></canvas>
+
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div class="hud-val">⬡ <span id="shard-count">0</span></div>
+    <div id="overload-bar"><div id="overload-fill"></div></div>
+  </div>
+  <div class="hud-right">
+    <div class="hud-val">🔑 <span id="banked-count">0</span></div>
+    <div id="dash-indicator">
+      <svg id="dash-radial" width="28" height="28" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="12" fill="none" stroke="#1a1c24" stroke-width="3"/>
+        <circle id="dash-arc" cx="14" cy="14" r="12" fill="none" stroke="#52E3D4" stroke-width="3"
+          stroke-dasharray="75.4" stroke-dashoffset="0" transform="rotate(-90 14 14)"
+          stroke-linecap="round"/>
+      </svg>
+      <span id="dash-text">Dash Ready</span>
+    </div>
+  </div>
+</div>
+
+<div id="bank-prompt">Bank now or risk overload</div>
+
+<div id="start-screen">
+  <h1>VAULT DRIFTER</h1>
+  <div class="subtitle">DESCEND · COLLECT · EXTRACT</div>
+  <button class="btn" id="btn-start">Start Run</button>
+  <div class="disclaimer">Rewards are only granted from banked shards.</div>
+</div>
+
+<div id="tutorial-screen" class="hidden">
+  <div class="step"><span class="step-num">1.</span> Swipe to change lanes.</div>
+  <div class="step"><span class="step-num">2.</span> Tap to phase-dash through danger.</div>
+  <div class="step"><span class="step-num">3.</span> Bank shards at gate markers before overload hits max.</div>
+  <button class="btn" id="btn-tutorial-ok" style="margin-top:20px">Got it</button>
+</div>
+
+<div id="game-over-screen" class="hidden">
+  <h2>Vault Sealed</h2>
+  <div class="stat">Shards Banked: <span id="go-shards">0</span></div>
+  <div class="reward">Keys Earned: <span id="go-keys">0</span></div>
+  <button class="btn" id="btn-claim">Claim Keys</button>
+  <button class="btn" id="btn-retry" style="margin-top:10px">Resume Run</button>
+  <button class="btn btn-accent" id="btn-quit" style="margin-top:10px">Exit Shaft</button>
+</div>
+
+<div id="connect-modal" class="hidden">
+  <div class="modal-box">
+    <h3>Connect to claim rewards</h3>
+    <p>Your run is saved. Connect with Telegram to convert banked shards into keys.</p>
+    <button class="btn" id="btn-connect">Continue with Telegram</button>
+    <button class="btn btn-accent" id="btn-later" style="margin-top:10px">Maybe later</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ── constants ── */
+const BG='#0D0F14',PRIMARY='#C9A227',ACCENT='#52E3D4',DANGER='#FF6B6B',UI='#F4F1E8';
+const LANE_COUNT=3,DASH_CD=1.8,DASH_DUR=0.25,MAGNET_DUR=5;
+const OVERLOAD_MAX=100,OVERLOAD_RATE=3.5,OVERLOAD_DECAY=0;
+const RAMP_INTERVAL=20;
+
+/* ── canvas setup ── */
+const cvs=document.getElementById('gc'),ctx=cvs.getContext('2d');
+let W,H,LW,LX,LANE_Y_START;
+function resize(){
+  const dpr=window.devicePixelRatio||1;
+  W=window.innerWidth;H=window.innerHeight;
+  cvs.width=W*dpr;cvs.height=H*dpr;
+  cvs.style.width=W+'px';cvs.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  LW=Math.min(W*0.8,360);
+  LX=(W-LW)/2;
+  LANE_Y_START=60;
+}
+window.addEventListener('resize',resize);resize();
+
+/* ── DOM refs ── */
+const $start=document.getElementById('start-screen');
+const $tut=document.getElementById('tutorial-screen');
+const $go=document.getElementById('game-over-screen');
+const $connect=document.getElementById('connect-modal');
+const $hud=document.getElementById('hud');
+const $shards=document.getElementById('shard-count');
+const $banked=document.getElementById('banked-count');
+const $ofill=document.getElementById('overload-fill');
+const $dashArc=document.getElementById('dash-arc');
+const $dashText=document.getElementById('dash-text');
+const $bankPrompt=document.getElementById('bank-prompt');
+const $goShards=document.getElementById('go-shards');
+const $goKeys=document.getElementById('go-keys');
+
+/* ── game state ── */
+let running=false,gameTime=0,score=0,bankedShards=0,overload=0;
+let playerLane=1,playerY,playerX,dashing=false,dashTimer=0,dashCooldown=0;
+let magnetTimer=0,speed=3.2,spawnTimer=0,spawnInterval=1.2;
+let obstacles=[],shards=[],bankGates=[],particles=[];
+let bgOffset=0,connected=false,seenTutorial=false;
+let difficultyLevel=0;
+
+/* ── helper ── */
+function laneCenter(l){return LX+LW/(LANE_COUNT*2)+l*(LW/LANE_COUNT)}
+function rand(a,b){return a+Math.random()*(b-a)}
+function randInt(a,b){return Math.floor(rand(a,b+1))}
+
+/* ── player ── */
+const POD_W=30,POD_H=38;
+function resetPlayer(){
+  playerLane=1;playerY=H*0.78;
+  playerX=laneCenter(playerLane);
+  dashing=false;dashTimer=0;dashCooldown=0;magnetTimer=0;
+}
+
+/* ── spawning ── */
+function spawnObstacle(){
+  const type=Math.random()<0.5?'laser':'door';
+  if(type==='laser'){
+    const lanes=[];
+    const count=Math.random()<0.3+difficultyLevel*0.02?2:1;
+    while(lanes.length<count){const l=randInt(0,2);if(!lanes.includes(l))lanes.push(l)}
+    lanes.forEach(l=>{
+      obstacles.push({type:'laser',lane:l,x:laneCenter(l),y:-20,w:LW/LANE_COUNT-16,h:10});
+    });
+  }else{
+    const safeLane=randInt(0,2);
+    for(let l=0;l<3;l++){
+      if(l!==safeLane) obstacles.push({type:'door',lane:l,x:laneCenter(l),y:-30,w:LW/LANE_COUNT-10,h:24});
+    }
+  }
+}
+function spawnShard(){
+  const l=randInt(0,2);
+  shards.push({lane:l,x:laneCenter(l),y:-20,r:8,golden:Math.random()<0.08});
+}
+function spawnBankGate(){
+  bankGates.push({y:-20,w:LW-20,x:LX+10});
+}
+
+/* ── drawing ── */
+function drawBG(){
+  ctx.fillStyle=BG;ctx.fillRect(0,0,W,H);
+  // lane lines
+  ctx.strokeStyle='rgba(201,162,39,0.12)';ctx.lineWidth=1;
+  for(let i=0;i<=LANE_COUNT;i++){
+    const x=LX+i*(LW/LANE_COUNT);
+    ctx.beginPath();ctx.moveTo(x,LANE_Y_START);ctx.lineTo(x,H);ctx.stroke();
+  }
+  // scrolling dashes
+  bgOffset=(bgOffset+speed*0.6)%40;
+  ctx.strokeStyle='rgba(82,227,212,0.06)';ctx.setLineDash([12,28]);
+  for(let i=1;i<LANE_COUNT;i++){
+    const x=LX+i*(LW/LANE_COUNT);
+    ctx.beginPath();ctx.moveTo(x,LANE_Y_START-bgOffset);ctx.lineTo(x,H);ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // side glow
+  const grd=ctx.createLinearGradient(LX-30,0,LX+10,0);
+  grd.addColorStop(0,'rgba(201,162,39,0)');grd.addColorStop(1,'rgba(201,162,39,0.04)');
+  ctx.fillStyle=grd;ctx.fillRect(LX-30,0,40,H);
+  const grd2=ctx.createLinearGradient(LX+LW-10,0,LX+LW+30,0);
+  grd2.addColorStop(0,'rgba(201,162,39,0.04)');grd2.addColorStop(1,'rgba(201,162,39,0)');
+  ctx.fillStyle=grd2;ctx.fillRect(LX+LW-10,0,40,H);
+}
+
+function drawPod(x,y){
+  ctx.save();
+  if(dashing){ctx.globalAlpha=0.4;ctx.shadowColor=ACCENT;ctx.shadowBlur=20}
+  // pod body
+  ctx.fillStyle=PRIMARY;
+  ctx.beginPath();
+  ctx.moveTo(x,y-POD_H/2);
+  ctx.lineTo(x+POD_W/2,y+POD_H/4);
+  ctx.quadraticCurveTo(x+POD_W/2,y+POD_H/2,x,y+POD_H/3);
+  ctx.quadraticCurveTo(x-POD_W/2,y+POD_H/2,x-POD_W/2,y+POD_H/4);
+  ctx.closePath();ctx.fill();
+  // cockpit
+  ctx.fillStyle=ACCENT;
+  ctx.beginPath();ctx.arc(x,y-POD_H/6,6,0,Math.PI*2);ctx.fill();
+  // thruster glow
+  ctx.fillStyle='rgba(82,227,212,0.3)';
+  ctx.beginPath();ctx.ellipse(x,y+POD_H/3+4,8,3+Math.random()*2,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  // magnet aura
+  if(magnetTimer>0){
+    ctx.strokeStyle='rgba(201,162,39,0.25)';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(x,y,40+Math.sin(gameTime*6)*5,0,Math.PI*2);ctx.stroke();
+  }
+}
+
+function drawObstacles(){
+  obstacles.forEach(o=>{
+    if(o.type==='laser'){
+      ctx.fillStyle=DANGER;
+      ctx.shadowColor=DANGER;ctx.shadowBlur=12;
+      ctx.fillRect(o.x-o.w/2,o.y-o.h/2,o.w,o.h);
+      ctx.shadowBlur=0;
+      // scan lines
+      ctx.fillStyle='rgba(255,107,107,0.3)';
+      ctx.fillRect(o.x-o.w/2,o.y-o.h/2-2,o.w,2);
+      ctx.fillRect(o.x-o.w/2,o.y+o.h/2,o.w,2);
+    }else{
+      ctx.fillStyle='#3a3d4a';
+      ctx.fillRect(o.x-o.w/2,o.y-o.h/2,o.w,o.h);
+      ctx.strokeStyle=PRIMARY;ctx.lineWidth=1;
+      ctx.strokeRect(o.x-o.w/2,o.y-o.h/2,o.w,o.h);
+      // rivets
+      ctx.fillStyle=PRIMARY;
+      ctx.fillRect(o.x-o.w/2+4,o.y-2,4,4);
+      ctx.fillRect(o.x+o.w/2-8,o.y-2,4,4);
+    }
+  });
+}
+
+function drawShards(){
+  shards.forEach(s=>{
+    ctx.save();
+    if(s.golden){ctx.shadowColor=PRIMARY;ctx.shadowBlur=15;ctx.fillStyle=PRIMARY}
+    else{ctx.shadowColor=ACCENT;ctx.shadowBlur=8;ctx.fillStyle=ACCENT}
+    // hexagon
+    ctx.beginPath();
+    for(let i=0;i<6;i++){const a=Math.PI/3*i-Math.PI/2;ctx.lineTo(s.x+s.r*Math.cos(a),s.y+s.r*Math.sin(a))}
+    ctx.closePath();ctx.fill();
+    ctx.restore();
+    if(s.golden){ctx.fillStyle='#0D0F14';ctx.font='bold 9px Courier New';ctx.textAlign='center';ctx.fillText('V',s.x,s.y+3)}
+  });
+}
+
+function drawBankGates(){
+  bankGates.forEach(g=>{
+    ctx.save();
+    ctx.strokeStyle=ACCENT;ctx.lineWidth=2;ctx.shadowColor=ACCENT;ctx.shadowBlur=10;
+    ctx.setLineDash([8,6]);
+    ctx.strokeRect(g.x,g.y-3,g.w,6);
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(82,227,212,0.06)';
+    ctx.fillRect(g.x,g.y-15,g.w,30);
+    ctx.restore();
+    ctx.fillStyle=ACCENT;ctx.font='10px Courier New';ctx.textAlign='center';
+    ctx.fillText('▸ BANK GATE ◂',W/2,g.y-8);
+  });
+}
+
+function drawParticles(){
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s);
+  });
+  ctx.globalAlpha=1;
+}
+
+/* ── particles ── */
+function emitParticles(x,y,color,count){
+  for(let i=0;i<count;i++){
+    particles.push({x,y,vx:rand(-2,2),vy:rand(-3,1),s:rand(2,5),life:1,color,decay:rand(0.02,0.05)});
+  }
+}
+
+/* ── collision ── */
+function boxHit(ax,ay,aw,ah,bx,by,bw,bh){
+  return ax-aw/2<bx+bw/2&&ax+aw/2>bx-bw/2&&ay-ah/2<by+bh/2&&ay+ah/2>by-bh/2;
+}
+
+/* ── update ── */
+function update(dt){
+  gameTime+=dt;
+
+  // difficulty ramp
+  const newLvl=Math.floor(gameTime/RAMP_INTERVAL);
+  if(newLvl>difficultyLevel){difficultyLevel=newLvl;spawnInterval=Math.max(0.45,1.2-difficultyLevel*0.07)}
+
+  // dash
+  if(dashing){dashTimer-=dt;if(dashTimer<=0){dashing=false}}
+  if(dashCooldown>0)dashCooldown=Math.max(0,dashCooldown-dt);
+
+  // smooth lane move
+  const tx=laneCenter(playerLane);
+  playerX+=(tx-playerX)*Math.min(1,dt*16);
+
+  // magnet
+  if(magnetTimer>0)magnetTimer-=dt;
+
+  // overload
+  if(score>0){
+    overload=Math.min(OVERLOAD_MAX,overload+OVERLOAD_RATE*dt*(1+difficultyLevel*0.08));
+    if(overload>=OVERLOAD_MAX){overloadTimer=(overloadTimer||0)+dt;if(overloadTimer>3)endGame()}
+  }else{overloadTimer=0}
+
+  // spawn
+  spawnTimer+=dt;
+  if(spawnTimer>=spawnInterval){
+    spawnTimer=0;spawnObstacle();
+    if(Math.random()<0.6)spawnShard();
+    if(Math.random()<0.12)spawnBankGate();
+  }
+
+  // move obstacles
+  obstacles.forEach(o=>o.y+=speed*60*dt);
+  obstacles=obstacles.filter(o=>o.y<H+50);
+
+  // move shards
+  shards.forEach(s=>{
+    s.y+=speed*60*dt;
+    if(magnetTimer>0){
+      const dx=playerX-s.x,dy=playerY-s.y,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<80&&d>0){s.x+=dx/d*4;s.y+=dy/d*4}
+    }
+  });
+
+  // move bank gates
+  bankGates.forEach(g=>g.y+=speed*60*dt);
+  bankGates=bankGates.filter(g=>g.y<H+50);
+
+  // collect shards
+  shards=shards.filter(s=>{
+    if(Math.abs(s.x-playerX)<22&&Math.abs(s.y-playerY)<28){
+      if(s.golden){magnetTimer=MAGNET_DUR;emitParticles(s.x,s.y,PRIMARY,12)}
+      else{score++;emitParticles(s.x,s.y,ACCENT,6)}
+      return false;
+    }
+    return s.y<H+30;
+  });
+
+  // bank gates
+  bankGates=bankGates.filter(g=>{
+    if(Math.abs(g.y-playerY)<18){
+      bankedShards+=score;score=0;overload=0;overloadTimer=0;
+      emitParticles(playerX,playerY,ACCENT,20);
+      return false;
+    }
+    return true;
+  });
+
+  // obstacle collision
+  if(!dashing){
+    for(const o of obstacles){
+      if(boxHit(playerX,playerY,POD_W-6,POD_H-6,o.x,o.y,o.w,o.h)){
+        emitParticles(playerX,playerY,DANGER,25);endGame();return;
+      }
+    }
+  }
+
+  // particles
+  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life-=p.decay});
+  particles=particles.filter(p=>p.life>0);
+
+  // HUD update
+  $shards.textContent=score;
+  $banked.textContent=bankedShards;
+  $ofill.style.width=(overload/OVERLOAD_MAX*100)+'%';
+
+  // dash HUD
+  if(dashCooldown>0){
+    const pct=dashCooldown/DASH_CD;
+    $dashArc.setAttribute('stroke-dashoffset',(75.4*pct).toFixed(1));
+    $dashText.textContent='Dash in '+dashCooldown.toFixed(1);
+    $dashArc.setAttribute('stroke',DANGER);
+  }else{
+    $dashArc.setAttribute('stroke-dashoffset','0');
+    $dashText.textContent='Dash Ready';
+    $dashArc.setAttribute('stroke',ACCENT);
+  }
+
+  // bank prompt visibility
+  $bankPrompt.style.opacity=overload>55?'1':'0';
+}
+
+/* ── render ── */
+function render(){
+  drawBG();drawBankGates();drawObstacles();drawShards();drawParticles();
+  drawPod(playerX,playerY);
+}
+
+/* ── loop ── */
+let lastT=0;
+function loop(t){
+  if(!running)return;
+  const dt=Math.min((t-lastT)/1000,0.05);lastT=t;
+  update(dt);render();
+  requestAnimationFrame(loop);
+}
+
+/* ── game flow ── */
+function startGame(){
+  score=0;bankedShards=0;overload=0;overloadTimer=0;gameTime=0;difficultyLevel=0;
+  speed=3.2;spawnTimer=0;spawnInterval=1.2;
+  obstacles=[];shards=[];bankGates=[];particles=[];
+  resetPlayer();running=true;
+  $hud.classList.remove('hidden');
+  lastT=performance.now();requestAnimationFrame(loop);
+}
+function endGame(){
+  running=false;
+  bankedShards+=Math.floor(score*0.25); // partial rescue
+  $goShards.textContent=bankedShards;
+  $goKeys.textContent=Math.floor(bankedShards/100);
+  $go.classList.remove('hidden');
+}
+
+/* ── input ── */
+let touchStartX=0,touchStartY=0,touchStartTime=0,swiped=false;
+document.addEventListener('touchstart',e=>{
+  if(!running)return;
+  const t=e.touches[0];touchStartX=t.clientX;touchStartY=t.clientY;touchStartTime=Date.now();swiped=false;
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(!running||swiped)return;
+  const t=e.touches[0],dx=t.clientX-touchStartX;
+  if(Math.abs(dx)>30){
+    swiped=true;
+    if(dx>0&&playerLane<2)playerLane++;
+    else if(dx<0&&playerLane>0)playerLane--;
+  }
+},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(!running)return;
+  if(!swiped&&Date.now()-touchStartTime<200){
+    // tap → dash
+    if(dashCooldown<=0){dashing=true;dashTimer=DASH_DUR;dashCooldown=DASH_CD;emitParticles(playerX,playerY+POD_H/2,ACCENT,8)}
+  }
+},{passive:true});
+
+// keyboard fallback
+document.addEventListener('keydown',e=>{
+  if(!running)return;
+  if(e.key==='ArrowLeft'&&playerLane>0)playerLane--;
+  if(e.key==='ArrowRight'&&playerLane<2)playerLane++;
+  if(e.key===' '&&dashCooldown<=0){dashing=true;dashTimer=DASH_DUR;dashCooldown=DASH_CD;emitParticles(playerX,playerY+POD_H/2,ACCENT,8)}
+});
+
+/* ── buttons ── */
+document.getElementById('btn-start').onclick=()=>{
+  $start.classList.add('hidden');
+  if(!seenTutorial){seenTutorial=true;$tut.classList.remove('hidden')}
+  else startGame();
+};
+document.getElementById('btn-tutorial-ok').onclick=()=>{$tut.classList.add('hidden');startGame()};
+document.getElementById('btn-retry').onclick=()=>{$go.classList.add('hidden');startGame()};
+document.getElementById('btn-quit').onclick=()=>{$go.classList.add('hidden');$start.classList.remove('hidden')};
+document.getElementById('btn-claim').onclick=()=>{
+  if(!connected){$connect.classList.remove('hidden')}
+  else{alert('Keys claimed!')}  // placeholder for real integration
+};
+document.getElementById('btn-connect').onclick=()=>{
+  const link='tg://resolve?domain=thenextgamesbot&startapp=vault_drifter_live';
+  window.open(link,'_blank')||window.location.assign('https://t.me/thenextgames');
+  connected=true;$connect.classList.add('hidden');
+};
+document.getElementById('btn-later').onclick=()=>{$connect.classList.add('hidden')};
+
+/* ── initial render ── */
+drawBG();
+})();
+</script>
+</body>
+</html>
