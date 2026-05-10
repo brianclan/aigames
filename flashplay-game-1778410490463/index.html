@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>City of Meishan</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg, #16213e 0%, #1a1a2e 50%, #0f3460 100%);
+        }
+        #gameCanvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+        }
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(26, 26, 46, 0.95);
+            pointer-events: auto;
+            z-index: 10;
+        }
+        #gameOverScreen {
+            display: none;
+        }
+        .title {
+            font-size: clamp(28px, 8vw, 56px);
+            color: #e94560;
+            text-shadow: 0 0 20px #e94560, 0 0 40px #e94560;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .subtitle {
+            font-size: clamp(14px, 3vw, 20px);
+            color: #533483;
+            margin-bottom: 30px;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .btn {
+            padding: 15px 50px;
+            font-size: clamp(16px, 4vw, 24px);
+            background: linear-gradient(135deg, #e94560, #0f3460);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 5px 20px rgba(233, 69, 96, 0.4);
+        }
+        .btn:hover, .btn:active {
+            transform: scale(1.1);
+            box-shadow: 0 8px 30px rgba(233, 69, 96, 0.6);
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            color: white;
+            font-size: clamp(14px, 3vw, 20px);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .hud-item {
+            background: rgba(15, 52, 96, 0.7);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 2px solid #e94560;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #aaa;
+            font-size: clamp(12px, 2.5vw, 16px);
+            text-align: center;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .landmarks {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .landmark {
+            width: 60px;
+            height: 60px;
+            background: rgba(233, 69, 96, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 2px solid #e94560;
+        }
+        #finalScore {
+            font-size: clamp(36px, 10vw, 72px);
+            color: #e94560;
+            margin: 20px 0;
+        }
+        .high-score {
+            color: #ffd700;
+            font-size: clamp(16px, 4vw, 24px);
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div id="hud" style="display:none;">
+                <div class="hud-item">🏆 Score: <span id="score">0</span></div>
+                <div class="hud-item">🎯 Best: <span id="highScore">0</span></div>
+            </div>
+            <div id="instructions"></div>
+        </div>
+        <div id="startScreen">
+            <div class="title">City of Meishan</div>
+            <div class="subtitle">Honor the beautiful city of 眉山市<br>Collect cultural icons, dodge obstacles!</div>
+            <div class="landmarks">
+                <div class="landmark">📚</div>
+                <div class="landmark">🏔️</div>
+                <div class="landmark">🍖</div>
+                <div class="landmark">🍵</div>
+            </div>
+            <button class="btn" id="startBtn">Start Run</button>
+        </div>
+        <div id="gameOverScreen">
+            <div class="title">Game Over</div>
+            <div id="finalScore">0</div>
+            <div class="high-score">Best: <span id="finalHighScore">0</span></div>
+            <button class="btn" id="restartBtn">Run Again</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const hud = document.getElementById('hud');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const finalHighScoreDisplay = document.getElementById('finalHighScore');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const instructions = document.getElementById('instructions');
+
+        let gameWidth, gameHeight;
+        let gameRunning = false;
+        let score = 0;
+        let highScore = localStorage.getItem('meishanHighScore') || 0;
+        let speed = 5;
+        let laneWidth;
+        let player;
+        let obstacles = [];
+        let collectibles = [];
+        let particles = [];
+        let buildings = [];
+        let roadLines = [];
+        let touchX = null;
+
+        const COLLECTIBLE_TYPES = [
+            { emoji: '📚', name: 'Sansu Hall', points: 50, color: '#FFD700' },
+            { emoji: '🏔️', name: 'Wawu Mountain', points: 30, color: '#4CAF50' },
+            { emoji: '🍖', name: 'Dongpo Pork', points: 40, color: '#FF6B6B' },
+            { emoji: '🍵', name: 'Tea', points: 20, color: '#8BC34A' },
+            { emoji: '🌸', name: 'Plum Blossom', points: 25, color: '#FF69B4' },
+            { emoji: '🎋', name: 'Bamboo', points: 15, color: '#00BCD4' }
+        ];
+
+        const OBSTACLE_TYPES = [
+            { emoji: '🚧', width: 0.8 },
+            { emoji: '🪨', width: 0.6 },
+            { emoji: '🚗', width: 1.0 },
+            { emoji: '📦', width: 0.7 }
+        ];
+
+        function resize() {
+            const container = document.getElementById('gameContainer');
+            gameWidth = Math.min(container.clientWidth, 450);
+            gameHeight = container.clientHeight;
+            canvas.width = gameWidth;
+            canvas.height = gameHeight;
+            laneWidth = gameWidth / 3;
+        }
+
+        function initGame() {
+            score = 0;
+            speed = 5;
+            obstacles = [];
+            collectibles = [];
+            particles = [];
+            buildings = [];
+            roadLines = [];
+            
+            player = {
+                x: gameWidth / 2,
+                y: gameHeight - 150,
+                width: 50,
+                height: 50,
+                targetX: gameWidth / 2,
+                emoji: '🏃'
+            };
+
+            for (let i = 0; i < 5; i++) {
+                buildings.push({
+                    x: Math.random() * gameWidth,
+                    y: Math.random() * gameHeight,
+                    width: 40 + Math.random() * 60,
+                    height: 60 + Math.random() * 100,
+                    color: `hsl(${200 + Math.random() * 40}, ${30 + Math.random() * 20}%, ${20 + Math.random() * 15}%)`,
+                    speed: 0.5 + Math.random() * 1
+                });
+            }
+
+            for (let i = 0; i < 10; i++) {
+                roadLines.push({
+                    y: i * 80,
+                    x: gameWidth / 2 - 2
+                });
+            }
+
+            updateHUD();
+        }
+
+        function startGame() {
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            hud.style.display = 'flex';
+            instructions.textContent = '👆 Tap left/right to move';
+            gameRunning = true;
+            initGame();
+            gameLoop();
+        }
+
+        function endGame() {
+            gameRunning = false;
+            hud.style.display = 'none';
+            instructions.textContent = '';
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('meishanHighScore', highScore);
+            }
+            
+            finalScoreDisplay.textContent = score;
+            finalHighScoreDisplay.textContent = highScore;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        function updateHUD() {
+            scoreDisplay.textContent = score;
+            highScoreDisplay.textContent = highScore;
+        }
+
+        function spawnObstacle() {
+            const type = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+            const lane = Math.floor(Math.random() * 3);
+            obstacles.push({
+                x: laneWidth * lane + laneWidth / 2,
+                y: -60,
+                width: laneWidth * type.width,
+                height: 50,
+                emoji: type.emoji,
+                type: 'obstacle'
+            });
+        }
+
+        function spawnCollectible() {
+            const type = COLLECTIBLE_TYPES[Math.floor(Math.random() * COLLECTIBLE_TYPES.length)];
+            const lane = Math.floor(Math.random() * 3);
+            collectibles.push({
+                x: laneWidth * lane + laneWidth / 2,
+                y: -60,
+                width: 45,
+                height: 45,
+                emoji: type.emoji,
+                points: type.points,
+                color: type.color,
+                type: 'collectible',
+                rotation: 0
+            });
+        }
+
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1,
+                    color: color,
+                    size: 3 + Math.random() * 5
+                });
+            }
+        }
+
+        function update() {
+            if (!gameRunning) return;
+
+            speed = 5 + score / 500;
+            score += 1;
+            updateHUD();
+
+            player.x += (player.targetX - player.x) * 0.15;
+
+            if (Math.random() < 0.02 + score / 5000) {
+                spawnObstacle();
+            }
+            if (Math.random() < 0.03) {
+                spawnCollectible();
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].y += speed;
+                if (obstacles[i].y > gameHeight + 60) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                collectibles[i].y += speed;
+                collectibles[i].rotation += 0.1;
+                if (collectibles[i].y > gameHeight + 60) {
+                    collectibles.splice(i, 1);
+                }
+            }
+
+            for (let i = roadLines.length - 1; i >= 0; i--) {
+                roadLines[i].y += speed;
+                if (roadLines[i].y > gameHeight) {
+                    roadLines[i].y = -80;
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].x += particles[i].vx;
+                particles[i].y += particles[i].vy;
+                particles[i].vy += 0.3;
+                particles[i].life -= 0.02;
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            for (let building of buildings) {
+                building.y += building.speed;
+                if (building.y > gameHeight + 150) {
+                    building.y = -150;
+                    building.x = Math.random() * gameWidth;
+                }
+            }
+
+            for (let obstacle of obstacles) {
+                const dx = Math.abs(player.x - obstacle.x);
+                const dy = Math.abs(player.y - obstacle.y);
+                if (dx < (player.width + obstacle.width) / 2 - 10 && 
+                    dy < (player.height + obstacle.height) / 2 - 10) {
+                    createParticles(player.x, player.y, '#FF0000');
+                    endGame();
+                    return;
+                }
+            }
+
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const c = collectibles[i];
+                const dx = Math.abs(player.x - c.x);
+                const dy = Math.abs(player.y - c.y);
+                if (dx < (player.width + c.width) / 2 - 5 && 
+                    dy < (player.height + c.height) / 2 - 5) {
+                    score += c.points;
+                    createParticles(c.x, c.y, c.color);
+                    collectibles.splice(i, 1);
+                    updateHUD();
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, gameWidth, gameHeight);
+
+            for (let building of buildings) {
+                ctx.fillStyle = building.color;
+                ctx.fillRect(building.x, building.y, building.width, building.height);
+                ctx.fillStyle = 'rgba(255, 200, 100, 0.3)';
+                for (let wy = building.y + 10; wy < building.y + building.height - 10; wy += 20) {
+                    for (let wx = building.x + 5; wx < building.x + building.width - 10; wx += 15) {
+                        if (Math.random() > 0.3) {
+                            ctx.fillRect(wx, wy, 8, 12);
+                        }
+                    }
+                }
+            }
+
+            ctx.fillStyle = '#2d3436';
+            ctx.fillRect(0, 0, gameWidth, gameHeight);
+
+            const roadWidth = laneWidth * 2.5;
+            const roadX = (gameWidth - roadWidth) / 2;
+            ctx.fillStyle = '#3d3d3d';
+            ctx.fillRect(roadX, 0, roadWidth, gameHeight);
+
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([]);
+            for (let line of roadLines) {
+                if (line.y > 0 && line.y < gameHeight) {
+                    ctx.beginPath();
+                    ctx.moveTo(gameWidth / 2 - 2, line.y);
+                    ctx.lineTo(gameWidth / 2 - 2, line.y + 40);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.strokeStyle = '#e94560';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(roadX, 0);
+            ctx.lineTo(roadX, gameHeight);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(roadX + roadWidth, 0);
+            ctx.lineTo(roadX + roadWidth, gameHeight);
+            ctx.stroke();
+
+            for (let obstacle of obstacles) {
+                ctx.font = `${obstacle.height}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(obstacle.emoji, obstacle.x, obstacle.y);
+            }
+
+            for (let c of collectibles) {
+                ctx.save();
+                ctx.translate(c.x, c.y);
+                ctx.rotate(Math.sin(c.rotation) * 0.2);
+                
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = 20;
+                ctx.font = `${c.height}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(c.emoji, 0, 0);
+                ctx.shadowBlur = 0;
+                
+                ctx.restore();
+            }
+
+            ctx.shadowColor = '#00FFFF';
+            ctx.shadowBlur = 15;
+            ctx.font = `${player.height}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(player.emoji, player.x, player.y);
+            ctx.shadowBlur = 0;
+
+            for (let p of particles) {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            ctx.fillStyle = 'rgba(26, 26, 46, 0.1)';
+            ctx.fillRect(0, gameHeight - 60, gameWidth, 60);
+            ctx.fillStyle = '#4a90a4';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('🏙️ City of Meishan - 四川眉山 🏯', gameWidth / 2, gameHeight - 20);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function handleMove(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            if (x < gameWidth / 2 - laneWidth / 2) {
+                player.targetX = laneWidth * 0.5;
+            } else if (x > gameWidth / 2 + laneWidth / 2) {
+                player.targetX = laneWidth * 2.5;
+            } else {
+                player.targetX = gameWidth / 2;
+            }
+        }
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameRunning) {
+                touchX = e.touches[0].clientX;
+                handleMove(touchX);
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (gameRunning) {
+                touchX = e.touches[0].clientX;
+                handleMove(touchX);
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (gameRunning) {
+                handleMove(e.clientX);
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameRunning && e.buttons === 1) {
+                handleMove(e.clientX);
+            }
+        });
+
+        startBtn.addEventListener('click', startGame);
+        startBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            startGame();
+        });
+
+        restartBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            startGame();
+        });
+
+        window.addEventListener('resize', resize);
+        resize();
+        highScoreDisplay.textContent = highScore;
+    </script>
+</body>
+</html>
