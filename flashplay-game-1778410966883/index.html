@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Meishan Sushi Poem</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:linear-gradient(180deg,#1a3a2a 0%,#2d5a3d 50%,#4a8b5c 100%);min-height:100vh;overflow:hidden;font-family:'Georgia',serif}
+#game{width:100%;max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative}
+#header{background:rgba(0,0,0,0.3);padding:10px;text-align:center;border-bottom:2px solid #d4af37}
+#header h1{color:#d4af37;font-size:1.3em;text-shadow:2px 2px 4px rgba(0,0,0,0.5)}
+#score-bar{display:flex;justify-content:space-around;padding:8px;background:rgba(0,0,0,0.2)}
+.score-item{color:#fff;font-size:0.85em;text-align:center}
+.score-item span{color:#d4af37;font-weight:bold}
+#scene{height:180px;position:relative;overflow:hidden}
+#canvas-scene{width:100%;height:100%}
+#poem-area{flex:1;padding:15px;display:flex;flex-direction:column;align-items:center}
+#poem-box{background:linear-gradient(135deg,#f5e6c8 0%,#e8d4a8 100%);border:3px solid #8b4513;border-radius:10px;padding:15px;width:100%;max-width:350px;box-shadow:0 5px 15px rgba(0,0,0,0.3)}
+#poem-title{color:#8b4513;font-size:1em;text-align:center;margin-bottom:10px;font-style:italic}
+#poem-line{color:#333;font-size:1.1em;text-align:center;min-height:50px;line-height:1.8}
+.blank-space{display:inline-block;min-width:30px;border-bottom:2px dashed #8b4513;margin:0 3px}
+#options-area{margin-top:20px;display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.option-btn{background:linear-gradient(135deg,#d4af37 0%,#b8942e 100%);color:#fff;border:none;padding:10px 18px;font-size:1em;border-radius:8px;cursor:pointer;transition:all 0.2s;box-shadow:0 3px 8px rgba(0,0,0,0.3)}
+.option-btn:hover{transform:scale(1.05);background:linear-gradient(135deg,#e8c347 0%,#c9a436 100%)}
+.option-btn:active{transform:scale(0.95)}
+#feedback{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2em;font-weight:bold;opacity:0;transition:opacity 0.3s;pointer-events:none;text-shadow:2px 2px 4px rgba(0,0,0,0.5)}
+#progress-bar{width:100%;max-width:350px;height:8px;background:#ddd;border-radius:4px;margin-top:15px;overflow:hidden}
+#progress-fill{height:100%;background:linear-gradient(90deg,#4a8b5c,#d4af37);width:0%;transition:width 0.3s}
+#overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100}
+#overlay.hidden{display:none}
+#overlay h2{color:#d4af37;font-size:1.8em;margin-bottom:15px;text-shadow:2px 2px 4px rgba(0,0,0,0.5)}
+#overlay p{color:#fff;text-align:center;max-width:300px;line-height:1.6;margin-bottom:10px;font-size:0.9em}
+#overlay .hint{color:#aaa;font-style:italic;font-size:0.8em}
+.btn-main{background:linear-gradient(135deg,#d4af37 0%,#b8942e 100%);color:#fff;border:none;padding:15px 40px;font-size:1.2em;border-radius:10px;cursor:pointer;margin-top:20px;box-shadow:0 4px 10px rgba(0,0,0,0.4)}
+.btn-main:hover{background:linear-gradient(135deg,#e8c347 0%,#c9a436 100%)}
+#author-badge{position:absolute;top:10px;right:10px;background:rgba(212,175,55,0.9);color:#fff;padding:5px 10px;border-radius:15px;font-size:0.75em}
+</style>
+</head>
+<body>
+<div id="game">
+<div id="header">
+<h1>🏔️ Meishan Sushi Poem 🏔️</h1>
+</div>
+<div id="score-bar">
+<div class="score-item">Score: <span id="score">0</span></div>
+<div class="score-item">Round: <span id="round">1</span>/10</div>
+<div class="score-item">Combo: <span id="combo">0</span>×</div>
+</div>
+<div id="scene">
+<canvas id="canvas-scene"></canvas>
+<div id="author-badge"></div>
+</div>
+<div id="poem-area">
+<div id="poem-box">
+<div id="poem-title">Loading...</div>
+<div id="poem-line"></div>
+</div>
+<div id="progress-bar"><div id="progress-fill"></div></div>
+<div id="options-area"></div>
+</div>
+<div id="feedback"></div>
+<div id="overlay">
+<h2>🖌️ Meishan Sushi Poem 🖌️</h2>
+<p>Three generations, one legendary family! Su Shi, Su Zhe, and Su Xun left their mark on Chinese poetry.</p>
+<p>Fill in the blanks of their famous poems and discover the beauty of their hometown Meishan!</p>
+<p class="hint">Click the correct character to complete each verse</p>
+<button class="btn-main" onclick="startGame()">Start Journey</button>
+</div>
+</div>
+<script>
+const poems = [
+  {author:"Su Shi",authorCn:"苏轼",poem:"水调歌头·明月几时有",line:"人有悲欢离合，月有阴晴圆缺，此事古难全。但愿人长久，千里共婵娟。",blankPos:12,options:["长","久","健","安"]},
+  {author:"Su Shi",authorCn:"苏轼",poem:"念奴娇·赤壁怀古",line:"大江东去，浪淘尽，千古风流人物。",blankPos:10,options:["浪","水","风","潮"]},
+  {author:"Su Shi",authorCn:"苏轼",poem:"题西林壁",line:"横看成岭侧成峰，远近高低各不同。不识庐山真面目，只缘身在此山中。",blankPos:30,options:["峰","山","岭","峰"]},
+  {author:"Su Zhe",authorCn:"苏辙",poem:"黄州快哉亭赠张偓佺",line:"南馆杨柳，暗雨微凉，乱云将断飞鸿没。",blankPos:12,options:["暗","阴","寒","凉"]},
+  {author:"Su Zhe",authorCn:"苏辙",poem:"赤壁怀古",line:"新筑沙堤，稳上琼台，倚阑挥袖。",blankPos:8,options:["沙","泥","石","岩"]},
+  {author:"Su Xun",authorCn:"苏洵",poem:"六国论",line:"六国破灭，非兵不利，战不善，弊在赂秦。",blankPos:15,options:["秦","齐","燕","赵"]},
+  {author:"Su Shi",authorCn:"苏轼",poem:"惠崇春江晚景",line:"竹外桃花三两枝，春江水暖鸭先知。蒌蒿满地芦芽短，正是河豚欲上时。",blankPos:25,options:["欲","可","将","能"]},
+  {author:"Su Shi",authorCn:"苏轼",poem:"饮湖上初晴后雨",line:"水光潋滟晴方好，山色空蒙雨亦奇。欲把西湖比西子，淡妆浓抹总相宜。",blankPos:35,options:["西","东","南","北"]},
+  {author:"Su Zhe",authorCn:"苏辙",poem:"上枢密韩太尉书",line:"太尉执事：辙生好为文，思之至深。以为文者气之所形，然文不可以学而能，气可以养而致。",blankPos:28,options:["能","成","得","为"]},
+  {author:"Su Shi",authorCn:"苏轼",poem:"江城子·密州出猎",line:"老夫聊发少年狂，左牵黄，右擎苍，锦帽貂裘，千骑卷平冈。",blankPos:18,options:["黄","红","白","黑"]}
+];
+
+let score=0,combo=0,round=0,totalRounds=10;
+const canvas=document.getElementById('canvas-scene');
+const ctx=canvas.getContext('2d');
+
+function resizeCanvas(){
+  canvas.width=canvas.offsetWidth;
+  canvas.height=canvas.offsetHeight;
+}
+
+function drawScene(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const w=canvas.width,h=canvas.height;
+  
+  let gradient=ctx.createLinearGradient(0,0,0,h);
+  gradient.addColorStop(0,'#87CEEB');
+  gradient.addColorStop(0.4,'#98D8C8');
+  gradient.addColorStop(1,'#228B22');
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,w,h);
+  
+  ctx.fillStyle='#8B7355';
+  ctx.beginPath();
+  ctx.moveTo(0,h);
+  ctx.lineTo(0,h*0.4);
+  ctx.lineTo(w*0.15,h*0.35);
+  ctx.lineTo(w*0.25,h*0.45);
+  ctx.lineTo(w*0.35,h*0.3);
+  ctx.lineTo(w*0.45,h*0.38);
+  ctx.lineTo(w,h*0.38);
+  ctx.lineTo(w,h);
+  ctx.fill();
+  
+  ctx.fillStyle='#228B22';
+  ctx.beginPath();
+  ctx.moveTo(0,h*0.42);
+  ctx.lineTo(w*0.1,h*0.4);
+  ctx.lineTo(w*0.2,h*0.48);
+  ctx.lineTo(w*0.3,h*0.42);
+  ctx.lineTo(w*0.4,h*0.46);
+  ctx.lineTo(w,h*0.46);
+  ctx.lineTo(w,h*0.5);
+  ctx.lineTo(0,h*0.5);
+  ctx.fill();
+  
+  ctx.fillStyle='#2E8B57';
+  ctx.beginPath();
+  ctx.moveTo(w*0.5,h*0.5);
+  ctx.lineTo(w*0.55,h*0.35);
+  ctx.lineTo(w*0.6,h*0.25);
+  ctx.lineTo(w*0.65,h*0.35);
+  ctx.lineTo(w*0.7,h*0.5);
+  ctx.fill();
+  ctx.fillStyle='#8B4513';
+  ctx.fillRect(w*0.58,h*0.35,0.04*w,0.15*h);
+  
+  ctx.fillStyle='#CD853F';
+  ctx.beginPath();
+  ctx.moveTo(w*0.1,h*0.4);
+  ctx.lineTo(w*0.15,h*0.38);
+  ctx.lineTo(w*0.2,h*0.42);
+  ctx.lineTo(w*0.18,h*0.4);
+  ctx.fill();
+  
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  for(let i=0;i<3;i++){
+    ctx.beginPath();
+    ctx.arc(w*0.7+i*w*0.08,h*0.15,12,0,Math.PI*2);
+    ctx.fill();
+  }
+  
+  ctx.fillStyle='rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.moveTo(w*0.2,h*0.15);
+  ctx.quadraticCurveTo(w*0.3,h*0.1,w*0.5,h*0.12);
+  ctx.quadraticCurveTo(w*0.7,h*0.14,w*0.8,h*0.1);
+  ctx.quadraticCurveTo(w*0.6,h*0.2,w*0.4,h*0.18);
+  ctx.quadraticCurveTo(w*0.2,h*0.16,w*0.2,h*0.15);
+  ctx.fill();
+  
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  for(let i=0;i<5;i++){
+    ctx.beginPath();
+    ctx.arc(w*0.1+i*w*0.18,h*0.1+Math.sin(i)*5,4,0,Math.PI*2);
+    ctx.fill();
+  }
+  
+  ctx.fillStyle='rgba(139,69,19,0.6)';
+  ctx.beginPath();
+  ctx.moveTo(w*0.08,h*0.38);
+  ctx.lineTo(w*0.12,h*0.32);
+  ctx.lineTo(w*0.16,h*0.38);
+  ctx.fill();
+  ctx.fillStyle='#228B22';
+  ctx.beginPath();
+  ctx.arc(w*0.12,h*0.33,8,0,Math.PI*2);
+  ctx.fill();
+}
+
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+function showPoem(){
+  if(round>=totalRounds){
+    endGame();
+    return;
+  }
+  const poem=poems[round];
+  const parts=poem.line.split('');
+  
+  document.getElementById('author-badge').textContent=poem.authorCn;
+  document.getElementById('poem-title').textContent=`— ${poem.poem} —`;
+  document.getElementById('round').textContent=round+1;
+  
+  let displayLine='';
+  for(let i=0;i<parts.length;i++){
+    if(i===poem.blankPos){
+      displayLine+=`<span class="blank-space">?</span>`;
+    }else{
+      displayLine+=parts[i];
+    }
+  }
+  document.getElementById('poem-line').innerHTML=displayLine;
+  
+  const shuffled=[...poem.options];
+  shuffle(shuffled);
+  
+  const optionsArea=document.getElementById('options-area');
+  optionsArea.innerHTML='';
+  shuffled.forEach(opt=>{
+    const btn=document.createElement('button');
+    btn.className='option-btn';
+    btn.textContent=opt;
+    btn.onclick=()=>checkAnswer(opt,poem.options[0]);
+    optionsArea.appendChild(btn);
+  });
+  
+  document.getElementById('progress-fill').style.width=((round/totalRounds)*100)+'%';
+}
+
+function checkAnswer(selected,correct){
+  const feedback=document.getElementById('feedback');
+  if(selected===correct){
+    combo++;
+    const points=10*combo;
+    score+=points;
+    feedback.textContent='✓ +'+points;
+    feedback.style.color='#4CAF50';
+    feedback.style.opacity='1';
+  }else{
+    combo=0;
+    feedback.textContent='✗';
+    feedback.style.color='#f44336';
+    feedback.style.opacity='1';
+  }
+  document.getElementById('score').textContent=score;
+  document.getElementById('combo').textContent=combo;
+  
+  setTimeout(()=>{feedback.style.opacity='0';round++;showPoem();},800);
+}
+
+function startGame(){
+  score=0;combo=0;round=0;
+  shuffle(poems);
+  document.getElementById('score').textContent='0';
+  document.getElementById('combo').textContent='0';
+  document.getElementById('overlay').classList.add('hidden');
+  showPoem();
+}
+
+function endGame(){
+  const overlay=document.getElementById('overlay');
+  overlay.innerHTML=`
+    <h2>🏆 Journey Complete! 🏆</h2>
+    <p>Final Score: <span style="color:#d4af37;font-size:1.5em">${score}</span></p>
+    <p>You have traveled through the poetic legacy of the Su family from Meishan!</p>
+    <p class="hint">Their hometown inspired countless masterpieces across generations</p>
+    <button class="btn-main" onclick="location.reload()">Play Again</button>
+  `;
+  overlay.classList.remove('hidden');
+}
+
+window.onload=function(){
+  resizeCanvas();
+  window.addEventListener('resize',resizeCanvas);
+  drawScene();
+  setInterval(drawScene,3000);
+};
+</script>
+</body>
+</html>
