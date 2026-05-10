@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flight Shoot Monster</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Game State
+const STATE = { MENU: 0, PLAYING: 1, GAMEOVER: 2 };
+let gameState = STATE.MENU;
+let score = 0;
+let highScore = 0;
+let lives = 3;
+let level = 1;
+let waveTimer = 0;
+let waveInterval = 180;
+
+// Player
+const player = {
+    x: 0, y: 0,
+    width: 50, height: 60,
+    speed: 6,
+    bulletCooldown: 0,
+    bulletRate: 10,
+    invincible: 0
+};
+
+// Arrays
+let bullets = [];
+let monsters = [];
+let particles = [];
+let stars = [];
+
+// Input
+let touchX = null;
+
+function initStars() {
+    stars = [];
+    for (let i = 0; i < 100; i++) {
+        stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            size: Math.random() * 2 + 0.5,
+            speed: Math.random() * 2 + 1
+        });
+    }
+}
+
+function initGame() {
+    score = 0;
+    lives = 3;
+    level = 1;
+    waveTimer = 0;
+    waveInterval = 180;
+    player.x = W / 2;
+    player.y = H - 100;
+    player.invincible = 60;
+    bullets = [];
+    monsters = [];
+    particles = [];
+}
+
+function spawnMonster() {
+    const type = Math.random();
+    let monster = {
+        x: Math.random() * (W - 60) + 30,
+        y: -60,
+        width: 50,
+        height: 50,
+        speed: 1.5 + Math.random() * 2 + level * 0.3,
+        hp: type < 0.7 ? 1 : 2,
+        type: type < 0.7 ? 'basic' : 'tough',
+        fireCooldown: 0
+    };
+    monsters.push(monster);
+}
+
+function spawnBullet(x, y) {
+    bullets.push({
+        x: x,
+        y: y,
+        width: 6,
+        height: 15,
+        speed: 10
+    });
+}
+
+function spawnParticle(x, y, color) {
+    for (let i = 0; i < 8; i++) {
+        particles.push({
+            x: x,
+            y: y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 30,
+            color: color
+        });
+    }
+}
+
+function checkCollision(a, b) {
+    return a.x - a.width/2 < b.x + b.width/2 &&
+           a.x + a.width/2 > b.x - b.width/2 &&
+           a.y - a.height/2 < b.y + b.height/2 &&
+           a.y + a.height/2 > b.y - b.height/2;
+}
+
+function update() {
+    if (gameState !== STATE.PLAYING) return;
+
+    // Stars
+    for (let star of stars) {
+        star.y += star.speed;
+        if (star.y > H) {
+            star.y = 0;
+            star.x = Math.random() * W;
+        }
+    }
+
+    // Player movement
+    if (touchX !== null) {
+        if (touchX < W / 3) {
+            player.x -= player.speed;
+        } else if (touchX > W * 2 / 3) {
+            player.x += player.speed;
+        }
+    }
+    player.x = Math.max(player.width/2, Math.min(W - player.width/2, player.x));
+
+    // Auto fire
+    player.bulletCooldown--;
+    if (player.bulletCooldown <= 0) {
+        spawnBullet(player.x - 15, player.y - 30);
+        spawnBullet(player.x + 15, player.y - 30);
+        player.bulletCooldown = player.bulletRate;
+    }
+
+    if (player.invincible > 0) player.invincible--;
+
+    // Bullets
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        bullets[i].y -= bullets[i].speed;
+        if (bullets[i].y < -20) {
+            bullets.splice(i, 1);
+        }
+    }
+
+    // Monsters
+    waveTimer++;
+    if (waveTimer >= waveInterval) {
+        spawnMonster();
+        waveTimer = 0;
+        if (level > 3 && Math.random() < 0.3) spawnMonster();
+    }
+
+    for (let i = monsters.length - 1; i >= 0; i--) {
+        let m = monsters[i];
+        m.y += m.speed;
+        m.x += Math.sin(m.y * 0.03) * 1.5;
+
+        // Bullet collision
+        for (let j = bullets.length - 1; j >= 0; j--) {
+            if (checkCollision(bullets[j], m)) {
+                bullets.splice(j, 1);
+                m.hp--;
+                if (m.hp <= 0) {
+                    spawnParticle(m.x, m.y, m.type === 'tough' ? '#ff4444' : '#44ff44');
+                    score += m.type === 'tough' ? 20 : 10;
+                    monsters.splice(i, 1);
+                }
+                break;
+            }
+        }
+
+        // Player collision
+        if (m && player.invincible <= 0 && checkCollision(m, player)) {
+            spawnParticle(player.x, player.y, '#ffff00');
+            lives--;
+            player.invincible = 120;
+            monsters.splice(i, 1);
+            if (lives <= 0) {
+                gameState = STATE.GAMEOVER;
+                if (score > highScore) highScore = score;
+            }
+            continue;
+        }
+
+        // Off screen
+        if (m && m.y > H + 60) {
+            monsters.splice(i, 1);
+        }
+    }
+
+    // Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.95;
+        p.vy *= 0.95;
+        p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Level progression
+    if (score > level * 200) {
+        level++;
+        waveInterval = Math.max(60, 180 - level * 15);
+    }
+}
+
+function drawPlayer() {
+    if (player.invincible > 0 && Math.floor(player.invincible / 5) % 2 === 0) return;
+
+    const x = player.x;
+    const y = player.y;
+
+    // Body
+    ctx.fillStyle = '#4488ff';
+    ctx.beginPath();
+    ctx.moveTo(x, y - 30);
+    ctx.lineTo(x - 15, y + 20);
+    ctx.lineTo(x + 15, y + 20);
+    ctx.closePath();
+    ctx.fill();
+
+    // Wings
+    ctx.fillStyle = '#2266cc';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 25, y + 15);
+    ctx.lineTo(x - 15, y + 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 25, y + 15);
+    ctx.lineTo(x + 15, y + 20);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cockpit
+    ctx.fillStyle = '#88ccff';
+    ctx.beginPath();
+    ctx.arc(x, y - 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Flame
+    ctx.fillStyle = '#ff8800';
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y + 20);
+    ctx.lineTo(x, y + 35 + Math.random() * 10);
+    ctx.lineTo(x + 8, y + 20);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawMonster(m) {
+    const x = m.x;
+    const y = m.y;
+
+    // Body
+    ctx.fillStyle = m.type === 'tough' ? '#cc2222' : '#22cc44';
+    ctx.beginPath();
+    ctx.arc(x, y, 25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(x - 8, y - 5, 8, 0, Math.PI * 2);
+    ctx.arc(x + 8, y - 5, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(x - 8, y - 5, 4, 0, Math.PI * 2);
+    ctx.arc(x + 8, y - 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Mouth
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y + 10, 10, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+
+    // Horns for tough
+    if (m.type === 'tough') {
+        ctx.fillStyle = '#880000';
+        ctx.beginPath();
+        ctx.moveTo(x - 15, y - 20);
+        ctx.lineTo(x - 20, y - 40);
+        ctx.lineTo(x - 8, y - 22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + 15, y - 20);
+        ctx.lineTo(x + 20, y - 40);
+        ctx.lineTo(x + 8, y - 22);
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+
+function draw() {
+    // Background
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    ctx.fillStyle = '#ffffff';
+    for (let star of stars) {
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    if (gameState === STATE.MENU) {
+        // Title
+        ctx.fillStyle = '#ff4444';
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('FLIGHT SHOOT', W/2, H/3 - 20);
+        ctx.fillStyle = '#44ff44';
+        ctx.font = 'bold 48px Arial';
+        ctx.fillText('MONSTER', W/2, H/3 + 40);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '20px Arial';
+        ctx.fillText('Tap LEFT / RIGHT to move', W/2, H/2);
+        ctx.fillText('Auto-fire enabled!', W/2, H/2 + 30);
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 28px Arial';
+        ctx.fillText('TAP TO START', W/2, H * 0.7);
+
+        if (highScore > 0) {
+            ctx.fillStyle = '#aaaaaa';
+            ctx.font = '18px Arial';
+            ctx.fillText('High Score: ' + highScore, W/2, H * 0.8);
+        }
+        return;
+    }
+
+    // Bullets
+    ctx.fillStyle = '#ffff00';
+    for (let b of bullets) {
+        ctx.fillRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
+    }
+
+    // Monsters
+    for (let m of monsters) {
+        drawMonster(m);
+    }
+
+    // Particles
+    for (let p of particles) {
+        ctx.globalAlpha = p.life / 30;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Player
+    drawPlayer();
+
+    // HUD
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Score: ' + score, 15, 35);
+    ctx.textAlign = 'right';
+    ctx.fillText('Level: ' + level, W - 15, 35);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ff4444';
+    for (let i = 0; i < lives; i++) {
+        ctx.fillText('♥', 15 + i * 25, 65);
+    }
+
+    if (gameState === STATE.GAMEOVER) {
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.fillStyle = '#ff4444';
+        ctx.font = 'bold 40px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', W/2, H/3);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '24px Arial';
+        ctx.fillText('Score: ' + score, W/2, H/2 - 20);
+        ctx.fillText('Level: ' + level, W/2, H/2 + 15);
+
+        if (score >= highScore && score > 0) {
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillText('NEW HIGH SCORE!', W/2, H/2 + 55);
+        }
+
+        ctx.fillStyle = '#44ff44';
+        ctx.font = 'bold 26px Arial';
+        ctx.fillText('TAP TO RETRY', W/2, H * 0.7);
+    }
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Touch/Mouse Events
+canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    handleInput(e.touches[0].clientX);
+});
+
+canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    touchX = e.touches[0].clientX;
+});
+
+canvas.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    touchX = null;
+});
+
+canvas.addEventListener('mousedown', function(e) {
+    handleInput(e.clientX);
+});
+
+canvas.addEventListener('mousemove', function(e) {
+    if (e.buttons === 1) {
+        touchX = e.clientX;
+    }
+});
+
+canvas.addEventListener('mouseup', function() {
+    touchX = null;
+});
+
+function handleInput(x) {
+    if (gameState === STATE.MENU) {
+        gameState = STATE.PLAYING;
+        initGame();
+    } else if (gameState === STATE.GAMEOVER) {
+        gameState = STATE.PLAYING;
+        initGame();
+    } else if (gameState === STATE.PLAYING) {
+        touchX = x;
+    }
+}
+
+// Init
+initStars();
+gameLoop();
+</script>
+</body>
+</html>
