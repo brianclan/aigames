@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cat Catch</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 50%, #90EE90 100%);
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        #hud {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .hud-item {
+            text-align: center;
+        }
+        .hud-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .hud-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+        #coins-display {
+            color: #FFD700;
+        }
+        #cats-display {
+            color: #FF6B6B;
+        }
+        #game-area {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        #city-grid {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 4px;
+            padding: 10px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 10px;
+        }
+        .grid-cell {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+            position: relative;
+        }
+        .grid-cell:hover {
+            background: rgba(255,255,255,0.8);
+            border-color: #4ECDC4;
+        }
+        .grid-cell.occupied {
+            background: rgba(255,255,255,0.9);
+            cursor: default;
+        }
+        .building {
+            font-size: 28px;
+            animation: buildPop 0.3s ease-out;
+        }
+        @keyframes buildPop {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        #build-menu {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .build-btn {
+            width: 70px;
+            height: 70px;
+            border: 3px solid #ddd;
+            border-radius: 12px;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 28px;
+        }
+        .build-btn:hover {
+            border-color: #4ECDC4;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .build-btn.selected {
+            border-color: #FF6B6B;
+            background: #FFF0F0;
+        }
+        .build-btn .btn-label {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+        .build-btn .btn-cost {
+            font-size: 9px;
+            color: #FFD700;
+            font-weight: bold;
+        }
+        #cat {
+            position: absolute;
+            font-size: 30px;
+            cursor: pointer;
+            transition: all 0.5s ease-out;
+            z-index: 50;
+            animation: catBounce 1s ease-in-out infinite;
+        }
+        @keyframes catBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        #cat.caught {
+            animation: catCaught 0.5s ease-out forwards;
+        }
+        @keyframes catCaught {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        #popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            z-index: 200;
+            display: none;
+        }
+        #popup h2 {
+            color: #FF6B6B;
+            margin-bottom: 10px;
+        }
+        #popup p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        #popup button {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: #4ECDC4;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #popup button:hover {
+            background: #3DBDB5;
+            transform: scale(1.05);
+        }
+        #instructions {
+            position: absolute;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 90;
+            opacity: 0.8;
+        }
+        .cat-counter {
+            position: absolute;
+            background: #FF6B6B;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            animation: floatUp 1s ease-out forwards;
+            z-index: 100;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="hud">
+            <div class="hud-item">
+                <div class="hud-label">Coins</div>
+                <div class="hud-value" id="coins-display">100</div>
+            </div>
+            <div class="hud-item">
+                <div class="hud-label">Cats Caught</div>
+                <div class="hud-value" id="cats-display">0</div>
+            </div>
+            <div class="hud-item">
+                <div class="hud-label">City Level</div>
+                <div class="hud-value" id="level-display">1</div>
+            </div>
+        </div>
+        <div id="game-area">
+            <div id="city-grid"></div>
+            <div id="instructions">Tap a building type, then tap a grid cell to build!</div>
+        </div>
+        <div id="build-menu">
+            <button class="build-btn" data-type="house" data-cost="20">
+                🏠
+                <span class="btn-label">House</span>
+                <span class="btn-cost">20</span>
+            </button>
+            <button class="build-btn" data-type="park" data-cost="30">
+                🌳
+                <span class="btn-label">Park</span>
+                <span class="btn-cost">30</span>
+            </button>
+            <button class="build-btn" data-type="shop" data-cost="40">
+                🏪
+                <span class="btn-label">Shop</span>
+                <span class="btn-cost">40</span>
+            </button>
+            <button class="build-btn" data-type="tree" data-cost="10">
+                🌲
+                <span class="btn-label">Tree</span>
+                <span class="btn-cost">10</span>
+            </button>
+            <button class="build-btn" data-type="cafe" data-cost="50">
+                ☕
+                <span class="btn-label">Cafe</span>
+                <span class="btn-cost">50</span>
+            </button>
+        </div>
+    </div>
+    <div id="popup">
+        <h2>🎉 City Level Up!</h2>
+        <p id="popup-message">Your city is growing!</p>
+        <button onclick="closePopup()">Continue</button>
+    </div>
+
+    <script>
+        const GRID_SIZE = 5;
+        const CAT_EMOJIS = ['🐱', '😺', '😸', '🐈', '😻'];
+        const BUILDINGS = {
+            house: { emoji: '🏠', attract: 10 },
+            park: { emoji: '🌳', attract: 15 },
+            shop: { emoji: '🏪', attract: 12 },
+            tree: { emoji: '🌲', attract: 5 },
+            cafe: { emoji: '☕', attract: 20 }
+        };
+
+        let coins = 100;
+        let catsCaught = 0;
+        let cityLevel = 1;
+        let selectedBuilding = null;
+        let grid = [];
+        let currentCat = null;
+        let catTimer = null;
+        let attractBonus = 0;
+
+        function init() {
+            createGrid();
+            setupBuildButtons();
+            spawnCat();
+            updateDisplay();
+        }
+
+        function createGrid() {
+            const gridEl = document.getElementById('city-grid');
+            gridEl.innerHTML = '';
+            grid = [];
+            
+            for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.index = i;
+                cell.addEventListener('click', () => placeBuilding(i));
+                gridEl.appendChild(cell);
+                grid.push(null);
+            }
+        }
+
+        function setupBuildButtons() {
+            const buttons = document.querySelectorAll('.build-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const cost = parseInt(btn.dataset.cost);
+                    if (coins >= cost) {
+                        buttons.forEach(b => b.classList.remove('selected'));
+                        btn.classList.add('selected');
+                        selectedBuilding = {
+                            type: btn.dataset.type,
+                            cost: cost
+                        };
+                    } else {
+                        showFloatingText(btn, 'Not enough!');
+                    }
+                });
+            });
+        }
+
+        function placeBuilding(index) {
+            if (grid[index] !== null) return;
+            if (!selectedBuilding) return;
+            if (coins < selectedBuilding.cost) return;
+
+            coins -= selectedBuilding.cost;
+            grid[index] = selectedBuilding.type;
+            attractBonus += BUILDINGS[selectedBuilding.type].attract;
+            
+            const cell = document.querySelector(`[data-index="${index}"]`);
+            cell.classList.add('occupied');
+            cell.innerHTML = `<span class="building">${BUILDINGS[selectedBuilding.type].emoji}</span>`;
+            
+            updateDisplay();
+            checkLevelUp();
+            spawnCat();
+        }
+
+        function spawnCat() {
+            if (catTimer) clearTimeout(catTimer);
+            if (currentCat) currentCat.remove();
+            
+            const gameArea = document.getElementById('game-area');
+            const cat = document.createElement('div');
+            cat.id = 'cat';
+            cat.textContent = CAT_EMOJIS[Math.floor(Math.random() * CAT_EMOJIS.length)];
+            
+            const maxX = gameArea.offsetWidth - 50;
+            const maxY = gameArea.offsetHeight - 100;
+            const x = Math.random() * maxX + 10;
+            const y = Math.random() * maxY + 10;
+            
+            cat.style.left = x + 'px';
+            cat.style.top = y + 'px';
+            
+            cat.addEventListener('click', () => catchCat(cat));
+            cat.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                catchCat(cat);
+            });
+            
+            gameArea.appendChild(cat);
+            currentCat = cat;
+            
+            const survivalTime = 8000 + attractBonus * 100;
+            catTimer = setTimeout(() => {
+                if (currentCat && !currentCat.classList.contains('caught')) {
+                    catEscape();
+                }
+            }, survivalTime);
+        }
+
+        function catchCat(cat) {
+            if (cat.classList.contains('caught')) return;
+            
+            cat.classList.add('caught');
+            catsCaught++;
+            coins += 15 + Math.floor(cityLevel * 5);
+            
+            showFloatingText(cat, '+15 coins!');
+            showCatCounter(cat);
+            
+            updateDisplay();
+            checkLevelUp();
+            
+            setTimeout(() => {
+                spawnCat();
+            }, 1000);
+        }
+
+        function catEscape() {
+            if (currentCat) {
+                currentCat.style.opacity = '0';
+                setTimeout(() => {
+                    spawnCat();
+                }, 500);
+            }
+        }
+
+        function showFloatingText(element, text) {
+            const rect = element.getBoundingClientRect();
+            const floater = document.createElement('div');
+            floater.style.cssText = `
+                position: fixed;
+                left: ${rect.left}px;
+                top: ${rect.top}px;
+                color: #FFD700;
+                font-weight: bold;
+                font-size: 16px;
+                pointer-events: none;
+                z-index: 300;
+                animation: floatUp 1s ease-out forwards;
+            `;
+            floater.textContent = text;
+            document.body.appendChild(floater);
+            setTimeout(() => floater.remove(), 1000);
+        }
+
+        function showCatCounter(element) {
+            const counter = document.createElement('div');
+            counter.className = 'cat-counter';
+            counter.textContent = '🐱 +1';
+            counter.style.left = element.style.left;
+            counter.style.top = element.style.top;
+            document.getElementById('game-area').appendChild(counter);
+            setTimeout(() => counter.remove(), 1000);
+        }
+
+        function checkLevelUp() {
+            const buildingCount = grid.filter(b => b !== null).length;
+            const newLevel = Math.floor(buildingCount / 3) + 1;
+            
+            if (newLevel > cityLevel && newLevel <= 10) {
+                cityLevel = newLevel;
+                showLevelUp();
+            }
+        }
+
+        function showLevelUp() {
+            const popup = document.getElementById('popup');
+            document.getElementById('popup-message').textContent = 
+                `Level ${cityLevel}! Your city attracts more cats!`;
+            popup.style.display = 'block';
+        }
+
+        function closePopup() {
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        function updateDisplay() {
+            document.getElementById('coins-display').textContent = coins;
+            document.getElementById('cats-display').textContent = catsCaught;
+            document.getElementById('level-display').textContent = cityLevel;
+        }
+
+        init();
+        
+        window.addEventListener('resize', () => {
+            if (currentCat && !currentCat.classList.contains('caught')) {
+                const maxX = document.getElementById('game-area').offsetWidth - 50;
+                const maxY = document.getElementById('game-area').offsetHeight - 100;
+                const x = Math.random() * maxX + 10;
+                const y = Math.random() * maxY + 10;
+                currentCat.style.left = x + 'px';
+                currentCat.style.top = y + 'px';
+            }
+        });
+    </script>
+</body>
+</html>
