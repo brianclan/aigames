@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cat Catch</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 50%, #7EC8E3 100%);
+            font-family: 'Comic Sans MS', 'Chalkboard', cursive;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #gameCanvas {
+            display: block;
+            background: transparent;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            z-index: 10;
+        }
+        .score-box {
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 15px;
+            padding: 8px 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border: 3px solid #FFD700;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 20;
+        }
+        .screen-title {
+            font-size: 48px;
+            color: #FFD700;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .screen-subtitle {
+            font-size: 22px;
+            color: #fff;
+            margin-bottom: 30px;
+            text-align: center;
+            padding: 0 20px;
+        }
+        .btn {
+            background: linear-gradient(180deg, #FF6B6B 0%, #EE5A5A 100%);
+            border: 4px solid #fff;
+            border-radius: 25px;
+            padding: 15px 50px;
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            cursor: pointer;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        #finalScore {
+            font-size: 36px;
+            color: #FFD700;
+            margin-bottom: 20px;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui" class="hidden">
+            <div class="score-box">Score: <span id="scoreDisplay">0</span></div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="startScreen">
+            <div class="screen-title">🐱 Cat Catch 🐟</div>
+            <div class="screen-subtitle">Move the cat to catch falling fish!<br>Use arrow keys or tap left/right.</div>
+            <button class="btn" id="startBtn">Play!</button>
+        </div>
+        
+        <div id="gameOverScreen" class="hidden">
+            <div class="screen-title">Game Over!</div>
+            <div id="finalScore">Score: 0</div>
+            <button class="btn" id="restartBtn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreEl = document.getElementById('finalScore');
+        const ui = document.getElementById('ui');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        let gameWidth, gameHeight;
+        let score = 0;
+        let gameRunning = false;
+        let fishArr = [];
+        let cat = { x: 0, y: 0, width: 80, height: 60, speed: 8 };
+        let keys = { left: false, right: false };
+        let touchX = null;
+        let lastTime = 0;
+        let fishSpawnTimer = 0;
+        let fishSpawnInterval = 1000;
+        let waterLevel = 0;
+        let waveOffset = 0;
+
+        function resize() {
+            gameWidth = window.innerWidth;
+            gameHeight = window.innerHeight;
+            canvas.width = gameWidth;
+            canvas.height = gameHeight;
+            cat.y = gameHeight - 120;
+            cat.x = gameWidth / 2 - cat.width / 2;
+            waterLevel = gameHeight - 60;
+        }
+
+        function drawCat(x, y, w, h) {
+            const scale = w / 80;
+            ctx.save();
+            ctx.translate(x + w/2, y + h/2);
+            ctx.scale(scale, scale);
+            
+            // Body
+            ctx.fillStyle = '#FFA500';
+            ctx.beginPath();
+            ctx.ellipse(0, 10, 35, 25, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Head
+            ctx.fillStyle = '#FFA500';
+            ctx.beginPath();
+            ctx.arc(0, -20, 28, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Ears
+            ctx.beginPath();
+            ctx.moveTo(-25, -35);
+            ctx.lineTo(-15, -55);
+            ctx.lineTo(-5, -35);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(25, -35);
+            ctx.lineTo(15, -55);
+            ctx.lineTo(5, -35);
+            ctx.fill();
+            
+            // Inner ears
+            ctx.fillStyle = '#FFB6C1';
+            ctx.beginPath();
+            ctx.moveTo(-22, -38);
+            ctx.lineTo(-15, -50);
+            ctx.lineTo(-10, -38);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(22, -38);
+            ctx.lineTo(15, -50);
+            ctx.lineTo(10, -38);
+            ctx.fill();
+            
+            // Eyes
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.ellipse(-10, -22, 10, 12, 0, 0, Math.PI * 2);
+            ctx.ellipse(10, -22, 10, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(-8, -20, 5, 0, Math.PI * 2);
+            ctx.arc(12, -20, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Nose
+            ctx.fillStyle = '#FF69B4';
+            ctx.beginPath();
+            ctx.moveTo(0, -10);
+            ctx.lineTo(-5, -5);
+            ctx.lineTo(5, -5);
+            ctx.fill();
+            
+            // Mouth
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -5);
+            ctx.lineTo(0, 0);
+            ctx.moveTo(-8, 2);
+            ctx.quadraticCurveTo(0, 8, 8, 2);
+            ctx.stroke();
+            
+            // Whiskers
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(-15, -8);
+            ctx.lineTo(-35, -12);
+            ctx.moveTo(-15, -5);
+            ctx.lineTo(-35, -3);
+            ctx.moveTo(15, -8);
+            ctx.lineTo(35, -12);
+            ctx.moveTo(15, -5);
+            ctx.lineTo(35, -3);
+            ctx.stroke();
+            
+            // Tail
+            ctx.strokeStyle = '#FFA500';
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(30, 15);
+            ctx.quadraticCurveTo(50, 0, 45, -20);
+            ctx.stroke();
+            
+            // Legs
+            ctx.fillStyle = '#FFA500';
+            ctx.fillRect(-25, 25, 12, 15);
+            ctx.fillRect(13, 25, 12, 15);
+            
+            ctx.restore();
+        }
+
+        function drawFish(x, y, size, color) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(size / 40, size / 40);
+            
+            // Body
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Tail
+            ctx.beginPath();
+            ctx.moveTo(-18, 0);
+            ctx.lineTo(-35, -12);
+            ctx.lineTo(-35, 12);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Fin
+            ctx.beginPath();
+            ctx.moveTo(0, -10);
+            ctx.lineTo(-5, -22);
+            ctx.lineTo(5, -10);
+            ctx.fill();
+            
+            // Eye
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(10, -3, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(11, -3, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function drawWater() {
+            waveOffset += 0.05;
+            ctx.fillStyle = 'rgba(30, 144, 255, 0.6)';
+            ctx.beginPath();
+            ctx.moveTo(0, waterLevel);
+            for (let i = 0; i <= gameWidth; i += 30) {
+                ctx.lineTo(i, waterLevel + Math.sin(waveOffset + i * 0.03) * 8);
+            }
+            ctx.lineTo(gameWidth, gameHeight);
+            ctx.lineTo(0, gameHeight);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function spawnFish() {
+            const colors = ['#FF6347', '#FFD700', '#FF69B4', '#00CED1', '#98FB98'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            fishArr.push({
+                x: Math.random() * (gameWidth - 50) + 25,
+                y: -40,
+                size: 35 + Math.random() * 20,
+                speed: 3 + Math.random() * 2 + score * 0.05,
+                color: color,
+                wobble: Math.random() * Math.PI * 2
+            });
+        }
+
+        function checkCollision(fish) {
+            const catCenterX = cat.x + cat.width / 2;
+            const catCenterY = cat.y + cat.height / 2;
+            const fishCenterX = fish.x;
+            const fishCenterY = fish.y;
+            const dist = Math.hypot(catCenterX - fishCenterX, catCenterY - fishCenterY);
+            return dist < (cat.width / 2 + fish.size / 2) * 0.8;
+        }
+
+        function update(deltaTime) {
+            // Move cat
+            if (keys.left) cat.x -= cat.speed;
+            if (keys.right) cat.x += cat.speed;
+            
+            if (touchX !== null) {
+                const targetX = touchX - cat.width / 2;
+                const diff = targetX - cat.x;
+                cat.x += diff * 0.15;
+            }
+            
+            // Keep cat in bounds
+            cat.x = Math.max(0, Math.min(gameWidth - cat.width, cat.x));
+            
+            // Spawn fish
+            fishSpawnTimer += deltaTime;
+            if (fishSpawnTimer >= fishSpawnInterval) {
+                spawnFish();
+                fishSpawnTimer = 0;
+                fishSpawnInterval = Math.max(500, 1000 - score * 10);
+            }
+            
+            // Update fish
+            for (let i = fishArr.length - 1; i >= 0; i--) {
+                const fish = fishArr[i];
+                fish.y += fish.speed;
+                fish.wobble += 0.1;
+                fish.x += Math.sin(fish.wobble) * 0.5;
+                
+                // Check collision
+                if (checkCollision(fish)) {
+                    score += 10;
+                    scoreDisplay.textContent = score;
+                    fishArr.splice(i, 1);
+                    continue;
+                }
+                
+                // Remove if off screen
+                if (fish.y > waterLevel + 20) {
+                    gameOver();
+                    return;
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, gameWidth, gameHeight);
+            
+            // Draw clouds
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            for (let i = 0; i < 5; i++) {
+                const cx = ((i * 200 + waveOffset * 20) % (gameWidth + 200)) - 100;
+                const cy = 60 + (i % 3) * 40;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+                ctx.arc(cx + 25, cy - 10, 25, 0, Math.PI * 2);
+                ctx.arc(cx + 50, cy, 28, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw fish
+            for (const fish of fishArr) {
+                drawFish(fish.x, fish.y, fish.size, fish.color);
+            }
+            
+            // Draw water
+            drawWater();
+            
+            // Draw cat
+            drawCat(cat.x, cat.y, cat.width, cat.height);
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+            
+            update(deltaTime);
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            score = 0;
+            fishArr = [];
+            scoreDisplay.textContent = '0';
+            cat.x = gameWidth / 2 - cat.width / 2;
+            fishSpawnTimer = 0;
+            fishSpawnInterval = 1000;
+            lastTime = performance.now();
+            
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            ui.classList.remove('hidden');
+            
+            gameRunning = true;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            finalScoreEl.textContent = 'Score: ' + score;
+            gameOverScreen.classList.remove('hidden');
+            ui.classList.add('hidden');
+        }
+
+        // Event listeners
+        window.addEventListener('resize', resize);
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+        });
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchX = e.touches[0].clientX;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            touchX = e.touches[0].clientX;
+        });
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchX = null;
+        });
+        
+        canvas.addEventListener('mousedown', (e) => {
+            touchX = e.clientX;
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (e.buttons === 1) {
+                touchX = e.clientX;
+            }
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            touchX = null;
+        });
+        
+        startBtn.addEventListener('click', startGame);
+        startBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            startGame();
+        });
+        
+        restartBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            startGame();
+        });
+
+        // Init
+        resize();
+        draw();
+    </script>
+</body>
+</html>
