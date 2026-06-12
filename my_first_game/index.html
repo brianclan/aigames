@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的第一个游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+
+        body {
+            background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            color: #fff;
+        }
+
+        .game-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(180deg, #87CEEB 0%, #E0F6FF 100%);
+            border-radius: 5px;
+        }
+
+        .score-board {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 1rem;
+        }
+
+        .score-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 100px;
+        }
+
+        .score-label {
+            font-size: 0.7rem;
+            color: #ddd;
+            margin-bottom: 5px;
+        }
+
+        .score-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            background: linear-gradient(145deg, #00d2ff, #3a7bd5);
+            color: #fff;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 25px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 210, 255, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .instructions {
+            margin-top: 15px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+        }
+
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            z-index: 100;
+            border: 3px solid #FFD700;
+        }
+
+        .game-over h2 {
+            color: #FF6B6B;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+
+        .game-over p {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            animation: twinkle 2s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    
+    <h1>🎮 我的第一个游戏</h1>
+    
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        
+        <div class="score-board">
+            <div class="score-item">
+                <div class="score-label">得分</div>
+                <div class="score-value" id="score">0</div>
+            </div>
+            <div class="score-item">
+                <div class="score-label">生命</div>
+                <div class="score-value" id="lives">❤️❤️❤️</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="startBtn">开始游戏</button>
+    </div>
+
+    <div class="instructions">
+        左右移动接住⭐星星，避开🔴红球<br>
+        键盘：← → 或 A D | 触摸：左右滑动
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <h2>游戏结束!</h2>
+        <p>得分：<span id="finalScore">0</span></p>
+        <p>最高分：<span id="finalHighScore">0</span></p>
+        <button class="btn" id="restartBtn">再来一局</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const livesEl = document.getElementById('lives');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const gameOverEl = document.getElementById('gameOver');
+        const finalScoreEl = document.getElementById('finalScore');
+        const finalHighScoreEl = document.getElementById('finalHighScore');
+        const starsContainer = document.getElementById('stars');
+
+        const playerWidth = 60;
+        const playerHeight = 15;
+        const itemRadius = 12;
+
+        let player = { x: canvas.width / 2 - playerWidth / 2, y: canvas.height - 40 };
+        let items = [];
+        let score = 0;
+        let lives = 3;
+        let gameLoop = null;
+        let isGameRunning = false;
+        let highScore = localStorage.getItem('myFirstGameHighScore') || 0;
+        let spawnRate = 60;
+        let frameCount = 0;
+
+        // Create background stars
+        for (let i = 0; i < 30; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.width = (Math.random() * 3 + 1) + 'px';
+            star.style.height = star.style.width;
+            star.style.animationDelay = Math.random() * 2 + 's';
+            starsContainer.appendChild(star);
+        }
+
+        function initGame() {
+            player = { x: canvas.width / 2 - playerWidth / 2, y: canvas.height - 40 };
+            items = [];
+            score = 0;
+            lives = 3;
+            spawnRate = 60;
+            frameCount = 0;
+            scoreEl.textContent = score;
+            updateLives();
+            gameOverEl.style.display = 'none';
+        }
+
+        function updateLives() {
+            livesEl.textContent = '❤️'.repeat(lives);
+        }
+
+        function spawnItem() {
+            const type = Math.random() > 0.3 ? 'star' : 'bomb';
+            items.push({
+                x: Math.random() * (canvas.width - itemRadius * 2) + itemRadius,
+                y: -itemRadius,
+                type: type,
+                speed: Math.random() * 2 + 2 + score / 50
+            });
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.roundRect(player.x, player.y, playerWidth, playerHeight, 8);
+            ctx.fill();
+            
+            // Highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.roundRect(player.x + 5, player.y + 2, playerWidth - 10, 5, 3);
+            ctx.fill();
+        }
+
+        function drawItem(item) {
+            if (item.type === 'star') {
+                // Draw star
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, itemRadius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Star glow
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, itemRadius - 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Star symbol
+                ctx.fillStyle = '#FFF';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('⭐', item.x, item.y);
+            } else {
+                // Draw bomb
+                ctx.fillStyle = '#FF4444';
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, itemRadius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#8B0000';
+                ctx.font = '14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🔴', item.x, item.y);
+            }
+        }
+
+        function update() {
+            frameCount++;
+            
+            // Spawn items
+            if (frameCount % spawnRate === 0) {
+                spawnItem();
+            }
+
+            // Update items
+            items.forEach((item, index) => {
+                item.y += item.speed;
+
+                // Remove off-screen items
+                if (item.y > canvas.height + itemRadius) {
+                    items.splice(index, 1);
+                    if (item.type === 'star') {
+                        lives--;
+                        updateLives();
+                        if (lives <= 0) {
+                            gameOver();
+                        }
+                    }
+                }
+
+                // Collision detection
+                if (
+                    item.y + itemRadius > player.y &&
+                    item.y - itemRadius < player.y + playerHeight &&
+                    item.x > player.x &&
+                    item.x < player.x + playerWidth
+                ) {
+                    if (item.type === 'star') {
+                        score += 10;
+                        scoreEl.textContent = score;
+                        if (score % 50 === 0 && spawnRate > 20) {
+                            spawnRate -= 5;
+                        }
+                    } else {
+                        lives--;
+                        updateLives();
+                        if (lives <= 0) {
+                            gameOver();
+                        }
+                    }
+                    items.splice(index, 1);
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw player
+            drawPlayer();
+
+            // Draw items
+            items.forEach(item => drawItem(item));
+        }
+
+        function gameStep() {
+            update();
+            draw();
+            if (isGameRunning) {
+                requestAnimationFrame(gameStep);
+            }
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('myFirstGameHighScore', highScore);
+            }
+            finalScoreEl.textContent = score;
+            finalHighScoreEl.textContent = highScore;
+            gameOverEl.style.display = 'block';
+            startBtn.textContent = '开始游戏';
+        }
+
+        function startGame() {
+            if (isGameRunning) return;
+            initGame();
+            isGameRunning = true;
+            startBtn.textContent = '游戏中...';
+            gameStep();
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', () => {
+            gameOverEl.style.display = 'none';
+            startGame();
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (!isGameRunning) return;
+            
+            const speed = 25;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                player.x = Math.max(0, player.x - speed);
+            } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                player.x = Math.min(canvas.width - playerWidth, player.x + speed);
+            }
+        });
+
+        // Touch controls
+        let touchStartX = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isGameRunning) return;
+            e.preventDefault();
+            const touchX = e.touches[0].clientX;
+            const deltaX = touchX - touchStartX;
+            player.x = Math.max(0, Math.min(canvas.width - playerWidth, player.x + deltaX));
+            touchStartX = touchX;
+        });
+
+        // Initial draw
+        draw();
+    </script>
+</body>
+</html>
