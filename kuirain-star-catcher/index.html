@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>接星星 Star Catcher</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; height:100%; overflow:hidden; touch-action:none; font-family:'Segoe UI',sans-serif; }
+  #game {
+    position:relative; width:100%; height:100%;
+    background:linear-gradient(180deg,#0b1e4b 0%,#1b3a8f 55%,#2a5fd0 100%);
+    overflow:hidden; cursor:pointer; user-select:none;
+  }
+  .star {
+    position:absolute; top:-50px; border-radius:50%;
+    pointer-events:none; will-change:transform;
+    box-shadow:0 0 12px rgba(255,255,150,.8);
+    animation:twinkle 1.5s infinite alternate;
+  }
+  @keyframes twinkle { from { filter:brightness(.85);} to { filter:brightness(1.25);} }
+  #basket {
+    position:absolute; bottom:18px; left:50%; transform:translateX(-50%);
+    width:96px; height:66px; pointer-events:none; z-index:5;
+  }
+  #hud {
+    position:absolute; top:0; left:0; right:0; padding:14px 18px;
+    display:flex; justify-content:space-between; align-items:center; z-index:10;
+    color:#fff; font-weight:700; font-size:20px; text-shadow:0 2px 6px rgba(0,0,0,.5);
+  }
+  #score { background:rgba(255,255,255,.18); padding:6px 14px; border-radius:20px; }
+  #lives { letter-spacing:2px; }
+  #overlay {
+    position:absolute; inset:0; background:rgba(6,14,40,.82); z-index:20;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff;
+  }
+  #overlay.hidden { display:none; }
+  #overlay h1 { font-size:42px; margin-bottom:8px; }
+  #overlay p  { font-size:20px; margin-bottom:24px; opacity:.9; }
+  #startBtn {
+    background:#ffb020; color:#1a1a1a; border:none; border-radius:40px;
+    padding:16px 52px; font-size:24px; font-weight:800; cursor:pointer;
+    box-shadow:0 6px 0 #cc8a10; transition:transform .08s;
+  }
+  #startBtn:active { transform:translateY(4px); box-shadow:0 2px 0 #cc8a10; }
+  .combo { position:absolute; color:#ffe27a; font-weight:900; font-size:26px; z-index:8;
+    text-shadow:0 0 10px rgba(255,200,0,.9); pointer-events:none; animation:popUp 1s forwards; }
+  @keyframes popUp { from { opacity:1; transform:translateY(0) scale(1);} to { opacity:0; transform:translateY(-60px) scale(1.4);} }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="hud">
+    <span id="score">⭐ 0</span>
+    <span id="lives">❤️❤️❤️</span>
+  </div>
+  <div id="basket"></div>
+  <div id="overlay">
+    <h1>⭐ 接星星</h1>
+    <p>滑动屏幕移动篮子，接住星星！漏 5 个就结束</p>
+    <button id="startBtn">开 始 玩</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const game = document.getElementById('game');
+  const basket = document.getElementById('basket');
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('startBtn');
+
+  let score = 0, lives = 3, running = false, speed = 1;
+  let spawnTimer = null, frameId = null;
+  const stars = [];
+  const colors = ['#ffd93d','#ff6b6b','#6bcbff','#a8e6a1','#ff9ff3','#feca57'];
+
+  // ---- 篮子 ----
+  let basketX = game.clientWidth / 2;
+  const basketW = 96;
+  function moveBasket(x){
+    basketX = Math.max(basketW/2, Math.min(game.clientWidth - basketW/2, x));
+    basket.style.left = basketX + 'px';
+  }
+  // 触摸 / 鼠标 控制
+  game.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    const t = e.touches[0];
+    moveBasket(t.clientX);
+  }, {passive:false});
+  game.addEventListener('touchstart', function(e){
+    if(!running) return;
+    const t = e.touches[0];
+    moveBasket(t.clientX);
+  }, {passive:false});
+  game.addEventListener('mousemove', function(e){
+    if(!running) return;
+    moveBasket(e.clientX);
+  });
+  window.addEventListener('resize', function(){
+    moveBasket(basketX);
+  });
+
+  // ---- 星星 ----
+  function spawnStar(){
+    const star = document.createElement('div');
+    star.className = 'star';
+    const size = 18 + Math.random() * 18;
+    star.style.width = size + 'px';
+    star.style.height = size + 'px';
+    star.style.left = (20 + Math.random() * (game.clientWidth - 40)) + 'px';
+    star.style.background = 'radial-gradient(circle at 35% 35%, #fff8d0, ' + colors[Math.floor(Math.random()*colors.length)] + ')';
+    star.dataset.x = parseFloat(star.style.left);
+    star.dataset.y = -40;
+    star.dataset.speed = (2.2 + Math.random() * 1.8) * speed;
+    game.appendChild(star);
+    stars.push(star);
+  }
+
+  function update(){
+    for(let i = stars.length - 1; i >= 0; i--){
+      const s = stars[i];
+      let y = parseFloat(s.dataset.y) + s.dataset.speed;
+      const x = parseFloat(s.dataset.x);
+      s.dataset.y = y;
+      s.style.top = y + 'px';
+      // 接住判断
+      const basketTop = game.clientHeight - 18 - 66;
+      if(y + parseFloat(s.style.width) >= basketTop && y <= basketTop + 66){
+        if(Math.abs(x - basketX) < (basketW/2 + parseFloat(s.style.width)/2)){
+          s.remove(); stars.splice(i,1);
+          score++;
+          scoreEl.textContent = '⭐ ' + score;
+          if(score % 10 === 0){ speed += 0.25; }
+          showCombo(x, y);
+          continue;
+        }
+      }
+      // 掉出屏幕
+      if(y > game.clientHeight + 60){
+        s.remove(); stars.splice(i,1);
+        lives--;
+        updateLives();
+        if(lives <= 0){ endGame(); return; }
+      }
+    }
+    if(running) frameId = requestAnimationFrame(update);
+  }
+
+  function showCombo(x, y){
+    const c = document.createElement('div');
+    c.className = 'combo';
+    c.textContent = '+1';
+    c.style.left = x + 'px'; c.style.top = y + 'px';
+    game.appendChild(c);
+    setTimeout(()=> c.remove(), 1000);
+  }
+
+  function updateLives(){
+    livesEl.textContent = '❤️'.repeat(Math.max(0,lives)) + '🖤'.repeat(Math.max(0,3-lives));
+  }
+
+  function startGame(){
+    // 清场
+    stars.forEach(s => s.remove());
+    stars.length = 0;
+    score = 0; lives = 3; speed = 1;
+    scoreEl.textContent = '⭐ 0';
+    updateLives();
+    overlay.classList.add('hidden');
+    running = true;
+    if(spawnTimer) clearInterval(spawnTimer);
+    spawnTimer = setInterval(function(){
+      if(running) spawnStar();
+    }, 550);
+    frameId = requestAnimationFrame(update);
+  }
+
+  function endGame(){
+    running = false;
+    clearInterval(spawnTimer);
+    if(frameId) cancelAnimationFrame(frameId);
+    overlay.classList.remove('hidden');
+    overlay.querySelector('h1').textContent = '游戏结束';
+    overlay.querySelector('p').textContent = '你接到了 ' + score + ' 颗星星！' + (score>=50 ? ' 🌟 太强了！' : score>=20 ? ' 👍 不错哦！' : ' 💪 再试一次！');
+    startBtn.textContent = '再 玩 一 次';
+  }
+
+  startBtn.addEventListener('click', startGame);
+  moveBasket(basketX);
+})();
+</script>
+</body>
+</html>
