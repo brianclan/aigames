@@ -107,20 +107,23 @@
   let W, H;
   let running = false;
   let score = 0;
-  let gameOver = false;
-  let gravity = { x: 0, y: 1 }; // gravity direction unit vector
-  let blocks = []; // placed blocks
+  let gameOverFlag = false;
+  let gravity = { x: 0, y: 1 };
+  let blocks = [];
   let currentBlock = null;
   let particles = [];
   let combo = 0;
-  let spawnTimer = 0;
-  let spawnInterval = 90; // frames between spawns
   let gridCols = 5;
   let cellW, cellH;
-  let cameraY = 0; // scrolling camera
+  // cameraY = world-to-screen offset (screenY = worldY - cameraY)
+  // Initially cameraY = 0, world Y=0 = screen Y=0 (top of canvas)
+  // H = canvas height, floor at world Y = H
+  let cameraY = 0;
   let targetCameraY = 0;
   let level = 1;
   let difficultyTimer = 0;
+  // World Y of the highest (topmost surface) placed block
+  let stackTopWorldY = Infinity;
 
   const PALETTE = [
     '#ff6b6b','#ffd700','#4ecdc4','#a29bfe','#fd79a8',
@@ -140,14 +143,20 @@
     return PALETTE[Math.floor(Math.random() * PALETTE.length)];
   }
 
+  // Spawn a new falling block above the visible area
   function spawnBlock() {
     const col = Math.floor(Math.random() * gridCols);
     const color = randomColor();
+    // Spawn above the visible area (world Y negative = above screen top)
+    // Visible world range at start: [-H*0.3, H]
+    const spawnWorldY = -H * 0.3;
     currentBlock = {
-      col, color,
+      col,
+      color,
       x: col * cellW + cellW / 2,
-      y: cameraY - cellH,
-      vx: 0, vy: 0,
+      y: spawnWorldY,
+      vx: 0,
+      vy: 0,
       size: cellW * 0.9,
       settled: false,
       age: 0
@@ -180,18 +189,18 @@
   }
 
   function applyGravity() {
-    // Normalize gravity
-    const len = Math.sqrt(gravity.x * gravity.x + gravity.y * gravity.y);
-    const nx = gravity.x / len;
-    const ny = gravity.y / len;
+    if (!currentBlock || currentBlock.settled) return;
+
+    const gx = gravity.x, gy = gravity.y;
+    const len = Math.sqrt(gx*gx + gy*gy);
+    if (len === 0) return;
+    const nx = gx/len, ny = gy/len;
     const gStrength = 3.5 + level * 0.3;
 
-    if (!currentBlock || currentBlock.settled) return;
     currentBlock.vx += nx * gStrength * 0.08;
     currentBlock.vy += ny * gStrength * 0.08;
 
-    // Speed cap
-    const spd = Math.sqrt(currentBlock.vx * currentBlock.vx + currentBlock.vy * currentBlock.vy);
+    const spd = Math.sqrt(currentBlock.vx*currentBlock.vx + currentBlock.vy*currentBlock.vy);
     const maxSpd = 8;
     if (spd > maxSpd) {
       currentBlock.vx = (currentBlock.vx / spd) * maxSpd;
@@ -202,8 +211,9 @@
     currentBlock.y += currentBlock.vy;
     currentBlock.age++;
 
-    // Wall bounce (horizontal gravity)
     const halfSize = currentBlock.size / 2;
+
+    // Wall bounce (horizontal walls always)
     if (currentBlock.x < halfSize) {
       currentBlock.x = halfSize;
       currentBlock.vx *= -0.4;
@@ -213,109 +223,124 @@
       currentBlock.vx *= -0.4;
     }
 
-    // Check landing on placed blocks or floor
+    // Ceiling bounce (when gravity is up)
+    if (ny < 0) {
+      if (currentBlock.y < halfSize) {
+        currentBlock.y = halfSize;
+        currentBlock.vy *= -0.4;
+      }
+    }
+
     checkLanding();
   }
 
-  function getBlockTop(col) {
-    // Returns the top Y of the highest block in a column
-    let topY = H - cellH; // floor
+  function findLandingY() {
+    // For the current block's column, find the world Y where it should land
+    // Returns { landY, landedOnBlock }
+    const halfSize = currentBlock.size / 2;
+    const curCol = currentBlock.col;
+
+    // Check floor first (world Y = H is the floor surface)
+    // Block center at floor: H - halfSize
+    let landY = H - halfSize;
+    let landedOnBlock = null;
+
     for (const b of blocks) {
-      const bc = Math.floor(b.x / cellW);
-      if (bc === col) {
-        if (b.y < topY) topY = b.y;
+      const bCol = b.col;
+      if (bCol !== curCol) continue;
+      // b.y is world Y of block center, top surface = b.y - b.size/2
+      const blockTopWorldY = b.y - b.size / 2;
+      // Block can land on top of this block if its top is higher than current floor
+      // (higher in world Y = smaller number, since Y increases downward)
+      if (blockTopWorldY < landY) {
+        landY = blockTopWorldY;
+        landedOnBlock = b;
       }
     }
-    return topY;
+    return { landY, landedOnBlock };
   }
 
   function checkLanding() {
-    if (!currentBlock) return;
-    const gx = gravity.x, gy = gravity.y;
-    const len = Math.sqrt(gx*gx+gy*gy);
-    const nx = gx/len, ny = gy/len;
+    if (!currentBlock || currentBlock.settled) return;
 
-    // Direction-aware: block moves in gravity direction
-    // Check if block's leading edge reached floor or another block
+    const gx = gravity.x, gy = gravity.y;
+    const len = Math.sqrt(gx*gx + gy*gy);
+    if (len === 0) return;
+    const nx = gx/len, ny = gy/len;
     const halfSize = currentBlock.size / 2;
     const speed = Math.sqrt(currentBlock.vx*currentBlock.vx + currentBlock.vy*currentBlock.vy);
+    if (speed < 0.5) return;
 
-    if (speed < 0.5) return; // wait for speed
-
-    // Compute leading edge position
-    const leadX = currentBlock.x + nx * halfSize;
-    const leadY = currentBlock.y + ny * halfSize;
-
-    // Floor boundary (bottom of screen in gravity-down, or other edges)
-    let floorY, floorX;
-    if (ny >= Math.abs(nx)) {
-      // Gravity mostly down
-      floorY = H - cellH;
-      if (leadY + currentBlock.vy >= floorY) {
-        settleBlock(floorY - ny * halfSize);
-        return;
-      }
-    } else if (ny <= -Math.abs(nx)) {
-      // Gravity mostly up
-      floorY = cameraY;
-      if (leadY + currentBlock.vy <= floorY) {
-        settleBlock(floorY - ny * halfSize);
+    // Downward gravity
+    if (ny > 0) {
+      const { landY } = findLandingY();
+      if (currentBlock.y >= landY - halfSize * 0.2) {
+        settleBlock(landY);
         return;
       }
     }
 
-    if (nx > Math.abs(ny)) {
-      // Right
-      floorX = W - halfSize;
-      if (leadX >= floorX) { settleBlock(floorX - nx * halfSize); return; }
-    } else if (nx < -Math.abs(ny)) {
-      // Left
-      floorX = halfSize;
-      if (leadX <= floorX) { settleBlock(floorX - nx * halfSize); return; }
+    // Block-to-block side collision (when moving horizontally)
+    if (nx !== 0) {
+      for (const b of blocks) {
+        // Only check blocks in adjacent columns roughly
+        if (Math.abs(b.x - currentBlock.x) > cellW * 1.5) continue;
+        const dy = Math.abs(currentBlock.y - b.y);
+        if (dy > halfSize + b.size/2) continue;
+        // Horizontal overlap
+        const overlapX = (halfSize + b.size/2) - Math.abs(currentBlock.x - b.x);
+        if (overlapX > 0 && ((nx > 0 && currentBlock.x > b.x) || (nx < 0 && currentBlock.x < b.x))) {
+          currentBlock.x = nx > 0
+            ? b.x - b.size/2 - halfSize
+            : b.x + b.size/2 + halfSize;
+          currentBlock.vx *= -0.3;
+          return;
+        }
+      }
     }
 
-    // Check collision with placed blocks
-    for (const b of blocks) {
-      if (Math.abs(b.x - currentBlock.x) > cellW * 1.2) continue;
-      if (Math.abs(b.y - currentBlock.y) > cellH * 1.2) continue;
-      const dx = currentBlock.x - b.x;
-      const dy = currentBlock.y - b.y;
-      const dot = dx * nx + dy * ny;
-      if (dot < 0) continue; // moving away
-      const perpDist = Math.abs(-nx * dy + ny * dx);
-      if (perpDist > halfSize + b.size/2 - 2) continue;
-      if (dot < halfSize + b.size/2) {
-        // Collision!
-        const newY = b.y - ny * (halfSize + b.size/2);
-        const newX = b.x - nx * (halfSize + b.size/2);
-        settleBlock(ny >= Math.abs(nx) ? newY : (ny <= -Math.abs(ny) ? newY : currentBlock.y),
-                    nx >= Math.abs(ny) ? newX : (nx <= -Math.abs(nx) ? newX : currentBlock.x));
-        return;
+    // Block-to-block vertical collision (when gravity is not purely down)
+    if (ny !== 0) {
+      for (const b of blocks) {
+        if (Math.abs(b.x - currentBlock.x) > halfSize + b.size/2) continue;
+        const dot = (currentBlock.x - b.x) * nx + (currentBlock.y - b.y) * ny;
+        if (dot >= 0) continue; // moving away
+        const perpDist = Math.abs(-nx * (currentBlock.y - b.y) + ny * (currentBlock.x - b.x));
+        if (perpDist > halfSize + b.size/2) continue;
+        if (dot > -(halfSize + b.size/2) * 2) {
+          if (ny < 0) {
+            // Falling up into block bottom
+            currentBlock.y = b.y + b.size/2 + halfSize;
+            currentBlock.vy *= -0.3;
+          } else {
+            currentBlock.y = b.y - b.size/2 - halfSize;
+            currentBlock.vy *= -0.3;
+          }
+          return;
+        }
       }
     }
   }
 
-  function settleBlock(y) {
+  function settleBlock(worldY) {
     if (!currentBlock) return;
 
-    // Snap to grid
-    const col = Math.floor(currentBlock.x / cellW);
-    const snappedCol = Math.max(0, Math.min(gridCols - 1, col));
-    currentBlock.x = snappedCol * cellW + cellW / 2;
-    currentBlock.y = y;
+    // Snap to column
+    const col = Math.max(0, Math.min(gridCols - 1,
+      Math.round((currentBlock.x - cellW / 2) / cellW)));
+    currentBlock.x = col * cellW + cellW / 2;
+    currentBlock.y = worldY;
+    currentBlock.col = col;
     currentBlock.settled = true;
     currentBlock.vx = 0;
     currentBlock.vy = 0;
 
-    // Score: check if same color nearby
-    let matched = false;
+    // Score
     let matchCount = 0;
     for (const b of blocks) {
       if (b.color === currentBlock.color) {
         const dist = Math.sqrt((b.x-currentBlock.x)**2 + (b.y-currentBlock.y)**2);
-        if (dist < cellW * 1.6) {
-          matchCount++;
-        }
+        if (dist < cellW * 1.6) matchCount++;
       }
     }
 
@@ -323,7 +348,6 @@
       combo++;
       const pts = combo >= 3 ? 30 : (combo >= 2 ? 20 : 10);
       score += pts;
-      matched = true;
       spawnParticles(currentBlock.x, currentBlock.y, currentBlock.color, 12);
       showScore(currentBlock.x, currentBlock.y, pts, combo >= 2);
     } else {
@@ -332,23 +356,31 @@
       spawnParticles(currentBlock.x, currentBlock.y, currentBlock.color, 6);
     }
 
-    // Push blocks up to make room
-    cameraY -= cellH;
-    targetCameraY = cameraY;
+    // Update stack top
+    const blockTopWorldY = currentBlock.y - currentBlock.size / 2;
+    if (blockTopWorldY < stackTopWorldY) {
+      stackTopWorldY = blockTopWorldY;
+    }
+
+    // Camera: keep top of stack visible near top of screen
+    // The top of the stack should appear near the top of the viewport
+    targetCameraY = stackTopWorldY - cellH * 1.5;
 
     blocks.push(currentBlock);
     scoreEl.textContent = score;
 
-    // Remove blocks that fell too low (game over condition)
-    const bottomY = H + cellH * 2;
-    const topY = cameraY - cellH * 4;
-    if (blocks.length > 60) {
-      // Remove blocks that scrolled off bottom
-      blocks = blocks.filter(b => b.y < bottomY && b.y > topY - cellH * 10);
-    }
-
     currentBlock = null;
     combo = 0;
+
+    // Check if any existing block scrolled off bottom → game over
+    const minVisibleWorldY = cameraY + H + cellH;
+    for (const b of blocks) {
+      if (b.y > minVisibleWorldY) {
+        endGame();
+        return;
+      }
+    }
+
     spawnBlock();
   }
 
@@ -359,7 +391,7 @@
       p.y += p.vy;
       p.vy += 0.12;
       p.life -= 0.025;
-      if (p.life <= 0) { particles.splice(i, 1); }
+      if (p.life <= 0) particles.splice(i, 1);
     }
   }
 
@@ -380,22 +412,18 @@
     const sy = b.y - b.size / 2 - cameraY;
     if (sy > H + 10 || sy + b.size < -10) return;
 
-    // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     roundRect(ctx, sx + 3, sy + 3, b.size, b.size, 6);
     ctx.fill();
 
-    // Body
     ctx.fillStyle = b.color;
     roundRect(ctx, sx, sy, b.size, b.size, 6);
     ctx.fill();
 
-    // Shine
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     roundRect(ctx, sx + 4, sy + 4, b.size * 0.4, b.size * 0.25, 3);
     ctx.fill();
 
-    // Border
     ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.lineWidth = 1.5;
     roundRect(ctx, sx, sy, b.size, b.size, 6);
@@ -422,7 +450,6 @@
     const sx = b.x - b.size / 2;
     const sy = b.y - b.size / 2 - cameraY;
 
-    // Glow
     ctx.save();
     ctx.shadowColor = b.color;
     ctx.shadowBlur = 20;
@@ -431,18 +458,15 @@
     ctx.fill();
     ctx.restore();
 
-    // Body
     ctx.fillStyle = b.color;
     roundRect(ctx, sx, sy, b.size, b.size, 6);
     ctx.fill();
 
-    // Pulsing inner ring
     const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 150);
-    ctx.fillStyle = `rgba(255,255,255,${0.15 + pulse * 0.2})`;
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.15 + pulse * 0.2) + ')';
     roundRect(ctx, sx + 6, sy + 6, b.size - 12, b.size - 12, 4);
     ctx.fill();
 
-    // Shine
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     roundRect(ctx, sx + 4, sy + 4, b.size * 0.4, b.size * 0.25, 3);
     ctx.fill();
@@ -453,12 +477,46 @@
     ctx.stroke();
   }
 
+  function drawFloor() {
+    // Draw floor line
+    const floorScreenY = H - cellH - cameraY;
+    if (floorScreenY > H + 20 || floorScreenY < -20) return;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(0, floorScreenY, W, cellH);
+    // Floor line
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, floorScreenY);
+    ctx.lineTo(W, floorScreenY);
+    ctx.stroke();
+  }
+
+  function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#1a1a2e');
+    grad.addColorStop(1, '#16213e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= gridCols; i++) {
+      const x = i * cellW;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+  }
+
   function drawGravityArrow() {
     const cx = W / 2;
     const cy = 60;
     const len = 22;
     const gx = gravity.x, gy = gravity.y;
     const gl = Math.sqrt(gx*gx+gy*gy);
+    if (gl === 0) return;
     const nx = gx/gl, ny = gy/gl;
 
     ctx.save();
@@ -470,7 +528,6 @@
     ctx.moveTo(cx - nx * len, cy - ny * len);
     ctx.lineTo(cx + nx * len, cy + ny * len);
     ctx.stroke();
-    // Arrowhead
     const angle = Math.atan2(ny, nx);
     ctx.beginPath();
     ctx.moveTo(cx + nx * len, cy + ny * len);
@@ -481,63 +538,26 @@
     ctx.restore();
   }
 
-  function drawBackground() {
-    // Gradient bg
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#1a1a2e');
-    grad.addColorStop(1, '#16213e');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
-
-    // Grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= gridCols; i++) {
-      const x = i * cellW;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, H);
-      ctx.stroke();
-    }
-    const totalH = H + 1000;
-    for (let i = 0; i <= Math.ceil(totalH / cellH); i++) {
-      const y = H - ((i * cellH - cameraY) % H + H) % H;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
-    }
-  }
-
   function gameLoop() {
-    if (gameOver) return;
+    if (gameOverFlag) return;
     ctx.clearRect(0, 0, W, H);
     drawBackground();
-    drawParticles();
 
-    // Camera smooth follow
+    // Smooth camera
     cameraY += (targetCameraY - cameraY) * 0.08;
 
-    // Draw placed blocks
+    drawFloor();
+    drawParticles();
+
     for (const b of blocks) drawBlock(b);
-
-    // Draw current block
     drawCurrentBlock();
-
-    // Apply gravity
-    applyGravity();
-
-    // Update particles
-    updateParticles();
-
-    // Gravity arrow indicator
     drawGravityArrow();
 
-    // Difficulty
+    applyGravity();
+    updateParticles();
+
     difficultyTimer++;
-    if (difficultyTimer % 600 === 0) {
-      level++;
-    }
+    if (difficultyTimer % 600 === 0) level++;
 
     requestAnimationFrame(gameLoop);
   }
@@ -552,16 +572,14 @@
     if (maps[dir]) gravity = maps[dir];
   }
 
-  // Keyboard controls
   document.addEventListener('keydown', e => {
     if (!running) return;
-    if (e.key === 'ArrowLeft' || e.key === 'a') setGravity('left');
+    if (e.key === 'ArrowLeft'  || e.key === 'a') setGravity('left');
     if (e.key === 'ArrowRight' || e.key === 'd') setGravity('right');
-    if (e.key === 'ArrowUp' || e.key === 'w') setGravity('up');
-    if (e.key === 'ArrowDown' || e.key === 's') setGravity('down');
+    if (e.key === 'ArrowUp'    || e.key === 'w') setGravity('up');
+    if (e.key === 'ArrowDown'  || e.key === 's') setGravity('down');
   });
 
-  // Touch swipe controls
   let touchStartX = 0, touchStartY = 0;
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
@@ -585,16 +603,17 @@
   function startGame() {
     score = 0;
     combo = 0;
-    gameOver = false;
+    gameOverFlag = false;
     blocks = [];
     particles = [];
     gravity = { x: 0, y: 1 };
     cameraY = 0;
     targetCameraY = 0;
+    stackTopWorldY = Infinity;
     level = 1;
     difficultyTimer = 0;
     scoreEl.textContent = '0';
-    bestEl.textContent = localStorage.getItem('stackFallBest') || 0;
+    bestEl.textContent = localStorage.getItem('stackFallBest') || '0';
     overlay.style.display = 'none';
     running = true;
     spawnBlock();
@@ -602,26 +621,683 @@
   }
 
   function endGame() {
-    gameOver = true;
+    gameOverFlag = true;
     running = false;
     const best = parseInt(localStorage.getItem('stackFallBest') || '0');
     if (score > best) localStorage.setItem('stackFallBest', score);
     setTimeout(() => {
-      overlay.innerHTML = `
-        <h1>游戏结束</h1>
-        <div id="finalScore">${score}</div>
-        <p>最高纪录：${Math.max(score, best)}</p>
-        <button class="btn btn-primary" id="restartBtn">再来一次</button>
-      `;
+      overlay.innerHTML = '<h1>游戏结束</h1><div id="finalScore">' + score + '</div><p>最高纪录：' + Math.max(score, best) + '</p><button class="btn btn-primary" id="restartBtn">再来一次</button>';
       overlay.style.display = 'flex';
       document.getElementById('restartBtn').addEventListener('click', startGame);
     }, 400);
   }
 
   startBtn.addEventListener('click', startGame);
-
-  bestEl.textContent = localStorage.getItem('stackFallBest') || 0;
+  bestEl.textContent = localStorage.getItem('stackFallBest') || '0';
 })();
+</script>
+
+<style>
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.inland-security-footer {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  right: 0;
+  width: fit-content;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tooltip-container {
+  position: relative;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background-color: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.minimax-link {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 300;
+  color: #adadad;
+  text-decoration: none;
+}
+
+.minimax-link:visited {
+  color: #adadad;
+}
+
+.minimax-link:hover {
+  color: #666666;
+}
+
+.tooltip-content {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  padding-bottom: 16px; /* 8px 内容间距 + 8px 用于鼠标移动的透明区域 */
+  font-size: 12px;
+  line-height: 17px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #171717;
+}
+
+/* 创建透明的连接区域，让鼠标可以平滑移动到 tooltip */
+.tooltip-content::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: flex;
+}
+
+.info-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.beian-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #171717;
+}
+
+.beian-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.underline-text {
+  color: #171717;
+  text-decoration: underline;
+}
+
+.underline-text:hover {
+  color: #000000;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .trigger-content {
+    background-color: transparent;
+  }
+
+  .minimax-link,
+  .minimax-link:visited {
+    color: #666666;
+  }
+
+  .minimax-link:hover {
+    color: #adadad;
+  }
+
+  .tooltip-content {
+    background-color: #262626;
+    color: #ededed;
+  }
+
+  .beian-link,
+  .underline-text {
+    color: #ededed;
+  }
+
+  .underline-text:hover {
+    color: #ffffff;
+  }
+}
+
+</style>
+<div class="inland-security-footer">
+  <div class="tooltip-container">
+    <div class="trigger-content">
+      <a href="https://www.minimaxi.com/" target="_blank" rel="noreferrer" class="minimax-link">
+        <span>© 2026 MiniMax</span>
+      </a>
+    </div>
+    <div class="tooltip-content">
+      <section class="info-section">
+        <span>上海稀宇科技有限公司</span>
+      </section>
+
+      <section class="info-section">
+        <a class="beian-link" href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=31010402010179" target="_blank" rel="noreferrer">
+          <img alt="hailuo-beian-icon" src="https://cdn.hailuoai.com/hailuo-video-web/public_assets/223037d3-79fd-4db0-a456-749f38a6a14b.png" class="beian-icon">
+          <span class="underline-text">沪公网安备31010402010179号</span>
+        </a>
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" class="underline-text">
+          沪ICP备2023003282号-38
+        </a>
+      </section>
+
+      <section class="info-section">
+        <span>模型名称：MiniMax</span>
+        <span>备案号：Shanghai-MiniMax-202505230046</span>
+      </section>
+
+      <section class="info-section">
+        <a href="https://agent.minimaxi.com/doc/zh/terms-of-service.html" target="_blank" rel="noreferrer" class="underline-text">
+          用户协议
+        </a>
+        <a href="https://agent.minimaxi.com/doc/zh/privacy-policy.html" target="_blank" rel="noreferrer" class="underline-text">
+          隐私政策
+        </a>
+      </section>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/**
+ * Iframe 元素高亮注入脚本
+ * 需要在目标网站中引入此脚本来支持跨域 iframe 高亮功能
+ *
+ * 使用方法：
+ * 1. 将此脚本添加到目标网站的 HTML 中
+ * 2. 或通过浏览器扩展、用户脚本等方式注入
+ */
+
+(function () {
+  "use strict";
+
+  // 检查是否在 iframe 中
+  if (window.self === window.top) {
+    return; // 不在 iframe 中，不执行
+  }
+
+  // 检查是否已经初始化过
+  if (window.__iframeHighlightInitialized) {
+    return;
+  }
+  window.__iframeHighlightInitialized = true;
+  console.log("Iframe 高亮脚本已加载");
+
+  // 创建高亮覆盖层
+  var overlay = document.createElement("div");
+  overlay.id = "iframe-highlight-overlay";
+  overlay.style.cssText = "\n    position: fixed;\n    top: 0;\n    left: 0;\n    width: 100vw;\n    height: 100vh;\n    pointer-events: none;\n    z-index: 999999;\n    overflow: hidden;\n  ";
+
+  // 创建悬停高亮框（虚线边框）
+  var highlightBox = document.createElement("div");
+  highlightBox.id = "iframe-highlight-box";
+  highlightBox.style.cssText = "\n    position: absolute;\n    border: 2px dashed #007AFF;\n    background: rgba(0, 122, 255, 0.08);\n    pointer-events: none;\n    display: none;\n    transition: all 0.1s ease;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);\n    border-radius: 2px;\n  ";
+
+  // 创建选中节点的常驻高亮框（实线边框）
+  var selectedBox = document.createElement("div");
+  selectedBox.id = "iframe-selected-box";
+  selectedBox.style.cssText = "\n    position: absolute;\n    border: 2px solid #007AFF;\n    pointer-events: none;\n    display: none;\n    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 8px rgba(255, 107, 53, 0.4);\n    border-radius: 2px;\n    z-index: 1000000;\n  ";
+
+  // 创建悬停标签显示
+  var tagLabel = document.createElement("div");
+  tagLabel.id = "iframe-tag-label";
+  tagLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 2px 6px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 2px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000001;\n    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);\n    font-weight: 500;\n  ";
+
+  // 创建选中节点标签
+  var selectedLabel = document.createElement("div");
+  selectedLabel.id = "iframe-selected-label";
+  selectedLabel.style.cssText = "\n    position: absolute;\n    background: #007AFF;\n    color: white;\n    padding: 3px 8px;\n    font-size: 11px;\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;\n    border-radius: 3px;\n    pointer-events: none;\n    display: none;\n    white-space: nowrap;\n    z-index: 1000002;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);\n    font-weight: 600;\n  ";
+  overlay.appendChild(highlightBox);
+  overlay.appendChild(selectedBox);
+  overlay.appendChild(tagLabel);
+  overlay.appendChild(selectedLabel);
+  document.body.appendChild(overlay);
+
+  // 存储当前选中的元素
+  var selectedElement = null;
+  var highlightEnabled = false;
+
+  // 更新选中元素的高亮显示
+  function updateSelectedHighlight(element) {
+    console.log("updateSelectedHighlight called with:", element);
+    if (!element) {
+      selectedBox.style.display = "none";
+      selectedLabel.style.display = "none";
+      selectedElement = null;
+      console.log("Cleared selected highlight");
+      return;
+    }
+    selectedElement = element;
+    var rect = element.getBoundingClientRect();
+    console.log("Selected element rect:", rect);
+
+    // 更新选中高亮框位置
+    selectedBox.style.display = "block";
+    selectedBox.style.left = "".concat(rect.left - 2, "px");
+    selectedBox.style.top = "".concat(rect.top - 2, "px");
+    selectedBox.style.width = "".concat(rect.width + 4, "px");
+    selectedBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新选中标签位置和内容
+    selectedLabel.style.display = "block";
+    selectedLabel.textContent = "\u2713 <".concat(element.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 28;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 5) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    var labelWidth = selectedLabel.offsetWidth || 100; // 预估宽度
+    if (labelLeft + labelWidth > window.innerWidth - 10) {
+      labelLeft = window.innerWidth - labelWidth - 10;
+    }
+    selectedLabel.style.left = "".concat(Math.max(5, labelLeft), "px");
+    selectedLabel.style.top = "".concat(labelTop, "px");
+    console.log("Selected highlight positioned at:", {
+      left: selectedBox.style.left,
+      top: selectedBox.style.top,
+      width: selectedBox.style.width,
+      height: selectedBox.style.height
+    });
+  }
+  function getElementSelector(element) {
+    if (!(element instanceof Element)) throw new Error('Argument must be a DOM element');
+    var segments = [];
+    var current = element;
+    while (current !== document.documentElement) {
+      var selector = '';
+      // 优先检查唯一ID
+      if (current.id && document.querySelectorAll("#".concat(current.id)).length === 1) {
+        segments.unshift("#".concat(current.id));
+        break; // ID唯一，无需继续向上
+      }
+
+      // 生成类名选择器（取第一个有效类名）
+      var classes = Array.from(current.classList).filter(function (c) {
+        return !c.startsWith('js-');
+      });
+      var className = classes.length > 0 ? ".".concat(classes[0]) : '';
+
+      // 生成位置索引（nth-child）
+      var tag = current.tagName.toLowerCase();
+      if (!className) {
+        var siblings = Array.from(current.parentNode.children);
+        var index = siblings.findIndex(function (el) {
+          return el === current;
+        }) + 1;
+        selector = "".concat(tag, ":nth-child(").concat(index, ")");
+      } else {
+        selector = className;
+      }
+      segments.unshift(selector);
+      current = current.parentElement;
+    }
+
+    // 处理根元素
+    if (current === document.documentElement) {
+      segments.unshift('html');
+    }
+    return segments.join(' > ');
+  }
+
+  // 获取元素文本内容
+  function getElementText(element) {
+    var _element$textContent;
+    if (element.tagName === "INPUT") {
+      return element.value || element.placeholder || "";
+    }
+    if (element.tagName === "TEXTAREA") {
+      return element.value || element.placeholder || "";
+    }
+    var text = ((_element$textContent = element.textContent) === null || _element$textContent === void 0 ? void 0 : _element$textContent.trim()) || "";
+    return text.length > 50 ? text.substring(0, 50) + "..." : text;
+  }
+
+  // 获取元素属性信息
+  function getElementAttributes(element) {
+    var attrs = {};
+    for (var i = 0; i < element.attributes.length; i++) {
+      var attr = element.attributes[i];
+      attrs[attr.name] = attr.value;
+    }
+    return attrs;
+  }
+
+  // 鼠标悬停事件处理
+  function handleMouseOver(e) {
+    if (!highlightEnabled) return;
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免高亮 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 如果是已选中的元素，不显示悬停高亮
+    if (target === selectedElement) {
+      highlightBox.style.display = "none";
+      tagLabel.style.display = "none";
+      return;
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+
+    // 更新悬停高亮框位置
+    highlightBox.style.display = "block";
+    highlightBox.style.left = "".concat(rect.left - 2, "px");
+    highlightBox.style.top = "".concat(rect.top - 2, "px");
+    highlightBox.style.width = "".concat(rect.width + 4, "px");
+    highlightBox.style.height = "".concat(rect.height + 4, "px");
+
+    // 更新标签位置和内容
+    tagLabel.style.display = "block";
+    tagLabel.textContent = "<".concat(target.tagName.toLowerCase(), ">");
+
+    // 计算标签位置，确保不超出视窗
+    var labelTop = rect.top - 22;
+    var labelLeft = rect.left;
+
+    // 如果标签会超出顶部，显示在元素下方
+    if (labelTop < 0) {
+      labelTop = rect.bottom + 5;
+    }
+
+    // 如果标签会超出右侧，向左调整
+    if (labelLeft + tagLabel.offsetWidth > window.innerWidth) {
+      labelLeft = window.innerWidth - tagLabel.offsetWidth - 5;
+    }
+    tagLabel.style.left = "".concat(Math.max(0, labelLeft), "px");
+    tagLabel.style.top = "".concat(labelTop, "px");
+
+    // 发送消息到父窗口
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 鼠标离开事件处理
+  function handleMouseOut(e) {
+    if (!highlightEnabled) return;
+    var relatedTarget = e.relatedTarget;
+
+    // 如果鼠标移动到高亮相关元素上，不隐藏高亮
+    if (relatedTarget && (relatedTarget === highlightBox || relatedTarget === tagLabel || relatedTarget === overlay || relatedTarget === selectedBox || relatedTarget === selectedLabel)) {
+      return;
+    }
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-hover",
+        data: null,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 点击事件处理
+  function handleClick(e) {
+    var target = e.target;
+    if (!target || target === overlay || target === highlightBox || target === tagLabel || target === selectedBox || target === selectedLabel) {
+      return;
+    }
+
+    // 避免处理 html 和 body 元素
+    if (target === document.documentElement || target === document.body) {
+      return;
+    }
+
+    // 检查是否是交互元素，这些元素需要保留默认行为
+    var isInteractiveElement = ['input', 'textarea', 'select', 'button', 'a'].includes(target.tagName.toLowerCase());
+
+    // 如果高亮功能启用，对于非交互元素阻止默认行为和事件传播
+    if (highlightEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    var rect = target.getBoundingClientRect();
+    var selector = getElementSelector(target);
+    var text = getElementText(target);
+    var attributes = getElementAttributes(target);
+    console.log("Element clicked:", {
+      tagName: target.tagName,
+      selector: selector,
+      rect: rect
+    });
+
+    // 立即更新选中高亮
+    updateSelectedHighlight(target);
+
+    // 隐藏悬停高亮，因为现在是选中状态
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    var elementInfo = {
+      tagName: target.tagName.toLowerCase(),
+      rect: {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        x: rect.x,
+        y: rect.y
+      },
+      selector: selector,
+      text: text,
+      attributes: attributes,
+      url: window.location.href,
+      path: window.location.pathname,
+      timestamp: Date.now()
+    };
+    try {
+      window.parent.postMessage({
+        type: "iframe-element-click",
+        data: elementInfo,
+        source: "iframe-highlight-injector"
+      }, "*");
+    } catch (error) {
+      console.warn("无法发送消息到父窗口:", error);
+    }
+  }
+
+  // 监听来自父窗口的消息
+  function handleParentMessage(event) {
+    console.log("Received message from parent:", event.data);
+    if (event.data.type === "iframe-highlight-toggle") {
+      var enabled = event.data.enabled;
+      console.log("Highlight toggle:", enabled);
+      if (enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "enable-iframe-highlight") {
+      console.log("Enable iframe highlight");
+      enableHighlight();
+    } else if (event.data.type === "disable-iframe-highlight") {
+      console.log("Disable iframe highlight");
+      disableHighlight();
+    } else if (event.data.type === "toggle-iframe-highlight") {
+      var _enabled = event.data.enabled !== undefined ? event.data.enabled : !highlightEnabled;
+      console.log("Toggle iframe highlight to:", _enabled);
+      if (_enabled) {
+        enableHighlight();
+      } else {
+        disableHighlight();
+      }
+    } else if (event.data.type === "update-selected-element") {
+      var selector = event.data.selector;
+      console.log("Update selected element with selector:", selector);
+      if (selector) {
+        try {
+          var element = document.querySelector(selector);
+          console.log("Found element by selector:", element);
+          updateSelectedHighlight(element);
+        } catch (error) {
+          console.warn("Failed to select element:", error);
+          updateSelectedHighlight(null);
+        }
+      } else {
+        updateSelectedHighlight(null);
+      }
+    } else if (event.data.type === "clear-selected-element") {
+      console.log("Clear selected element");
+      updateSelectedHighlight(null);
+    }
+  }
+
+  // 启用高亮功能
+  function enableHighlight() {
+    console.log("Enabling highlight");
+    document.addEventListener("mouseover", handleMouseOver, true);
+    document.addEventListener("mouseout", handleMouseOut, true);
+    document.addEventListener("click", handleClick, true);
+    highlightEnabled = true;
+    overlay.style.display = "block";
+  }
+
+  // 禁用高亮功能
+  function disableHighlight() {
+    console.log("Disabling highlight");
+    highlightEnabled = false;
+    // 保持事件监听器，但通过 highlightEnabled 变量控制行为
+    // 这样可以保留选中状态的显示
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    // 不隐藏 selectedBox 和 selectedLabel，保留选中状态
+  }
+
+  // 完全禁用高亮功能（移除所有监听器）
+  function fullyDisableHighlight() {
+    console.log("Fully disabling highlight");
+    highlightEnabled = false;
+    document.removeEventListener("mouseover", handleMouseOver, true);
+    document.removeEventListener("mouseout", handleMouseOut, true);
+    document.removeEventListener("click", handleClick, true);
+    overlay.style.display = "none";
+    highlightBox.style.display = "none";
+    tagLabel.style.display = "none";
+    selectedBox.style.display = "none";
+    selectedLabel.style.display = "none";
+  }
+
+  // 添加事件监听
+  enableHighlight();
+  window.addEventListener("message", handleParentMessage);
+
+  // 暴露全局函数供外部调用
+  window.__iframeHighlightControl = {
+    enable: enableHighlight,
+    disable: disableHighlight,
+    fullyDisable: fullyDisableHighlight,
+    isEnabled: function isEnabled() {
+      return highlightEnabled;
+    },
+    getSelectedElement: function getSelectedElement() {
+      return selectedElement;
+    },
+    updateSelected: updateSelectedHighlight,
+    // 通过消息发送开关控制
+    sendToggleMessage: function sendToggleMessage(enabled) {
+      window.parent.postMessage({
+        type: 'iframe-highlight-status',
+        enabled: enabled || highlightEnabled,
+        source: 'iframe-highlight-injector'
+      }, '*');
+    }
+  };
+
+  // 通知父窗口脚本已加载
+  try {
+    window.parent.postMessage({
+      type: "iframe-highlight-ready",
+      data: {
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now()
+      },
+      source: "iframe-highlight-injector"
+    }, "*");
+  } catch (error) {
+    console.warn("无法发送就绪消息到父窗口:", error);
+  }
+
+  // 清理函数
+  window.__iframeHighlightCleanup = function () {
+    fullyDisableHighlight();
+    window.removeEventListener("message", handleParentMessage);
+    if (overlay.parentElement) {
+      overlay.parentElement.removeChild(overlay);
+    }
+    delete window.__iframeHighlightInitialized;
+    delete window.__iframeHighlightCleanup;
+  };
+})();
+
 </script>
 </body>
 </html>
