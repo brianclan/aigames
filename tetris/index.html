@@ -79,7 +79,7 @@
   /* Controls */
   #controls {
     display: grid;
-    grid-template-columns: repeat(3, 60px);
+    grid-template-columns: repeat(4, 60px);
     grid-template-rows: repeat(2, 60px);
     gap: 6px;
     margin: 12px 0 8px;
@@ -101,7 +101,11 @@
   .btn.wide {
     grid-column: span 2;
   }
-  #btn-rotate { grid-column: 2; grid-row: 1; }
+  /* Row 1: [CCW-rotate] [empty] [CW-rotate] [hard-drop] */
+  #btn-rotate-ccw { grid-column: 1; grid-row: 1; font-size: 1rem; }
+  #btn-rotate     { grid-column: 3; grid-row: 1; }
+  #btn-hard-drop  { grid-column: 4; grid-row: 1; font-size: 1rem; color: #f97316; border-color: #f9731644; }
+  /* Row 2: [left] [down] [right] [empty] */
   #btn-left   { grid-column: 1; grid-row: 2; }
   #btn-down   { grid-column: 2; grid-row: 2; }
   #btn-right  { grid-column: 3; grid-row: 2; }
@@ -154,7 +158,10 @@
 </div>
 
 <div id="controls">
-  <div class="btn" id="btn-rotate">↑</div>
+  <div class="btn" id="btn-rotate-ccw" title="Rotate CCW">↺</div>
+  <!-- col 2 empty -->
+  <div class="btn" id="btn-rotate" title="Rotate CW">↻</div>
+  <div class="btn" id="btn-hard-drop" title="Hard Drop">⤓</div>
   <div class="btn" id="btn-left">←</div>
   <div class="btn" id="btn-down">↓</div>
   <div class="btn" id="btn-right">→</div>
@@ -223,7 +230,7 @@ function newBoard() {
 
 function randomPiece() {
   const id = Math.floor(Math.random() * 7) + 1;
-  return { id, shape: PIECES[id].map(r => [...r]) };
+  return { id, shape: PIECES[id].map(r => [...r]), rotState: 0 };
 }
 
 function initGame() {
@@ -267,7 +274,7 @@ function collides(shape, ox, oy) {
 }
 
 // ── Rotate ─────────────────────────────────────────────────
-function rotate(shape) {
+function rotateCW(shape) {
   const rows = shape.length, cols = shape[0].length;
   const result = Array.from({length: cols}, () => new Array(rows).fill(0));
   for (let r = 0; r < rows; r++)
@@ -276,18 +283,66 @@ function rotate(shape) {
   return result;
 }
 
-function tryRotate() {
-  const rotated = rotate(piece.shape);
-  // wall kick: try offsets 0, -1, +1, -2, +2
-  for (const dx of [0, -1, 1, -2, 2]) {
-    if (!collides(rotated, pieceX + dx, pieceY)) {
-      piece.shape = rotated;
+function rotateCCW(shape) {
+  // CCW = CW three times, or transpose + flip vertically
+  const rows = shape.length, cols = shape[0].length;
+  const result = Array.from({length: cols}, () => new Array(rows).fill(0));
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      result[cols - 1 - c][r] = shape[r][c];
+  return result;
+}
+
+// SRS wall kick offsets: [from_state] -> list of (dx, dy) to try
+// States: 0=spawn, 1=CW, 2=180, 3=CCW
+// JLSTZ pieces
+const SRS_KICK = {
+  '0>1': [ [0,0],[-1,0],[-1, 1],[0,-2],[-1,-2] ],
+  '1>0': [ [0,0],[ 1,0],[ 1,-1],[0, 2],[ 1, 2] ],
+  '1>2': [ [0,0],[ 1,0],[ 1,-1],[0, 2],[ 1, 2] ],
+  '2>1': [ [0,0],[-1,0],[-1, 1],[0,-2],[-1,-2] ],
+  '2>3': [ [0,0],[ 1,0],[ 1, 1],[0,-2],[ 1,-2] ],
+  '3>2': [ [0,0],[-1,0],[-1,-1],[0, 2],[-1, 2] ],
+  '3>0': [ [0,0],[-1,0],[-1,-1],[0, 2],[-1, 2] ],
+  '0>3': [ [0,0],[ 1,0],[ 1, 1],[0,-2],[ 1,-2] ],
+};
+// I piece has different kicks
+const SRS_KICK_I = {
+  '0>1': [ [0,0],[-2,0],[ 1,0],[-2,-1],[ 1, 2] ],
+  '1>0': [ [0,0],[ 2,0],[-1,0],[ 2, 1],[-1,-2] ],
+  '1>2': [ [0,0],[-1,0],[ 2,0],[-1, 2],[ 2,-1] ],
+  '2>1': [ [0,0],[ 1,0],[-2,0],[ 1,-2],[-2, 1] ],
+  '2>3': [ [0,0],[ 2,0],[-1,0],[ 2, 1],[-1,-2] ],
+  '3>2': [ [0,0],[-2,0],[ 1,0],[-2,-1],[ 1, 2] ],
+  '3>0': [ [0,0],[ 1,0],[-2,0],[ 1,-2],[-2, 1] ],
+  '0>3': [ [0,0],[-1,0],[ 2,0],[-1, 2],[ 2,-1] ],
+};
+
+function tryRotateDir(dir) {
+  // dir: +1 = CW, -1 = CCW
+  const newShape = dir === 1 ? rotateCW(piece.shape) : rotateCCW(piece.shape);
+  const fromState = piece.rotState;
+  const toState = ((fromState + (dir === 1 ? 1 : 3)) % 4);
+  const key = `${fromState}>${toState}`;
+  const table = piece.id === 1 ? SRS_KICK_I : SRS_KICK;
+  const kicks = table[key] || [[0,0]];
+
+  for (const [dx, dy] of kicks) {
+    // SRS dy: positive = up in standard coords, but canvas y is flipped
+    // In canvas: row increases downward, so dy offset is negated
+    if (!collides(newShape, pieceX + dx, pieceY - dy)) {
+      piece.shape = newShape;
       pieceX += dx;
+      pieceY -= dy;
+      piece.rotState = toState;
       draw();
       return;
     }
   }
 }
+
+function tryRotate()    { tryRotateDir(+1); }
+function tryRotateCCW() { tryRotateDir(-1); }
 
 // ── Movement ───────────────────────────────────────────────
 function moveLeft()  { if (!collides(piece.shape, pieceX-1, pieceY)) { pieceX--; draw(); } }
@@ -457,29 +512,27 @@ document.getElementById('start-btn').addEventListener('click', () => {
 document.addEventListener('keydown', e => {
   if (!running) return;
   switch(e.key) {
-    case 'ArrowLeft':  e.preventDefault(); moveLeft();  break;
-    case 'ArrowRight': e.preventDefault(); moveRight(); break;
-    case 'ArrowDown':  e.preventDefault(); softDrop();  break;
-    case 'ArrowUp':    e.preventDefault(); tryRotate(); break;
-    case ' ':          e.preventDefault(); hardDrop();  break;
+    case 'ArrowLeft':  e.preventDefault(); moveLeft();     break;
+    case 'ArrowRight': e.preventDefault(); moveRight();    break;
+    case 'ArrowDown':  e.preventDefault(); softDrop();     break;
+    case 'ArrowUp':    e.preventDefault(); tryRotate();    break;
+    case 'z': case 'Z': e.preventDefault(); tryRotateCCW(); break;
+    case ' ':          e.preventDefault(); hardDrop();     break;
   }
 });
 
 // ── Touch buttons ──────────────────────────────────────────
 function bindBtn(id, fn) {
   const el = document.getElementById(id);
+  if (!el) return;
   el.addEventListener('touchstart', e => { e.preventDefault(); if (running) fn(); }, {passive:false});
   el.addEventListener('mousedown',  e => { e.preventDefault(); if (running) fn(); });
 }
-bindBtn('btn-rotate', tryRotate);
-bindBtn('btn-left',   moveLeft);
-bindBtn('btn-right',  moveRight);
-bindBtn('btn-down',   softDrop);
 
-// Repeat for held left/right/down
 function bindRepeat(id, fn) {
-  let timer;
   const el = document.getElementById(id);
+  if (!el) return;
+  let timer;
   const start = e => {
     e.preventDefault();
     if (!running) return;
@@ -494,18 +547,16 @@ function bindRepeat(id, fn) {
   el.addEventListener('mouseup',    stop);
   el.addEventListener('mouseleave', stop);
 }
-// override btn-left/right/down with repeat
-['btn-left','btn-right','btn-down'].forEach(id => {
-  const el = document.getElementById(id);
-  // remove previous listeners by cloning
-  const clone = el.cloneNode(true);
-  el.parentNode.replaceChild(clone, el);
-});
+
+// Single-tap buttons
+bindBtn('btn-rotate',     tryRotate);
+bindBtn('btn-rotate-ccw', tryRotateCCW);
+bindBtn('btn-hard-drop',  hardDrop);
+
+// Hold-repeat buttons
 bindRepeat('btn-left',  moveLeft);
 bindRepeat('btn-right', moveRight);
 bindRepeat('btn-down',  softDrop);
-// rotate still uses single tap
-bindBtn('btn-rotate', tryRotate);
 
 // ── Swipe gestures on board ────────────────────────────────
 let touchStartX, touchStartY, touchLastX, swipeHandled;
