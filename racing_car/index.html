@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>赛车飞驰</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#1c1f26;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;display:flex;align-items:center;justify-content:center;}
+  canvas{border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:block;}
+</style>
+</head>
+<body>
+<canvas id="cv" width="400" height="560"></canvas>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+  function fit(){ var s=Math.min(window.innerWidth/400, window.innerHeight/560); cv.style.width=(400*s)+'px'; cv.style.height=(560*s)+'px'; }
+  fit(); window.addEventListener('resize',fit);
+  var W=400,H=560;
+  var laneW=W/3, car={lane:1,y:H-130,w:70,h:110};
+  var foes=[], score=0, dead=false, started=false, speed=5;
+  function reset(){ car.lane=1; foes=[]; score=0; dead=false; started=false; speed=5; }
+  function spawn(){ if(Math.random()<0.02){ var l=(Math.random()*3)|0; if(!foes.some(function(f){return f.lane===l&&f.y<80;})) foes.push({lane:l,y:-140,w:70,h:110}); } }
+  function steer(d){ if(dead){reset();return;} started=true; var nl=car.lane+d; if(nl>=0&&nl<=2) car.lane=nl; }
+  function step(){
+    if(dead) return;
+    if(started){
+      speed=Math.min(11,speed+0.01); score+=1;
+      spawn();
+      var cx=car.lane*laneW+laneW/2;
+      for(var i=foes.length-1;i>=0;i--){ var f=foes[i]; f.y+=speed; if(f.y>H+140) foes.splice(i,1); }
+      for(var j=0;j<foes.length;j++){ var o=foes[j]; var ox=o.lane*laneW+laneW/2;
+        if(Math.abs(ox-cx)<(car.w+o.w)/2-8 && o.y+o.h>car.y+12 && o.y<car.y+car.h-10){ dead=true; } }
+    }
+  }
+  function drawRoad(){
+    ctx.fillStyle='#3a3f4a'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#2c3038'; ctx.fillRect(0,0,W,H*0.06); ctx.fillRect(0,H*0.94,W,H*0.06);
+    for(var i=0;i<2;i++){ ctx.fillStyle='#fff'; ctx.fillRect((i+1)*laneW-3,0,6,H); }
+    var off=(performance.now()/30)%60;
+    ctx.fillStyle='#e8e8e8';
+    for(var y=-60;y<H;y+=60){ ctx.fillRect(laneW/2-6,y+off,12,32); ctx.fillRect(laneW*1.5-6,y+off,12,32); ctx.fillRect(laneW*2.5-6,y+off,12,32); }
+  }
+  function drawCar(x,y,w,h,body,roof,glass){
+    ctx.fillStyle='#1a1a1a'; ctx.beginPath(); ctx.moveTo(x+8,y+h);ctx.lineTo(x+2,y+h-20);ctx.lineTo(x+w-2,y+h-20);ctx.lineTo(x+w-8,y+h);ctx.closePath();ctx.fill();
+    ctx.fillStyle=body; ctx.fillRect(x+4,y+h-96,w-8,h-24);
+    ctx.fillStyle=glass; ctx.fillRect(x+12,y+h-96,w-24,h-34);
+    ctx.fillStyle=roof; ctx.fillRect(x+2,y+h-70,w-4,10);
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(x+12,y+h-14,9,0,7);ctx.arc(x+w-12,y+h-14,9,0,7);ctx.fill();
+    ctx.fillStyle='#ffd166'; ctx.beginPath(); ctx.arc(x+12,y+h-14,4,0,7);ctx.arc(x+w-12,y+h-14,4,0,7);ctx.fill();
+  }
+  function draw(){
+    drawRoad();
+    for(var i=0;i<foes.length;i++){ var f=foes[i]; drawCar(f.lane*laneW+laneW/2-f.w/2, f.y, f.w, f.h, '#e74c3c','#c0392b','#ffd9d9'); }
+    drawCar(car.lane*laneW+laneW/2-car.w/2, car.y, car.w, car.h, '#3498db','#217dbb','#bfe6ff');
+    ctx.fillStyle='#fff'; ctx.font='bold 18px system-ui'; ctx.textAlign='left';
+    ctx.fillText('🏁 '+score, 12, 28);
+    if(!started&&!dead){ ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#fff'; ctx.font='bold 26px system-ui'; ctx.textAlign='center';
+      ctx.fillText('🏎️ 赛车飞驰', W/2, H/2-20); ctx.font='14px system-ui';
+      ctx.fillText('点按左/右半边屏幕变道 · 躲避红色车辆', W/2, H/2+12); }
+    if(dead){ ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(0,H/2-30,W,60);
+      ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui'; ctx.textAlign='center';
+      ctx.fillText('撞车了! 得分 '+score, W/2, H/2+8); ctx.font='13px system-ui'; ctx.fillText('点击重新开始', W/2, H/2+28); }
+  }
+  var last=0;
+  function loop(ts){ if(ts-last>15){ step(); draw(); last=ts; } requestAnimationFrame(loop); }
+  function press(e){ e.preventDefault();
+    var x=(e.clientX!==undefined?e.clientX:e.touches[0].clientX);
+    var r=cv.getBoundingClientRect(); var px=(x-r.left)/r.width;
+    steer(px<0.5?-1:1);
+  }
+  cv.addEventListener('touchstart',press,{passive:false});
+  cv.addEventListener('mousedown',press);
+  cv.addEventListener('contextmenu',function(e){e.preventDefault();});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')steer(-1); else if(e.key==='ArrowRight')steer(1);
+    else if(e.key===' '){e.preventDefault(); started=true;}
+  });
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
