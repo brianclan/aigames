@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>连连看</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#2e4a62;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;display:flex;align-items:center;justify-content:center;}
+  canvas{border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);display:block;}
+</style>
+</head>
+<body>
+<canvas id="cv" width="420" height="460"></canvas>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+  function fit(){ var s=Math.min(window.innerWidth/420, window.innerHeight/460); cv.style.width=(420*s)+'px'; cv.style.height=(460*s)+'px'; }
+  fit(); window.addEventListener('resize',fit);
+  var W=420,H=460, cols=6, rows=6, CELL=56, PAD=36;
+  var emojis=['🍎','🍊','🍇','🍓','🍒','🍉','🍌','🥝','🍍','🥥'];
+  var grid=[], sel=null, dragLine=null, matched=0, total=0, dead=false;
+  function idx(x,y){ return y*cols+x; }
+  function init(){
+    var cells=[]; matched=0;
+    var n=cols*rows;
+    for(var r=0;r<n/2;r++){ var e=emojis[r%emojis.length]; cells.push(e,e); }
+    // shuffle
+    for(var i=n-1;i>0;i--){ var j=(Math.random()*(i+1))|0; var t=cells[i];cells[i]=cells[j];cells[j]=t; }
+    grid=[]; total=0;
+    for(var y=0;y<rows;y++){ grid[y]=[]; for(var x=0;x<cols;x++){ grid[y][x]={e:cells[idx(x,y)],x:x,y:y,dead:false}; total++; } }
+    // ensure solvable-ish: keep reshuffling until at least one pair connectable
+    for(var tries=0;tries<12;tries++){ if(findAnyPair()) break; shuffleGrid(); }
+    sel=null; dead=false;
+  }
+  function shuffleGrid(){ var cs=[]; for(var y=0;y<rows;y++)for(var x=0;x<cols;x++) if(!grid[y][x].dead) cs.push(grid[y][x].e);
+    for(var i=cs.length-1;i>0;i--){var j=(Math.random()*(i+1))|0;var t=cs[i];cs[i]=cs[j];cs[j]=t;}
+    var k=0; for(var y2=0;y2<rows;y2++)for(var x2=0;x2<cols;x2++) if(!grid[y2][x2].dead) grid[y2][x2].e=cs[k++]; }
+  function findAnyPair(){ for(var y=0;y<rows;y++)for(var x=0;x<cols;x++){var a=grid[y][x]; if(a.dead)continue;
+    for(var y2=0;y2<rows;y2++)for(var x2=0;x2<cols;x2++){var b=grid[y2][x2]; if(b.dead||(x===x2&&y===y2))continue;
+      if(a.e===b.e&&canConnect(a,b)) return true; } } return false; }
+  function canConnect(a,b){
+    if(a.e!==b.e) return false;
+    if(a.x===b.x){ var mn=Math.min(a.y,b.y),mx=Math.max(a.y,b.y),ok=true;
+      for(var yy=mn+1;yy<mx;yy++){ if(!grid[yy][a.x].dead){ok=false;break;} } if(ok) return true; }
+    if(a.y===b.y){ var mn2=Math.min(a.x,b.x),mx2=Math.max(a.x,b.x),ok2=true;
+      for(var xx=mn2+1;xx<mx2;xx++){ if(!grid[a.y][xx].dead){ok2=false;break;} } if(ok2) return true; }
+    // one corner
+    if(a.x!==b.x&&a.y!==b.y){
+      if(grid[a.y][b.x].dead){ var ok3=true;
+        for(var yy2=Math.min(a.y,b.y);yy2<=Math.max(a.y,b.y);yy2++){ if(!grid[yy2][b.x].dead&&!(yy2===a.y&&b.x===a.x)&&!(yy2===b.y)){ok3=false;break;} }
+        for(var xx3=Math.min(a.x,b.x);xx3<=Math.max(a.x,b.x);xx3++){ if(!grid[a.y][xx3].dead&&!(xx3===a.x)&&!(a.y===b.y&&xx3===b.x)){ok3=false;break;} }
+        if(ok3) return true; }
+      if(grid[b.y][a.x].dead){ var ok4=true;
+        for(var yy3=Math.min(a.y,b.y);yy3<=Math.max(a.y,b.y);yy3++){ if(!grid[yy3][a.x].dead&&!(yy3===a.y)&&!(a.x===b.x&&yy3===b.y)){ok4=false;break;} }
+        for(var xx4=Math.min(a.x,b.x);xx4<=Math.max(a.x,b.x);xx4++){ if(!grid[b.y][xx4].dead&&!(xx4===b.x)&&!(b.y===a.y&&xx4===a.x)){ok4=false;break;} }
+        if(ok4) return true; }
+    }
+    return false;
+  }
+  function cellCenter(c){ return {x:PAD+c.x*CELL+CELL/2, y:PAD+c.y*CELL+CELL/2}; }
+  function cellAt(px,py){ var x=Math.floor((px-PAD)/CELL), y=Math.floor((py-PAD)/CELL);
+    if(x<0||x>=cols||y<0||y>=rows) return null; return grid[y][x]; }
+  function tryMatch(a,b){
+    if(a===b) return false;
+    if(a.e===b.e&&canConnect(a,b)){
+      a.dead=b.dead=true; matched+=2; sel=null;
+      if(matched>=total){ dead=true; }
+      return true;
+    }
+    return false;
+  }
+  function draw(){
+    ctx.fillStyle='#e8f1f8'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#8fb3cc';
+    for(var x=0;x<cols;x++)for(var y=0;y<rows;y++){
+      ctx.fillStyle='#cfe3f0'; ctx.strokeStyle='#a9c6d8'; ctx.lineWidth=1;
+      roundRect(PAD+x*CELL+2,PAD+y*CELL+2,CELL-4,CELL-4,8); ctx.fill(); ctx.stroke(); }
+    for(var y2=0;y2<rows;y2++)for(var x2=0;x2<cols;x2++){ var c=grid[y2][x2];
+      if(c.dead) continue;
+      ctx.font='30px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(c.e, PAD+x2*CELL+CELL/2, PAD+y2*CELL+CELL/2+2); }
+    if(sel&&!sel.dead){ var sc=cellCenter(sel);
+      ctx.strokeStyle='#2ba3e0'; ctx.lineWidth=3; roundRect(PAD+sel.x*CELL+2,PAD+sel.y*CELL+2,CELL-4,CELL-4,8); ctx.stroke(); }
+    if(dragLine&&dragLine.a&&!dragLine.a.dead&&dragLine.b){ var p1=cellCenter(dragLine.a);
+      ctx.strokeStyle='rgba(46,204,113,.95)'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(dragLine.b.x,dragLine.b.y); ctx.stroke();
+      ctx.strokeStyle='#2ecc71'; ctx.lineWidth=8; ctx.beginPath(); ctx.arc(p1.x,p1.y,7,0,7);ctx.stroke(); }
+    ctx.fillStyle='#fff'; ctx.font='bold 16px system-ui'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=4;
+    ctx.fillText('🧩 连连看  '+(total-matched)+'/'+total, 10, 8);
+    ctx.shadowBlur=0;
+    if(dead){ ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(0,H/2-30,W,60);
+      ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui'; ctx.textAlign='center';
+      ctx.fillText('🎉 全部消除! 点击重新开始', W/2, H/2+8); }
+  }
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  // ---- Touch / mouse drag ----
+  function pos(e){ var r=cv.getBoundingClientRect();
+    var cx=(e.clientX!==undefined?e.clientX:e.touches[0].clientX), cy=(e.clientY!==undefined?e.clientY:e.touches[0].clientY);
+    return {x:(cx-r.left)*(W/r.width), y:(cy-r.top)*(H/r.height)}; }
+  function down(e){ e.preventDefault(); if(dead){ init(); return; }
+    var p=pos(e); var c=cellAt(p.x,p.y); if(!c||c.dead) return;
+    dragLine={a:c,b:null}; sel=c; }
+  function move(e){ e.preventDefault(); if(!dragLine) return;
+    var p=pos(e); dragLine.b=p;
+    var c=cellAt(p.x,p.y);
+    if(c&&!c.dead&&c!==dragLine.a&&dragLine.a.e===c.e){ if(tryMatch(dragLine.a,c)){ dragLine=null; } } }
+  function up(e){ e.preventDefault(); dragLine=null; }
+  cv.addEventListener('touchstart',down,{passive:false});
+  cv.addEventListener('touchmove',move,{passive:false});
+  cv.addEventListener('touchend',up,{passive:false});
+  cv.addEventListener('mousedown',down);
+  cv.addEventListener('mousemove',move);
+  cv.addEventListener('mouseup',up);
+  cv.addEventListener('contextmenu',function(e){e.preventDefault();});
+  init(); requestAnimationFrame(function loop(){ draw(); requestAnimationFrame(loop); });
+})();
+</script>
+</body>
+</html>
