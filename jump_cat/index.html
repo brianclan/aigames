@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>跳跳猫</title>
+<style>
+  html,body{margin:0;padding:0;background:#ffd94d;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;height:100%;display:flex;align-items:center;justify-content:center;}
+  canvas{border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);background:#7ec8f7;display:block;}
+</style>
+</head>
+<body>
+<canvas id="cv" width="400" height="300"></canvas>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+  // scale to fit screen while keeping 400x300 logical
+  function fit(){ var s=Math.min(window.innerWidth/400, window.innerHeight/300); cv.style.width=(400*s)+'px'; cv.style.height=(300*s)+'px'; }
+  fit(); window.addEventListener('resize',fit);
+  var W=400,H=300;
+  var cat={x:90,y:170,w:34,h:34,vy:0}, GROUND=245, jumpPw=-9.2;
+  var obs=[], score=0, dead=false, started=false, speed=3.4;
+  var GRAV=0.55;
+  function reset(){ cat.y=GROUND-cat.h; cat.vy=0; obs=[]; score=0; dead=false; started=false; speed=3.4; }
+  function spawn(){ if(Math.random()<0.012 || (obs.length&&obs[obs.length-1].x<W-230)) return; var h=24+Math.random()*44; obs.push({x:W,y:GROUND-h,w:20,h:h,scored:false}); }
+  function jump(){ if(dead){ reset(); return; } started=true; if(cat.y>=GROUND-cat.h-1){ cat.vy=jumpPw; } }
+  function step(){
+    if(dead) return;
+    if(started){
+      speed=Math.min(7, speed+0.0016);
+      cat.vy+=GRAV; cat.y+=cat.vy;
+      if(cat.y>GROUND-cat.h){ cat.y=GROUND-cat.h; cat.vy=0; }
+      if(cat.y<0){ cat.y=0; cat.vy=0; }
+      spawn();
+      for(var i=obs.length-1;i>=0;i--){ var o=obs[i]; o.x-=speed; if(!o.scored&&o.x+o.w<cat.x){ o.scored=true; score++; } if(o.x+o.w<0) obs.splice(i,1); }
+      // collision
+      for(var i2=0;i2<obs.length;i2++){ var b=obs[i2];
+        if(cat.x+6<b.x+b.w && cat.x+cat.w-6>b.x && cat.y+6<b.y+b.h && cat.y+cat.h-6>b.y){ dead=true; }
+      }
+    }
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // sun & clouds
+    ctx.fillStyle='#fff3a0'; ctx.beginPath(); ctx.arc(60,45,22,0,7); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(150,40,14,0,7);ctx.arc(172,46,10,0,7);ctx.fill();
+    // ground
+    ctx.fillStyle='#67c25c'; ctx.fillRect(0,GROUND,W,H-GROUND);
+    ctx.fillStyle='#4da344'; ctx.fillRect(0,GROUND,W,5);
+    // obstacles (boxes)
+    for(var i=0;i<obs.length;i++){ var o=obs[i]; ctx.fillStyle='#b5651d'; ctx.fillRect(o.x,o.y,o.w,o.h);
+      ctx.strokeStyle='#8a4a10'; ctx.lineWidth=2; ctx.strokeRect(o.x+2,o.y+2,o.w-4,o.h-4); }
+    // cat
+    var c=cat;
+    ctx.fillStyle='#f4a93b'; ctx.fillRect(c.x,c.y,c.w,c.h); // body
+    ctx.fillStyle='#e08a1f'; ctx.fillRect(c.x-6,c.y+8,6,14); ctx.fillRect(c.x+c.w,c.y+8,6,14); // legs
+    ctx.fillStyle='#f4a93b'; // head
+    ctx.beginPath(); ctx.arc(c.x+c.w/2,c.y-4,15,0,7); ctx.fill();
+    // ears
+    ctx.beginPath(); ctx.moveTo(c.x+c.w/2-13,c.y-12);ctx.lineTo(c.x+c.w/2-7,c.y-26);ctx.lineTo(c.x+c.w/2-1,c.y-12);ctx.fill();
+    ctx.beginPath(); ctx.moveTo(c.x+c.w/2+1,c.y-12);ctx.lineTo(c.x+c.w/2+7,c.y-26);ctx.lineTo(c.x+c.w/2+13,c.y-12);ctx.fill();
+    // eyes & mouth
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(c.x+c.w/2-6,c.y-6,2.4,0,7);ctx.arc(c.x+c.w/2+6,c.y-6,2.4,0,7);ctx.fill();
+    ctx.strokeStyle='#222'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(c.x+c.w/2-3,c.y);ctx.quadraticCurveTo(c.x+c.w/2,c.y+4,c.x+c.w/2+3,c.y);ctx.stroke();
+    // tail
+    ctx.strokeStyle='#f4a93b'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(c.x-2,c.y+6);ctx.quadraticCurveTo(c.x-16,c.y-6,c.x-10,c.y-20);ctx.stroke();
+    ctx.fillStyle='#222'; ctx.font='bold 15px system-ui'; ctx.textAlign='left';
+    ctx.fillText('🍣 x'+score, 8, 24);
+    if(!started&&!dead){ ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui'; ctx.textAlign='center';
+      ctx.fillText('🐱 跳跳猫', W/2, H/2-14); ctx.font='13px system-ui'; ctx.fillText('点击屏幕让小猫咪跳跃', W/2, H/2+12); }
+    if(dead){ ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(0,H/2-26,W,52);
+      ctx.fillStyle='#fff'; ctx.font='bold 20px system-ui'; ctx.textAlign='center';
+      ctx.fillText('哎呀! 得分 '+score, W/2, H/2+7); ctx.font='12px system-ui'; ctx.fillText('点击重新开始', W/2, H/2+24); }
+  }
+  var last=0;
+  function loop(ts){ if(ts-last>15){ step(); draw(); last=ts; } requestAnimationFrame(loop); }
+  function press(e){ e.preventDefault(); jump(); }
+  cv.addEventListener('touchstart',press,{passive:false});
+  cv.addEventListener('mousedown',press);
+  cv.addEventListener('contextmenu',function(e){e.preventDefault();});
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
