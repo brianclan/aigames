@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Jumping Ball</title>
+  <style>
+    #canvas {
+      background-color: #eee;
+      width: 400px;
+      height: 300px;
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let ball = { x: 50, y: canvas.height - 20, size: 20, speed: 0, gravity: 1, yVelocity: 0, jumpStrength: 15 ;
+    function drawBall() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'blue';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    function update() {
+      if (ball.y + ball.size >= canvas.height) {
+        ball.y = canvas.height - ball.size;
+       else {
+        ball.yVelocity += ball.gravity;
+        ball.y += ball.yVelocity;
+      }
+      drawBall();
+    }
+    function jump() {
+      ball.yVelocity = -ball.jumpStrength;
+    }
+    canvas.addEventListener('touchstart', jump, false);
+
+    setInterval(update, 20);
+  </script>
+</body>
+</html>
