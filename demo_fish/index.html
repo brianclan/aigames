@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>贪吃鱼</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0a2a4a;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;}
+  #wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;}
+  canvas{background:linear-gradient(#0a2a4a,#0e3d66);border-radius:8px;box-shadow:0 0 24px rgba(0,200,255,.35);}
+  #hud{color:#9fe8ff;font:bold 16px/1.4 system-ui,sans-serif;text-align:center;margin-bottom:8px;width:100%;}
+  #tip{color:#5fa8cc;font:12px system-ui,sans-serif;margin-top:8px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">🐟 贪吃鱼 &nbsp; 得分 <span id="score">0</span></div>
+  <canvas id="cv"></canvas>
+  <div id="tip">滑动屏幕改变方向 · 点击暂停/继续</div>
+</div>
+<script>
+(function(){
+  var cv=document.getElementById('cv'),ctx=cv.getContext('2d'),sc=document.getElementById('score');
+  var CW=Math.min(window.innerWidth-8, 420), CH=Math.min(window.innerHeight-170, 560);
+  cv.width=CW; cv.height=CH;
+  var S=Math.max(14, Math.floor(CW/22)); // cell
+  var COLS=Math.floor(CW/S), ROWS=Math.floor(CH/S);
+  var dir={x:1,y:0},nextDir={x:1,y:0},food=null,dead=false,paused=false,score=0;
+  var fish=[];
+  function randFood(){ while(true){ var f={x:(Math.random()*COLS)|0,y:(Math.random()*ROWS)|0}; if(!fish.some(function(p){return p.x===f.x&&p.y===f.y;})) return f; } }
+  function reset(){ fish=[]; for(var i=0;i<4;i++) fish.push({x:8-i,y:8}); dir={x:1,y:0}; nextDir={x:1,y:0}; dead=false; paused=false; score=0; sc.textContent=0; food=randFood(); }
+  function step(){
+    if(dead||paused) return;
+    dir=nextDir;
+    var h={x:fish[0].x+dir.x, y:fish[0].y+dir.y};
+    if(h.x<0)h.x=COLS-1; if(h.x>=COLS)h.x=0; if(h.y<0)h.y=ROWS-1; if(h.y>=ROWS)h.y=0;
+    for(var i=0;i<fish.length;i++){ if(fish[i].x===h.x&&fish[i].y===h.y){ dead=true; return; } }
+    fish.unshift(h);
+    if(h.x===food.x&&h.y===food.y){ score+=10; sc.textContent=score; food=randFood(); }
+    else fish.pop();
+  }
+  function draw(){
+    ctx.clearRect(0,0,CW,CH);
+    ctx.strokeStyle='rgba(255,255,255,.04)';
+    for(var x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*S+0.5,0);ctx.lineTo(x*S+0.5,CH);ctx.stroke();}
+    for(var y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*S+0.5);ctx.lineTo(CW,y*S+0.5);ctx.stroke();}
+    // food
+    ctx.fillStyle='#ffd166';
+    ctx.beginPath(); ctx.arc(food.x*S+S/2, food.y*S+S/2, S*0.32, 0, Math.PI*2); ctx.fill();
+    // fish body (gradient head->tail)
+    for(var i=fish.length-1;i>=0;i--){
+      var p=fish[i], t=i===0?0:Math.min(1,i/8);
+      var r=Math.round(60+190*(1-t)), g=Math.round(200-120*t), b=Math.round(140);
+      ctx.fillStyle='rgb('+r+','+g+','+b+')';
+      var cx=p.x*S+S/2, cy=p.y*S+S/2;
+      if(i===0){ ctx.fillStyle='#ffe08a'; }
+      ctx.beginPath(); ctx.arc(cx,cy,S*0.42,0,Math.PI*2); ctx.fill();
+    }
+    // eye on head
+    var hd=fish[0];
+    ctx.fillStyle='#123';
+    ctx.beginPath(); ctx.arc(hd.x*S+S/2+dir.x*S*0.18, hd.y*S+S/2+dir.y*S*0.18, S*0.12, 0, Math.PI*2); ctx.fill();
+    if(dead){ ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(0,CH/2-30,CW,60);
+      ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui'; ctx.textAlign='center';
+      ctx.fillText('游戏结束 得分 '+score, CW/2, CH/2+8);
+      ctx.fillStyle='#9fe8ff'; ctx.font='14px system-ui'; ctx.fillText('点击重新开始', CW/2, CH/2+30); }
+    if(paused&&!dead){ ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(0,CH/2-24,CW,48);
+      ctx.fillStyle='#fff'; ctx.font='bold 20px system-ui'; ctx.textAlign='center'; ctx.fillText('已暂停', CW/2, CH/2+7); }
+  }
+  var last=0;
+  function loop(ts){ var dt=ts-last; if(dt>120){ step(); last=ts; draw(); } requestAnimationFrame(loop); }
+  // ---- Touch / mouse ----
+  var t0=null;
+  function onDown(e){ e.preventDefault(); paused=false; if(dead){ reset(); return; } t0={x:e.clientX||e.touches[0].clientX, y:e.clientY||e.touches[0].clientY}; }
+  function onMove(e){ e.preventDefault(); }
+  function onUp(e){
+    e.preventDefault();
+    if(t0){
+      var x=(e.clientX!==undefined?e.clientX:e.changedTouches[0].clientX);
+      var y=(e.clientY!==undefined?e.clientY:e.changedTouches[0].clientY);
+      var dx=x-t0.x, dy=y-t0.y;
+      if(Math.abs(dx)>14||Math.abs(dy)>14){
+        if(Math.abs(dx)>Math.abs(dy)) nextDir={x:dx>0?1:-1,y:0};
+        else nextDir={x:0,y:dy>0?1:-1};
+        t0=null; return;
+      }
+      t0=null; paused=!paused; // tap = pause toggle
+    }
+  }
+  cv.addEventListener('touchstart',onDown,{passive:false});
+  cv.addEventListener('touchmove',onMove,{passive:false});
+  cv.addEventListener('touchend',onUp,{passive:false});
+  cv.addEventListener('mousedown',function(e){onDown({preventDefault:function(){},clientX:e.clientX,clientY:e.clientY,touches:[e]});});
+  cv.addEventListener('mouseup',function(e){onUp({preventDefault:function(){},clientX:e.clientX,clientY:e.clientY,changedTouches:[e]});});
+  cv.addEventListener('contextmenu',function(e){e.preventDefault();});
+  // keyboard fallback
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowUp')nextDir={x:0,y:-1};
+    else if(e.key==='ArrowDown')nextDir={x:0,y:1};
+    else if(e.key==='ArrowLeft')nextDir={x:-1,y:0};
+    else if(e.key==='ArrowRight')nextDir={x:1,y:0};
+    else if(e.key===' '){e.preventDefault(); paused=!paused;}
+  });
+  reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
