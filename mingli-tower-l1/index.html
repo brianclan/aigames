@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>名理之塔 · 名实之门</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:"Songti SC","Source Han Serif SC","Noto Serif CJK SC",Georgia,serif;
+  background:#ece7dc;color:#211d18;line-height:1.85;font-size:16px;
+  -webkit-font-smoothing:antialiased;
+}
+.ui{font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+#app{max-width:520px;margin:0 auto;min-height:100%;background:#f7f3ea;position:relative;
+  box-shadow:0 0 0 1px rgba(33,29,24,.08)}
+#hud{position:sticky;top:0;z-index:20;background:rgba(247,243,234,.94);
+  backdrop-filter:saturate(1.2) blur(8px);
+  border-bottom:1px solid rgba(33,29,24,.1);padding:8px 14px;
+  display:flex;align-items:center;gap:10px;font-size:12px}
+#hud .lv{font-weight:600;letter-spacing:.04em;flex:1;color:#2f5d54}
+#hud .chip{border:1px solid rgba(33,29,24,.18);border-radius:999px;padding:2px 9px;
+  color:#5a5248;white-space:nowrap;cursor:pointer}
+#hud .chip.on{background:#2f5d54;border-color:#2f5d54;color:#fff}
+#stage{padding:20px 20px 96px;min-height:60vh}
+.fade{animation:fi .5s ease both}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+h2.sc{margin:0 0 4px;font-size:13px;letter-spacing:.18em;color:#8a7f70;font-weight:500}
+h1.ct{margin:0 0 18px;font-size:22px;line-height:1.5;font-weight:600;letter-spacing:.02em}
+p{margin:0 0 15px}
+p.ind{text-indent:2em}
+.hook{margin:22px 0 0;padding:14px 16px;border-left:2px solid #2f5d54;
+  background:rgba(47,93,84,.06);font-size:15px;color:#3b3427}
+.note{margin:16px 0;padding:11px 14px;background:#efe9dc;border:1px solid rgba(33,29,24,.09);
+  border-radius:6px;font-size:14px;line-height:1.75}
+.note b{font-weight:600;color:#2f5d54}
+.note.sys{background:#e8eef0;border-color:rgba(47,93,84,.14)}
+.tip{margin:18px 0;padding:12px 14px;border:1px dashed rgba(150,72,26,.45);
+  background:rgba(186,117,23,.06);border-radius:6px;font-size:13.5px;color:#6b4a1c}
+.tip::before{content:"教学提示 · ";font-weight:600;color:#8a5212}
+.tip.hide{display:none}
+.btn{display:block;width:100%;margin:24px 0 0;padding:13px 16px;
+  border:1px solid rgba(33,29,24,.22);background:transparent;border-radius:8px;
+  font-family:inherit;font-size:16px;color:#211d18;text-align:center;cursor:pointer}
+.btn:active{background:rgba(33,29,24,.05)}
+.btn.pri{background:#2f5d54;border-color:#2f5d54;color:#fff}
+.btn.pri:active{background:#25483f}
+.btn.sm{margin:10px 0 0;font-size:14px;padding:10px}
+/* 无名之海 / 夜 / 纸 三种色调 */
+.tone-night{background:#211d18;color:#e9e2d2}
+.tone-night .note{background:#2b2621;border-color:rgba(233,226,210,.14);color:#cfc7b6}
+.tone-night .note.sys{background:#26302f;color:#c6d2cd}
+.tone-night .hook{background:rgba(233,226,210,.08);border-left-color:#9dcfc2;color:#e2dbcc}
+.tone-night h2.sc{color:#8d8577}
+.tone-night .opt{border-color:rgba(233,226,210,.22);color:#e9e2d2}
+.tone-night #hud{background:rgba(33,29,24,.9);border-bottom-color:rgba(233,226,210,.16)}
+.tone-night #hud .lv{color:#9dcfc2}
+.tone-night #hud .chip{border-color:rgba(233,226,210,.3);color:#cfc7b6}
+.tone-night #app{background:#211d18}
+.tone-night .btn{border-color:rgba(233,226,210,.3);color:#e9e2d2}
+.tone-night .btn.pri{background:#9dcfc2;border-color:#9dcfc2;color:#16302a}
+.tone-deep #app{background:#efeae0}
+/* 探索点 */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 4px}
+.hot{border:1px solid rgba(33,29,24,.18);border-radius:8px;padding:12px 12px;cursor:pointer;
+  font-size:14px;line-height:1.6;background:transparent;font-family:inherit;color:inherit;text-align:left}
+.hot.done{border-color:rgba(47,93,84,.5);background:rgba(47,93,84,.07)}
+.hot .n{display:block;font-size:11px;color:#8a7f70;letter-spacing:.1em;margin-bottom:3px}
+.hot.done .n{color:#2f5d54}
+/* 门 */
+.door{border-radius:8px;padding:18px 16px 4px;margin:0 0 18px;position:relative;overflow:hidden}
+.door.L{background:#eef2ef;border:1px solid rgba(47,93,84,.28)}
+.door.R{background:#f6efe6;border:1px solid rgba(150,93,40,.28)}
+.door .dh{font-size:11.5px;letter-spacing:.16em;margin-bottom:10px;font-weight:600}
+.door.L .dh{color:#2f5d54}
+.door.R .dh{color:#965d28}
+.door .q{font-size:17px;line-height:1.75;margin:0 0 4px}
+.opt{display:block;width:100%;text-align:left;margin:9px 0 0;padding:12px 14px;
+  border:1px solid rgba(33,29,24,.2);border-radius:8px;background:transparent;
+  font-family:inherit;font-size:15.5px;line-height:1.65;color:inherit;cursor:pointer}
+.opt:active{background:rgba(33,29,24,.05)}
+.opt.sel{border-color:#2f5d54;border-width:2px;padding:11px 13px;background:rgba(47,93,84,.07)}
+.opt.ok{border-color:#3f7a3f;background:rgba(63,122,63,.12)}
+.opt.bad{border-color:#a33b34;background:rgba(163,59,52,.09)}
+.rub{margin:16px 0 0;font-size:15px;line-height:1.85;padding:14px 15px;border-radius:8px;background:rgba(163,59,52,.08)}
+.rub.good{background:rgba(63,122,63,.09)}
+.rub .who{font-size:12px;letter-spacing:.1em;color:#8a7f70;margin-bottom:6px;display:block}
+.dlg{margin:0 0 14px;padding:12px 14px;border-left:2px solid;background:rgba(247,243,234,.5)}
+.dlg .who{font-size:12px;letter-spacing:.12em;margin-bottom:5px;display:block;opacity:.75}
+.tone-night .dlg{background:rgba(255,255,255,.05)}
+textarea{width:100%;min-height:88px;border:1px solid rgba(33,29,24,.22);border-radius:8px;
+  background:transparent;color:inherit;font-family:inherit;font-size:15px;padding:12px;line-height:1.7}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0 4px}
+.stat div{background:#efe9dc;border-radius:8px;padding:12px 14px}
+.stat .l{font-size:11.5px;color:#8a7f70;letter-spacing:.08em}
+.stat .v{font-size:22px;font-weight:600;margin-top:2px}
+.tone-night .stat div{background:#2b2621}
+.kv{margin:14px 0 0;font-size:14px;line-height:1.9}
+.kv span{color:#8a7f70;font-size:12px;letter-spacing:.1em;display:block;margin-top:10px}
+.foot{padding:0 20px 40px;font-size:12px;color:#8a7f70;line-height:1.9}
+.prog{height:2px;background:rgba(33,29,24,.08);position:sticky;top:38px;z-index:19}
+.prog i{display:block;height:100%;background:#2f5d54;transition:width .4s}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <span class="lv" id="hLv">第一层 · 名实之门</span>
+    <span class="chip" id="hScar">裂痕 0</span>
+    <span class="chip on" id="hTip">教学</span>
+    <span class="chip" id="hMenu">≡</span>
+  </div>
+  <div class="prog"><i id="pBar" style="width:0%"></i></div>
+  <div id="stage"></div>
+</div>
+<script>
+const KEY='mll1_v1';
+let S={i:0,scars:0,ding:0,bag:[],seen:[],tip:true,wrong:{}};
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&typeof o.i==='number')S=Object.assign(S,o)}}catch(e){}}
+const $=s=>document.querySelector(s);
+const stage=$('#stage');
+function hud(){
+  $('#hScar').textContent='裂痕 '+S.scars;
+  $('#hTip').className='chip'+(S.tip?' on':'');
+  $('#hTip').textContent=S.tip?'教学':'教学 ·关';
+  const done=S.seen.length,n=DATA.length;
+  $('#pBar').style.width=(Math.min(100,Math.round(done/n*100)))+'%';
+}
+function body(){return document.body}
+function tone(t){document.body.className=t?('tone-'+t):''}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function ps(arr,cls){return arr.map((t,i)=>'<p'+(cls?' class="'+cls+'"':'')+' style="animation-delay:'+(i*70)+'ms">'+t+'</p>').join('')}
+
+/* ---------- 场景渲染 ---------- */
+function render(){
+  const sc=DATA[S.i];tone(sc.tone||'');hud();
+  let html='';
+  if(sc.type==='title')html=rTitle(sc);
+  else if(sc.type==='prose')html=rProse(sc);
+  else if(sc.type==='input')html=rInput(sc);
+  else if(sc.type==='explore')html=rExplore(sc);
+  else if(sc.type==='quiz')html=rQuiz(sc,0,false);
+  else if(sc.type==='boss')html=rBoss(sc,0,false,null);
+  else if(sc.type==='reveal')html=rReveal(sc);
+  else if(sc.type==='summary')html=rSummary(sc);
+  stage.innerHTML='<div class="fade">'+html+'</div>';
+  bind(sc);
+  stage.scrollIntoView?0:0;
+}
+function mark(){if(!S.seen.includes(S.i))S.seen.push(S.i);save();}
+function go(n){S.i=n;save();render();window.scrollTo(0,0)}
+function cont(){mark();go(Math.min(DATA.length-1,S.i+1))}
+
+function head(sc){let s='';if(sc.sc)s+='<h2 class="sc">'+sc.sc+'</h2>';if(sc.title)s+='<h1 class="ct">'+sc.title+'</h1>';return s}
+function notes(ns){if(!ns)return '';return ns.map(n=>'<div class="note'+(n.k==='sys'?' sys':'')+'"><b>'+n.k+'</b> · '+n.v+'</div>').join('')}
+function tip(sc){return sc.tip?'<div class="tip'+(S.tip?'':' hide')+'">'+sc.tip+'</div>':''}
+
+function rTitle(sc){
+  return head(sc)+ps(sc.body,'ind')+notes(sc.notes)+
+   '<button class="btn pri" data-act="start">'+(sc.btn||'开始登塔')+'</button>'+
+   '<div class="kv"><span>说明</span>'+sc.meta+'</div>';
+}
+function rProse(sc){
+  return head(sc)+(sc.dlg?sc.dlg.map(d=>'<div class="dlg" style="border-left-color:'+(d.c||'#2f5d54')+'"><span class="who">'+d.who+'</span>'+d.t+'</div>').join(''):'')+
+   ps(sc.body,'ind')+notes(sc.notes)+tip(sc)+
+   (sc.hook?'<div class="hook">'+sc.hook+'</div>':'')+
+   '<button class="btn pri" data-act="next">'+(sc.btn||'继续')+'</button>';
+}
+function rInput(sc){
+  return head(sc)+ps(sc.body,'ind')+notes(sc.notes)+tip(sc)+
+   '<textarea id="ta" placeholder="'+sc.ph+'"></textarea>'+
+   '<div class="kv" style="font-size:12px;color:#8a7f70">'+sc.hint+'</div>'+
+   (sc.res?ps(sc.res,'ind'):'')+
+   '<button class="btn pri" data-act="next">'+(sc.btn||'继续')+'</button>';
+}
+function rExplore(sc){
+  const item=S.sub!==null&&S.sub!==undefined?sc.items[S.sub]:null;
+  if(item)return head(item)+ps(item.body,'ind')+notes(item.notes)+
+    (item.tag?'<div class="note sys"><b>记入</b> · '+item.tag+'</div>':'')+
+    '<button class="btn" data-act="back">返回道场</button>';
+  const n=sc.items.filter(x=>S.seen.includes('x'+x.id)).length;
+  return head(sc)+ps(sc.body,'ind')+
+   '<div class="grid">'+sc.items.map((it,k)=>'<button class="hot'+(S.seen.includes('x'+it.id)?' done':'')+'" data-ex="'+k+'"><span class="n">探索点 '+(k+1)+'</span>'+it.label+'</button>').join('')+'</div>'+
+   '<div class="kv" style="font-size:12.5px;color:#8a7f70">已勘 '+n+' / '+sc.items.length+(n<sc.items.length?' · 全部勘过才能前行':' · 道场已勘尽')+'</div>'+
+   notes(sc.notes)+tip(sc)+
+   (n>=sc.items.length?'<button class="btn pri" data-act="next">'+(sc.btn||'走向门楣')+'</button>':'');
+}
+function optHtml(a,idx){
+  return a.map((o,k)=>'<button class="opt" data-o="'+k+'"><span style="color:#8a7f70">'+
+   'ABCD'[k]+'</span>&nbsp;&nbsp;'+o.t+'</button>').join('');
+}
+function qCard(q){
+  return '<div class="door '+(q.door||'L')+'"><div class="dh">'+q.dh+'</div><div class="q">'+q.q+'</div></div>';
+}
+function rQuiz(sc,i,retry,isBoss){
+  const arr=sc.qs, q=arr[i];
+  let html='<h2 class="sc">'+sc.sc+'</h2>'+(q.dh?'':'')+qCard(q)+
+    '<div id="opts">'+optHtml(q.a)+'</div>'+
+    '<div id="fb"></div>'+
+    (i>0||retry?'':'<div class="kv" style="font-size:12px;color:#8a7f70">'+sc.how+'</div>');
+  if(!retry)html+=tip(sc);
+  return html;
+}
+function rBoss(sc,i,retry,state){
+  const r=sc.rounds[i];
+  let html='<h2 class="sc">'+sc.sc+'</h2><h1 class="ct">'+r.title+'</h1>'+
+    (sc.notes&&i===0?notes(sc.notes):'')+(i===0?tip(sc):'')+
+    r.lines.map(d=>'<div class="dlg" style="border-left-color:'+(d.c||'#965d28')+'"><span class="who">'+d.who+'</span>'+d.t+'</div>').join('')+
+    (r.body?ps(r.body,'ind'):'')+
+    '<div class="note sys"><b>你要做的</b> · '+r.task+'</div>'+
+    '<div id="opts">'+optHtml(r.a)+'</div><div id="fb"></div>';
+  return html;
+}
+function rReveal(sc){
+  return head(sc)+ps(sc.body,'ind')+notes(sc.notes)+tip(sc)+
+   (sc.hook?'<div class="hook">'+sc.hook+'</div>':'')+
+   '<button class="btn pri" data-act="next">'+(sc.btn||'继续')+'</button>';
+}
+function rSummary(sc){
+  const tot=countQ(),bad=Object.keys(S.wrong).length;
+  return head(sc)+'<div class="stat">'+
+   '<div><div class="l">塔身裂痕</div><div class="v">'+S.scars+'</div></div>'+
+   '<div><div class="l">廌鸣次数</div><div class="v">'+S.ding+'</div></div>'+
+   '<div><div class="l">答错</div><div class="v">'+bad+' / '+tot+'</div></div>'+
+   '<div><div class="l">读数</div><div class="v">'+Math.round((tot-bad)/tot*100)+'</div></div>'+
+   '</div>'+
+   '<div class="kv"><span>工具囊</span>'+(S.bag.join('　')||'空')+'</div>'+
+   '<div class="kv"><span>已埋下的伏笔</span>'+(S.seen.includes('x5')?'左门第三砖 · 褶皱（已记录）':'—')+'　'+(S.seen.includes('x1')?'林未然纹路（已编号）':'—')+'</div>'+
+   ps(sc.body,'ind')+notes(sc.notes)+
+   '<button class="btn pri" data-act="home">回到扉页</button>'+
+   '<button class="btn sm" data-act="reset">清空进度 · 重新登塔</button>';
+}
+function countQ(){let n=0;DATA.forEach(s=>{if(s.qs)n+=s.qs.length});return n}
+
+/* ---------- 交互 ---------- */
+function ding(){S.ding++;save();const e=$('#hScar');if(e){e.textContent='叮';setTimeout(hud,700)}}
+function scar(){S.scars++;save();hud()}
+function fbArea(){return $('#fb')}
+
+function answer(sc,i,k,retry,isBoss){
+  const arr=isBoss?sc.rounds:sc.qs, q=arr[i], o=q.a[k], area=fbArea();
+  document.querySelectorAll('#opts .opt').forEach((b,j)=>{
+    b.className='opt'+(o.ok?'':' ')+(j===k?(o.ok?'ok':'bad'):'');
+    b.disabled=true;
+  });
+  S.wrong[S.i+'_'+i]=o.ok?'1':'0';save();
+  let t='';
+  if(o.ok){
+    if(o.act)t+='<div class="rub good"><span class="who">门</span>'+o.act+'</div>';
+    if(o.teach||q.teachAll)t+='<div class="rub">'+(o.teach||q.teachAll)+'</div>';
+    if(o.cls||q.cls)t+='<div class="note"><b>命题拆解</b> · '+(o.cls||q.cls)+'</div>';
+    if(o.ding)ding();
+    const last=i>=arr.length-1;
+    t+='<button class="btn pri" data-act="'+(last?'next':'nq')+'">'+(last?(sc.nextLabel||'走向上方'):'下一题')+'</button>';
+  }else{
+    scar();
+    if(o.ding)ding();
+    if(o.fb||q.fbAll)t+='<div class="rub"><span class="who">门回写</span>'+(o.fb||q.fbAll)+'</div>';
+    if(o.micro||q.microAll)t+='<div class="note"><b>谈微</b> · '+(o.micro||q.microAll)+'</div>';
+    if(o.teach||q.teachAll)t+='<div class="rub">'+(o.teach||q.teachAll)+'</div>';
+    t+='<button class="btn" data-act="retry">重证 · 再说一次</button>';
+  }
+  area.innerHTML='<div class="fade">'+t+'</div>';
+  area.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{
+    const a=b.dataset.act;
+    if(a==='next'){mark();cont()}
+    else if(a==='nq'){S.qi=i+1;if(isBoss)renderB();else renderN()}
+    else if(a==='retry'){if(isBoss)renderB(true);else renderN(true)}
+  });
+}
+function renderN(retry){
+  const sc=DATA[S.i];const i=S.qi||0;
+  stage.innerHTML='<div class="fade">'+rQuiz(sc,i,!!retry,false)+'</div>';
+  opts(sc,i,!!retry,false);
+}
+function opts(sc,i,retry,isBoss){
+  document.querySelectorAll('#opts .opt').forEach(b=>b.onclick=()=>answer(sc,i,+b.dataset.o,retry,isBoss));
+}
+function bind(sc){
+  if(S.cur!==S.i){S.cur=S.i;S.sub=null;if(sc.type==='quiz'||sc.type==='boss')S.qi=0}
+  stage.querySelectorAll('[data-act]').forEach(b=>{
+    const a=b.dataset.act;
+    if(a==='next')b.onclick=()=>{capture();cont()};
+    else if(a==='start')b.onclick=()=>{mark();go(1)};
+    else if(a==='reset')b.onclick=()=>{if(confirm('清空本层进度？')){localStorage.removeItem(KEY);S={i:0,scars:0,ding:0,bag:[],seen:[],tip:true,wrong:{}};go(0)}};
+    else if(a==='back')b.onclick=()=>{S.sub=null;save();render()};
+  });
+  stage.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{
+    S.sub=+b.dataset.ex;const id=sc.items[S.sub].id;
+    if(!S.seen.includes('x'+id)){S.seen.push('x'+id);save()}
+    const it=sc.items[S.sub];
+    if(it.add&&!S.bag.includes(it.add)){S.bag.push(it.add);save()}
+    render();window.scrollTo(0,0);
+  });
+  const ta=$('#ta');if(ta){ta.value=S.txt||'';ta.oninput=()=>{S.txt=ta.value;save()}}
+  $('#hTip').onclick=()=>{S.tip=!S.tip;save();render()};
+  $('#hMenu').onclick=()=>menu();
+  if(sc.type==='quiz'){renderN()}
+  if(sc.type==='boss'){renderB()}
+}
+function capture(){const ta=$('#ta');if(ta){S.txt=ta.value;save()}}
+function renderB(retry){
+  const sc=DATA[S.i];const i=S.qi||0;
+  stage.innerHTML='<div class="fade">'+rBoss(sc,i,!!retry,null)+'</div>';
+  document.querySelectorAll('#opts .opt').forEach(b=>b.onclick=()=>{
+    answer(sc,i,+b.dataset.o,!!retry,true);
+  });
+}
+function menu(){alert('第一层 · 名实之门\n\n已勘节点：'+S.seen.filter(x=>typeof x==='number').length+' / '+DATA.length+
+  '\n裂痕：'+S.scars+'\n廌鸣：'+S.ding+'\n\n进度已自动保存在本机，关掉也会在。')}
+
+const DATA=[
+{
+ type:'title', tone:'', sc:'《名理之塔》', title:'名实之门',
+ body:[
+ '传说塔开水上，八层可见，每层住着一位把自己的思考方式活成了形状的人。',
+ '这一层住的是邓析。他有两个头，两张嘴，一左一右同时咀嚼两句相反的话。',
+ '他没有恶意。他只是比所有人都早地发现：语言，是可以被双向驱动的。'
+ ],
+ notes:[
+  {k:'本层教学单元',v:'概念概述 · 内涵与外延 · 定义与划分 · 限制与概括 · 偷换概念'},
+  {k:'建议投放',v:'第 2 周，绪论与概念论之后'},
+  {k:'预计时长',v:'课堂 20 分钟 + 课后 15 分钟'},
+  {k:'本层工具',v:'名实铜尺'}
+ ],
+ meta:'进度自动保存在本机浏览器里，关掉也在。右上「教学」按钮可开关教师提示。',
+ btn:'开始登塔'
+},
+{
+ type:'prose', tone:'night', sc:'序 · 接引', title:'在那句话落地之前',
+ body:[
+ '《逻辑学》第三节，老师讲什么是概念。谈微在底下刷手机，转发了一条某知名奶茶店使用工业色素的朋友圈。她觉得愤怒，也觉得该说点什么。',
+ '三小时后，学校门口那家加盟店的老板，是她高中同学的父亲。第四天，那条消息被证实是隔壁街同行的恶意拍摄。店已经关了。',
+ '当天夜里，她在图书馆旧书区捡到一本没有封面的《墨经》。翻开第一页的时候，她听见地板里传来一声极轻的金属响。'
+ ],
+ notes:[{k:'系统',v:'这是塔外的部分。不计入塔内计时，也不产生裂痕。'}],
+ hook:'她对着那页残简说：我想把话说对。——塔收到了这句话。',
+ btn:'推门'
+},
+{
+ type:'prose', tone:'night', sc:'一 · 现实短章', title:'群里那条还没撤回的消息',
+ body:[
+ '灯熄了。女生宿舍六张床的蚊帐里浮着六块手机冷光，像六口浅浅的井。谈微躺在下铺，右耳那只蓝牙耳机空着一只，左耳塞着，里面其实什么都没放——她只是习惯只听一半世界。',
+ '屏幕亮着。班群里，那条关于学校要封校的截图还在缓慢往上爬，已经有人接龙求带饭。不是她转的。',
+ '可她盯着那条消息，指腹悬在转发键上，忽然想起另一张图——大一那年，她转的那张某知名奶茶店使用工业色素，配文她自己写的，笃定得像亲眼所见。三小时之后，店就关了。',
+ '群里现在还在传的，是另一桩，源头却是同一种东西：一种我觉得该说点什么的急切。谈微拇指划过聊天记录，看见林未然——她下铺那个圆脸姑娘——十分钟前又甩进来一条姐妹们避雷，亲眼看的后厨，配的是一张看不清落款的图。林未然转完，在群里发了个抱抱的表情，像完成了一件善事。',
+ '谈微想说话。她想说等一下，这张图我们先核实。可话到嘴边，她听见自己心里另有一个声音：你有什么立场劝别人核实？你自己的那张图，到现在都没跟人家道过一句歉。',
+ '她把手机扣在胸口。黑屏映出她自己的脸。她想起水房里那些复盘，想起日记里那行字：我说了一句我没核实的话，一个人因此不见了。那是高一，沈同学，转学，再没回来。奶茶店这次，店关了，人还在，可她连一句对不起都还没组织出来——每次想开口，那句话就在喉咙里转成漂亮话，又自己散掉。'
+ ],
+ notes:[
+  {k:'UI',v:'班群对话框右上角有个红点：陈砚（奶茶店那位女儿）的头像，三天前发过一条「正常糖，慢点喝」，谈微一直没回。'},
+  {k:'系统',v:'现实侧不计入塔内计时。此刻你只是谈微，带着一个没说出口的道歉，和一段想注销又舍不得的群聊。'}
+ ],
+ tip:'此处建议暂停 2 分钟，让学生先自己给「谣言」下个定义再继续——他们大概率会给出「假的消息」这类过宽定义，正好接住本层「定义必须相称」的教学点。',
+ hook:'她终于打了一行字想发给陈砚，写到一半又全删了。屏幕暗下去的瞬间，她听见地板深处一声极轻的金属响——像很远的地方，有谁替她把那半句话，先叮了一声。塔，在等她。',
+ btn:'入塔'
+},
+{
+ type:'input', tone:'night', sc:'插话 · 停下来想一想', title:'先给「谣言」下一个定义',
+ body:[
+ '在继续之前，先把你自己的答案写下来。',
+ '不用给标准答案。邓析会把你的定义钉在这面墙上，等你看过这一层之后，自己回来改。'
+ ],
+ notes:[{k:'规则',v:'定义必须相称：被定义项的外延，必须和定义项正好一样大。大了叫定义过宽，小了叫定义过窄。'}],
+ ph:'谣言是……',
+ hint:'你写的答案会随进度保存在本机，不会上传，也不会计分。',
+ res:[
+ '林未然在黑暗里翻了个身，声音闷闷的：微姐，你睡不着啊？',
+ '嗯。谈微说。她想补一句我在想那天那家店，可「但——」那个停顿卡在中间，她没接下去。',
+ '你是不是也觉得，林未然很轻地说，我们这种人，转了也就转了，反正又不是故意的。',
+ '谈微没答。她听见自己心跳比平时快半拍，那是她每次准备说一句漂亮话前的节律。但她这次没说。她只是把手机重新点亮，把陈砚那条消息点开，又关上，关上，再点开。'
+ ],
+ btn:'关灯'
+},
+{
+ type:'prose', tone:'', sc:'二 · 入塔', title:'名实之门，先分了才谈得上守',
+ body:[
+ '从图书馆旧书区那本无封面的《墨经》算起，谈微已经走了很远——远到她自己都没察觉脚步变了。等她再睁眼，脚底下已经不是宿舍熄灯后的瓷砖地，而是一段由「判断」凝成的薄板，凉而发颤，踩上去微微下陷，像踩在别人没说完的话上。',
+ '她先看见的，是海。',
+ '那不是水。是一片缓慢翻涌的灰白雾，尝不到咸，也没有浮力，手伸进去不会湿，只会让人忽然想不起来自己刚才要说什么。无名之海。雾海表面浮着破碎的词——一个孤零零的但是、一个找不到主语的因为你、一句没人承认说过的话，它们互相碰撞，偶尔粘成一句完整的谎，短暂亮一下，又散掉。',
+ '最刺眼的是那些银白色的纹路，从雾里爬上塔基，像毛细血管。谈微蹲下来，屏住呼吸——每一条银白纹路的尽头，都连着一个极淡的影子，低着头，神情匆忙，像刚在手机上按下一个键。一个最初的转发者。他们大多不是恶意的，只是匆匆忙忙地、带着一点正义感地，按了那个钮。',
+ '然后门在她面前立起来。两扇。左门冷青色铜，右门暖赭色石，中间隔着三丈宽的甬道。门楣上各浮着一行字，字是活的，像被谁用湿笔写在空气里，水珠顺着看不见的笔画往下淌。空气里有干燥的、带点霉味的纸香，混着铜锈的腥甜——邓析两千多年没写完的讼辞。'
+ ],
+ notes:[
+  {k:'系统',v:'雾海极深处有持续的、几乎听不见的沙沙声，像一万个人同时把一句话咽回去。'},
+  {k:'UI',v:'无名之海 · 未成之言。说了、生效了、但是错的——这一类，会发光。'}
+ ],
+ dlg:[
+  {who:'口袋里的廌',c:'#2f5d54',t:'叮。（角尖在卫衣口袋里绷了一下，又松。）<br>不是示警。是确认。它准予之后，往后出声永远只在这一种情形：你前后不一致了，它响；你只是没想好，它不响。它从不会告诉你该选哪边。'}
+ ],
+ hook:'两扇门在她身后无声合拢。甬道中央，一个人长了出来——一双赤足踩上夯土，再是青布袍的下摆。这人有两个头，左右并排，各长着一张嘴。',
+ btn:'认门'
+},
+{
+ type:'prose', tone:'', sc:'二 · 入塔（续）', title:'两张嘴的第一个问题',
+ body:[
+ '两张嘴的嘴唇以不同的节奏翕动，像同时咀嚼两句相反的话。左边的头神态松弛，右边的头微微前倾，像永远在替对方补一句但是。他的胸腔是分开的两个腔，呼吸一快一慢，你分不清哪一声是赞同，哪一声是反驳。'
+ ],
+ dlg:[
+  {who:'邓析 · 两嘴同开',c:'#965d28',t:'你来了。名实之门。进来之前，先告诉我——你刚才那句我想把话说对，你说的对，是哪个对？'},
+  {who:'邓析 · 左边先闭，右边续',c:'#965d28',t:'你进门之前，门先问你一句。你转过那条奶茶店的消息。你告诉我，那是真的，还是假的？'},
+  {who:'邓析 · 两个头同时偏了偏',c:'#965d28',t:'塔知道每一个进来的人，说过哪句没核实的话。这道题，留到论辩时再问你。现在——先认认这门。'}
+ ],
+ bodyTail:[],
+ tip:'先让学生意识到：「真」这个字本身不是一个名字，它后面站着两个不同的实——事件的真，和你那句话的真。让学生自己举例：什么时候一件事确实发生了、但你说出去的那一句是错的。',
+ hook:'邓析两张嘴同时合了一下，像替她把后半句咽回去。谈微站在灰白界线上，第一次意识到：自己嘴里随便一句真的假的，落到这塔里，原来都是有重量的。而她，还不会掂。',
+ btn:'走进道场'
+},
+{
+ type:'explore', sc:'三 · 道场探索', title:'两扇门，和门后那道压平的字',
+ body:[
+ '道场不算高阔，却极深。地面是老旧的夯土，掺着碎陶片和半截竹简，脚踩上去有细碎的咯吱声，像踩在谁没说完的话上。穹顶很低，上面凿着密密麻麻的小字，是历代登塔者刻下的名实之辨残句，大多被刮掉又重刻，字迹重叠如伤疤。',
+ '光线从两扇门缝漏进来，左门偏蓝，右门偏橙，在甬道中央交叠成一道灰白的界。',
+ '可交互处共有五处。全部勘过，才能走到门楣前。'
+ ],
+ items:[
+  {id:1, label:'银白纹路墙', sc:'探索点一', title:'最初的转发者',
+   body:[
+   '四壁的银白纹路缓缓明灭，亮一下，暗一下。谈微走近任意一条，纹路尽头那个最初的转发者就抬起头——其中一个侧影，她认得。林未然。下铺那个圆脸姑娘，此刻在墙上低着头，神情既非恶意也非天真，就是那种我觉得该说点什么的急切。',
+   '谈微胸口一紧：这是她在塔里第一次看见自己。她高一时转的那张沈同学截图，走的也是同一条银白路；林未然将来在宿舍群转的那些图，也会走同一条路。无名之海里发亮的，从来不是恶意，是匆匆忙忙的正义感。'
+   ],
+   notes:[{k:'系统',v:'已记录镜像：林未然的纹路编号（为第四现实章救她埋线）。'}],
+   tag:'林未然 · 银白纹路，编号已入背包'},
+  {id:2, label:'两可之门', sc:'探索点二', title:'门楣上的字，要「说」出来',
+   body:[
+   '左门与右门各自浮着一道题。门楣上的字须说出来才算作答——谈微须对着门念出答案，门才判断。说对，门上字如被擦净般淡去，门轴松一寸；说错，门楣水珠逆流，墙面留一道可见裂痕。',
+   '两门之间横着一根青铜门闩，上面刻着可字的两个异体写法：一个从口，一个从丂。玩家可在此反复试读同字异义——这是本层偷换概念教学的前置感官。'
+   ],
+   notes:[{k:'UI',v:'同字，异构，常常也异义。记住这感觉。'}],
+   tag:'答题阶梯已就绪'},
+  {id:3, label:'两可之辞残简', sc:'探索点三', title:'洧水的那具尸',
+   body:[
+   '右门内侧斜倚着一卷半朽的竹简，是邓析当年替郑人处理讼案的两可之辞实录。竹片凉而脆，指尖一碰就掉一层薄屑。最清晰的一条记着那桩著名的赎尸案：洧水大涨，郑国一个富人的尸体被人捞起，死者家属嫌赎金高，来问邓析；捞尸者慌了也来问。简上两行小字并列。',
+   '谈微念了两遍，忽然觉得哪里不对，又说不上来。口袋里的廌角尖绷了一下，叮——不是因为她错了，是因为两句安之都站得住。它认得这种东西：不是谎，是同一个词在两处指了不同的实。'
+   ],
+   notes:[{k:'系统',v:'此简是 BOSS 战第三轮的直接教材。'}],
+   tag:'赎尸案 · 两可之辞'},
+  {id:4, label:'名实铜尺', sc:'探索点四', title:'第一件能用的武器',
+   body:[
+   '左门背后的石龛里，供着一柄一尺长的青铜尺。尺身正面刻名，背面刻实，中间一道可滑动的游标。谈微把它抽出来，沉手，凉里透一点体温似的余温，像一块刚从太阳下收进屋的铜。',
+   '她把它别进卫衣口袋，口袋立刻往一边坠——和廌并排，一左一右，像给她挂了两只秤砣。'
+   ],
+   notes:[{k:'UI',v:'铜尺入袋，一声极轻的咔，像锁扣合上。'}],
+   tag:'名实铜尺 · 已可调用', add:'名实铜尺'},
+  {id:5, label:'左门第三砖', sc:'探索点五', title:'一道压平的字',
+   body:[
+   '她转身要走，视线落在左门左下角第三块砖的接缝处。那里有一处极不自然的起伏——墙皮像被什么东西从内部顶了一下，又被人用手掌抚平。',
+   '她盯住它。超过五秒，那起伏里显出两个被压扁的字，既非中文也非希腊文，是偏向本身凝结的纹。它不说话，只是让经过的人觉得这里好像有点不对，又说不上来。',
+   '谈微伸手想用铜尺去量那道褶皱，尺身冰凉，没有反应。廌在口袋里也安静——它管的是前后不一致，而这道褶皱连话都没说出口，不在它的管辖里。'
+   ],
+   notes:[{k:'系统',v:'位置已记录：名实之门 · 左门第三砖。此刻无从识别它是什么，只记下这处不自然。'}],
+   tag:'塞拉绪的第一道褶皱 · 已记录'}
+ ],
+ notes:[{k:'规则',v:'答错会在塔身留下可见裂痕。裂痕不会消失，但提供「重证」——重来一次，裂痕不再新增。'}],
+ tip:'本层谬误物种：稻草人 / 含混 / 偷换概念。三者皆可视、可直接指认，适合作为全塔第一层。',
+ btn:'走到门楣前'
+},
+{
+ type:'quiz', sc:'四 · 答题阶梯 · 把答案说给门听',
+ how:'门楣上的字须「说」出来才算作答。选中答案后按下「念给门听」。说对，门上字淡去、门轴松一寸；说错，门楣水珠逆流，墙面留一道可见裂痕。裂痕不再消失，但可重证。',
+ tip:'本阶梯建议课堂 20 分钟内跑完。每题答错后，务必让学生口头重述「我刚才把哪两个概念弄混了」，这是把裂痕转成台阶的关键一步。',
+ nextLabel:'走向论辩',
+ qs:[
+  {door:'L',dh:'第 1 题 · 左门 · 概念的内涵与外延',
+   q:'人言「概念」，有两副筋骨。一曰内涵，一曰外延。试问：内涵愈多，则外延如何？',
+   a:[
+    {t:'外延愈小。',ok:true,act:'门楣水珠顺笔画淌下，字缓缓淡去。',teach:'内涵反映对象本质属性的多少；内涵越多，限定越严，能装的对象越少。「人」什么都能装；「中国男青年」装不下女人、装不下外国人、装不下老人。内涵递增，外延递减——此谓反变关系。',cls:'正确答案 A。内涵与外延呈反变关系——内涵（本质属性）越多，限定条件越严，外延（适用范围）越小。'},
+    {t:'外延愈大。'},
+    {t:'二者正比。'},
+    {t:'二者无关。'}
+   ],
+   fbAll:'你以为主项多，范围也大？想想：人→中国人→中国男青年。',
+   microAll:'但——内涵多，不是知道得更多吗？知道得多不该管得更宽？',
+   teachAll:'你刚才把「知道得多」和「装得多」弄混了，这是同一种偷换：把「信息的多少」偷换成「范围的大小」。',
+   cls:'错误项：B 把反变说成正变（常见直觉错误）；C 误以为正比；D 误以为无关，未建立概念两维的关联。'},
+  {door:'R',dh:'第 2 题 · 右门 · 下定义的方法',
+   q:'请以「种差＋邻近属」之法定「人」之名。',
+   a:[
+    {t:'人是有理性的动物。',ok:true,act:'门轴再松一寸。',cls:'正确答案 A。科学定义结构＝被定义项＋联项＋（种差＋邻近属）。「动物」是邻近属，「有理性」是种差。'},
+    {t:'人就是人。',fb:'「人就是人」——你用「人」自己解释「人」，绕了一圈回到原点。这叫同语反复，也叫循环定义：定义项直接含了被定义项，什么都没揭示。'},
+    {t:'人是不用四肢行走者。',fb:'你用了「不」——负概念作种差，且不准：躺着的病人也不用四肢行走，他还是人。定义一般不可用否定。'},
+    {t:'人是可以制造工具的。',fb:'黑猩猩也能制造简单工具。「可以制造工具的」比「人」宽——你这定义把黑猩猩也装进来了，叫定义过宽。记住这四个字，第四层亚里士多德会拿它当陷阱。',micro:'但制造工具不是人的标志吗？'}
+   ],
+   teachAll:'标志不等于定义。定义要「相称」：被定义项的外延，必须和定义项正好一样大。「可以制造工具的」装下了黑猩猩，比你说的「人」宽，所以过宽。A 项里「动物」是邻近属，「有理性」是种差，不大不小，正好把你说的「人」框住——这才是「种差＋邻近属」。',
+   cls:'错误项：B 同语反复／循环定义；C 用负概念作种差且不准；D 定义过宽。'},
+  {door:'L',dh:'第 3 题 · 左门 · 划分的规则',
+   q:'有司将「三角形」划分为：锐角三角形、直角三角形、钝角三角形、等边三角形。其谬在何处？',
+   a:[
+    {t:'子项不全。',fb:'按「角」分，前三类已穷尽所有三角形，没漏。错不在少，在混。',micro:'那等边三角形不是三角形吗？怎么会全？'},
+    {t:'标准不一、子项相容。',ok:true,act:'门楣水珠停住，字一层层淡去。',cls:'正确答案 B。前三类按「角」划分，第四类按「边」划分，每次划分须按同一标准，否则子项交叉（等边三角形必是锐角三角形）。'},
+    {t:'用了负概念。',fb:'此处无负概念。「非锐角」才是负概念，题里没有。'},
+    {t:'划分越级。',fb:'越级是跳着分，比如先分「三角形／非三角形」再直接跳到「等边」。本题主要错不在这。'}
+   ],
+   teachAll:'等边三角形当然是三角形，问题恰恰在这：它是「按边」分出来的，而前面三个是「按角」分出来的。一次划分只能用一个标准。你前脚用「角」，后脚用「边」，于是等边三角形既是锐角（它三个角都六十度）又单独算一类——子项相容了。划分两条规则被同时踩破：每次须按同一标准；子项应当互斥。你刚才把「分类的维度」和「分类的结果」弄混了。',
+   cls:'错误项：A 误以为遗漏（按角已穷尽）；C 负概念（无）；D 越级（非主要错误）。'},
+  {door:'R',dh:'第 4 题 · 右门 · 限制与概括',
+   q:'自「树」而下，可得何物？',
+   a:[
+    {t:'植物。',fb:'「植物」「生物」比「树」宽，是你往上走，不是往下走。这叫概括，不是限制。'},
+    {t:'杨树。',ok:true,act:'门轴微微一沉，认了。',cls:'正确答案 B。限制是增加内涵、缩小外延，从属概念到种概念（树→杨树）。'},
+    {t:'生物。',fb:'「植物」「生物」比「树」宽，是你往上走，不是往下走。这叫概括，不是限制。'},
+    {t:'森林。',fb:'森林由树组成，但森林不是「一种树」。整体—部分关系，不是属—种关系。你刚才把「组成」当成了「属于」。',micro:'森林里全是树啊，怎么不算树的一种？'}
+   ],
+   teachAll:'「杨树是一种树」站得住，因为杨树具备树的全部本质属性，只是多了叶子掌状这点限制。「森林是一片树」站不住，因为森林还含泥土、动物、空隙——它不是树，它有树。限制与概括只在属种关系里动：加内涵、缩外延是限制；减内涵、扩外延是概括。森林和树是整体与部分，这套手术刀切不进去。',
+   cls:'错误项：A／C 混淆限制与概括的方向；D 误把整体—部分当属种关系。'},
+  {door:'L',dh:'第 5 题 · 左门 · 偷换概念（同一律）',
+   q:'甲曰「年轻人该多读书」。乙驳：「我爷爷读了一辈子书，如今连智能手机都不会用，读书有何用？」乙之失在？',
+   a:[
+    {t:'偷换概念。',ok:true,act:'角落那捆稻草人歪了歪头，像被点名。',cls:'正确答案 A。甲说的是「该有学习的习惯」，乙答的是「读书多不等于啥都会」，两句话的「读书」不是同一个名。'},
+    {t:'诉诸人身。',fb:'乙没骂甲本人，他骂的是「读书」这件事。诉诸人身是攻击人，不是攻击理。方向错了。',micro:'可乙不是在抬杠吗？抬杠不就是人身？'},
+    {t:'滑坡。',fb:'乙没有「然后…然后…」的链条，谈不上滑坡。'},
+    {t:'虚假因果。',fb:'乙不是把两件事当因果，他是把两个「读书」当同一个词。这是概念层面的病。'}
+   ],
+   teachAll:'抬杠不一定是人身。乙真正做的，是把甲规范性命题里的「多读书」——持续地学习、广泛地获取——偷换成了「读了大量书就必然有能力」这个不同的概念，再拿爷爷当反例否掉原命题。这叫偷换概念，违反同一律：在同一思维过程中，概念须保持同一。你过去说圆的大多数话，犯的正是这一类——把「出发点是好的」偷换成「说得是对的」。',
+   cls:'错误项：B 乙未攻击甲本人；C 无链式推导；D 非因果误置。'},
+  {door:'R',dh:'第 6 题 · 右门 · 两可的逻辑根由',
+   q:'邓析对赎尸案两方皆曰「安之」，而两言皆立。其所以立，根在？',
+   a:[
+    {t:'同词异境指不同概念（一词二实）。',ok:true,ding:true,act:'廌在口袋里「叮」一声——这次是赞许，因为它认得这恰是它管的那类前后不一致。',cls:'正确答案 A。同一词在两处指不同事实基础、即不同概念，故各立其说。'},
+    {t:'中项不周延。',fb:'中项不周延是第四层亚里士多德的词。本案里根本没有三段论，别把一切「说得通」都塞进一个筐。',micro:'可他两边都说得通，不就是逻辑有病？'},
+    {t:'诉诸群众。',fb:'邓析没拉围观群众站队。诉诸群众是「大家都这么想」。本题无。'},
+    {t:'循环论证。',fb:'循环是「用结论证前提」。邓析两句各有各的根据，不循环。'}
+   ],
+   teachAll:'说得通，不等于有谬误。对买家，「安之」的根据是除了你，没人会买这具尸；对卖家，「安之」的根据是除了这家人，没人能卖给你。同一个词「安之」（放心），在两处语境内指称了不同的事实基础、即不同的概念，所以各立其说。这正是两可的逻辑本质——不是错，是一词二实。邓析没骗人，他只是没把两个「实」标出来。若不加标注地混用，便是偷换；若分别标明，则是合理的语境歧义。',
+   cls:'错误项：B 属第四层三段论问题；C／D 与本案无关。'},
+  {door:'L',dh:'第 7 题 · 左门 · 综合识别偷换概念',
+   q:'或辩曰：「自由乃天赋人权。大学宿舍里学生想要自由。故大学宿舍里学生想要天赋人权。」其失在？',
+   a:[
+    {t:'两处「自由」非同一概念，偷换。',ok:true,act:'门楣上那两个「可」字同时淡去，两扇门轴各松一寸，甬道尽头透出光。',cls:'正确答案 A。首句「自由」是政治哲学意义上的天赋权利；次句「自由」是生活自主、作息自主。二者同名异实。'},
+    {t:'大项不当扩大。',fb:'这是三段论形式的病，本案连标准三段论都不是。主因在「自由」这个词被换了，不在格与式。'},
+    {t:'中项不周延。',fb:'这是三段论形式的病，本案连标准三段论都不是。主因在「自由」这个词被换了，不在格与式。'},
+    {t:'结论必假。',fb:'结论真不真，不由「它犯了偷换」直接断定。你判的是推理过程，不是内容真假——别把「有效」和「可靠」混了。',micro:'可这结论听着就不对啊。'}
+   ],
+   teachAll:'听着不对，和「推理错在哪」是两件事。推理在「自由」一词上偷换，前提并未真正支持结论。你若直接判「结论假」，就跳过了真正的病根——你没指出被偷换的是哪个词、前后指了哪两个不同的概念。这正是本层最该练的那一下：标出那个词，说出它前后各指什么。B、C 是形式层错误，你把概念层错误误判成了形式层错误；D 是用内容真假反推推理，混淆了有效与可靠。',
+   cls:'错误项：B／C 把概念层面错误误判为三段论形式错误（学生常混淆两层）；D 以结论内容真假反推推理。'}
+ ]
+},
+{
+ type:'boss', sc:'五 · 论辩 BOSS 战 · 邓析', notes:[
+  {k:'UI',v:'邓析不攻击，他「辩」。三轮，每轮他抛一段完整论证（以两可之姿说出），你要做的是：识别其中被偷换或未守的概念；用规则把它重构为概念清晰、名实相符的版本。'},
+  {k:'系统',v:'答错，塔身留一道裂痕，邓析两张嘴同时轻叹，左门第三砖那道褶皱微亮——塞拉绪替你记下一笔。'}
+ ],
+ tip:'BOSS 战是课堂高潮，建议留 8—10 分钟。每轮先让学生口头指出「被偷换的是哪个词」，再给重构。邓析的每一句都真，所以学生容易想「那他没错啊」——这正是教学点：真，不等于没偷换。',
+ nextLabel:'跨过门槛',
+ rounds:[
+  {title:'第一轮 · 真的两张脸',
+   lines:[
+    {who:'邓析 · 左嘴',c:'#965d28',t:'你转过那条奶茶店的消息。你告诉我，那是真的，还是假的？'},
+    {who:'邓析 · 右嘴',c:'#2f5d54',t:'你说它是真的——因为店确实关了，事确实发生了。你又说它是假的——因为图是恶意拍摄，陈述并不准确。看，它既是真的，又是假的。名实之门，为你敞开。'}
+   ],
+   body:['谈微本能地想退半步。塔里没有情绪，那点慌只是残影。她逼自己把「真」这个字拎起来看。'],
+   task:'识别：此处「真」被偷换。存在「事件发生了」（事实真）与「这条消息的陈述是准确的」（报告真）两个不同概念，邓析把二者混为一谈，制造「既是真又是假」的两可。',
+   a:[
+    {t:'我拆开：一、该店曾关门为真；二、网传「使用工业色素」的陈述准确为假。两命题主词不同，不构成矛盾，名实各归其位。',ok:true,act:'邓析两嘴合成一声：好。名，先分了，才谈得上守。',teach:'把事件的真和你那句话的真分开钉牢，不是把自己钉在耻辱柱上。这是把名实分开的第一步：承认一件事可以同时「确实发生」和「被说错」。',cls:'第一轮通过。'},
+    {t:'它就是假的，图是假的，整件事都假。',fb:'你又用动机盖住了事实。你说假，是因为你心里愧；你说真，是因为店确实关了。你挑你想要的那个「真」，还是没分。',micro:'可我就是传了假图啊——',teach:'你传的图陈述不准，这是「报告假」；但店关门是「事实真」。两件事叠在一句话里，你若不拆，就永远觉得自己要么全错要么全对。'},
+    {t:'它就是真的，店关了，事实摆在那。',fb:'你又用动机盖住了事实。你说假，是因为你心里愧；你说真，是因为店确实关了。你挑你想要的那个「真」，还是没分。',teach:'你传的图陈述不准，这是「报告假」；但店关门是「事实真」。两件事叠在一句话里，你若不拆，就永远觉得自己要么全错要么全对。'}
+   ]},
+  {title:'第二轮 · 负责的两种称量',
+   lines:[
+    {who:'邓析 · 左嘴',c:'#965d28',t:'你说你转发，是为了负责。'},
+    {who:'邓析 · 右嘴',c:'#2f5d54',t:'可你转发的那一刻，你也在「负责地提醒别人」。那么你是对的——一个负责的人，做的当然是负责任的事。名实之门，继续为你开。'}
+   ],
+   body:['谈微的右手无意识转了一下手机。她懂了：邓析把「负责」这个词，悄悄换了个底。'],
+   task:'识别：「负责」被偷换为「出发点是好的」（动机负责）与「对后果担责」（结果负责）两个概念。动机好不等于行为对，邓析用前者冒充后者。',
+   a:[
+    {t:'我分：一、我转发的动机是提醒大家，为真；二、我的转发造成了可核实的伤害，亦为真。动机与后果是两个名，不能互相抵消。',ok:true,act:'邓析两嘴微偏：你把「想负责」和「真负责」分开了。这比「说圆」难。',teach:'动机和后果是两个独立的命题，可以同真。承认其中一条，不等于免掉另一条——也不等于自己全是错的。',cls:'第二轮通过。'},
+    {t:'我动机是好的，所以我没错。',fb:'你又用一半的负责，去抵另一半的负责。门，只认钉牢的名，不认抵消的账。',micro:'我负责的，是我想负责的心情；我不负责的，是那个人转学的后果。',teach:'这正是偷换：「负责」从「对后果担责」滑到了「出发点是好的」。好心不构成免责，但它也不自动构成定罪——两件事要分开钉。'},
+    {t:'我造成了伤害，所以我全是错的。',fb:'你又用一半的负责，去抵另一半的负责。门，只认钉牢的名，不认抵消的账。',teach:'这正是偷换的另一头：用后果去吞掉动机。整合的结果不是「全对」也不是「全错」，是两句话各自成立。'}
+   ]},
+  {title:'第三轮 · 两可之辞的总辩',
+   lines:[
+    {who:'邓析 · 左嘴',c:'#965d28',t:'买家来，我说：安之，人必莫之买。'},
+    {who:'邓析 · 右嘴',c:'#2f5d54',t:'卖家来，我说：安之，此必无所更买。'},
+    {who:'邓析 · 两嘴合',c:'#6b4a1c',t:'两句皆立。你说，我骗了谁？'}
+   ],
+   body:[
+   '这一问最沉。谈微盯着残简上那两行小字。她忽然后背发凉——不是因为邓析错了，恰恰因为他没错。',
+   '一个两千年前的讼师，两句话都站得住，他骗了谁呢？他谁都没骗。他只是第一个发现：语言本身可以被双向驱动。今天所有两边都有道理能轻松绕过追问的话，根都在这两扇门里。'],
+   task:'邓析之「可」成立，正因「安之」在两处指了不同的实。他揭示的是语言天然具备的双向可驱动——这本身不是错，是语言的性状。你要做的不是判他错，而是点明两可成立的机制：同一词在不同语境承载不同概念；不加标注地混用，便是偷换；分别标明，则是合理的语境歧义。',
+   a:[
+    {t:'你没骗人。你的「安之」对买家指除你无人愿购此尸，对卖家指除彼家无人能售与你——同词二实。错不在你，错在把两境混着用的人。我把两句各补一句语境注脚，名实注明，两可便不再是诡，而是清晰的双边分析。',ok:true,act:'邓析两张嘴第一次同时笑了，不是讽刺，是释然：你终于看见——两可之门里没有骗子，只有不肯把名和实钉牢的人。门，开了。',teach:'对买家：除你无人愿购此尸，故可待价而沽；对卖家：除彼家无人能售与你，故可持价不松。两个安之，两个实，标清楚了，谁都骗不了。',cls:'第三轮通过。'},
+    {t:'你骗了两边，因为你说的话让他们都没去赎、没降价。',fb:'我若骗了，便不必有两可。你判我骗，是替自己省了那一下分名实的功夫。',teach:'判对方「骗」，是最省力的一步，也是最容易跳过钉名实的一步。'},
+    {t:'你没错，所以这根本不是逻辑问题，是道德问题，塔管不着。',fb:'你说塔管不着——可你进的是名实之门。门只问名实钉没钉牢，不问你心里舒不舒服。',teach:'把说不圆的话推给「道德」，和把说不通的话推给「立场」，是同一种逃逸。'}
+   ]}
+ ]
+},
+{
+ type:'reveal', tone:'', sc:'六 · 先知的一句话', title:'他留给你的，是一个结',
+ body:[
+ '两扇门彻底松开，灰白界线的光铺成一条向上的阶。邓析没有道别，两张嘴在谈微跨过门槛前，合为一声。',
+ '谈微在门槛上停了一瞬。这话不像过关奖励，倒像个被塞进手里的、没解开的结。她想问那到底该跟着走还是站着等，可邓析已经退回甬道中央，两个头一左一右地，继续咀嚼那两句永远相反的话，像从来没有打断过。',
+ '口袋里，名实铜尺沉甸甸地坠着一边，廌在另一边，安静。它不替她答，也不会答——它只认得前后不一致，而这个问题恰恰前后都一致、只是没有答案。'
+ ],
+ dlg:[
+  {who:'邓析 · 两嘴合一声',c:'#6b4a1c',t:'你说「名」该守住「实」。可若有一日，「实」自己也在变——人长大了，词的意思也长大了——名该跟着走，还是该站着等？你替我记着这个问题，后面有人会作答。'}
+ ],
+ notes:[
+  {k:'系统',v:'已记录先知赠言（未解）。此问将在第三层荀子「正名之庭」被部分照亮——当所有人都同意叫黑作白，名的守住者是谁。'}
+ ],
+ tip:'这一句是全塔八句赠言的第一句。建议让学生把它抄下来，到第三层再翻出来对照。',
+ hook:'她手里多了一柄尺，心里多了一个没有答案的问。塔里没有情绪，可她第一次觉得，自己或许真的能学会，在张嘴前先认出嘴里那个名站着哪个实。',
+ btn:'回到宿舍'
+},
+{
+ type:'prose', tone:'night', sc:'七 · 回到现实', title:'先把那句话，量一量再说',
+ body:[
+ '谈微是被手机的震动拽回宿舍的。六块蚊帐里的井还亮着，林未然已经睡了，呼吸很轻。谈微把屏幕点开，陈砚那条「正常糖，慢点喝」还停在三天前。',
+ '她深吸一口气，把名实铜尺从口袋里摸出来——在现实里，它变成一件安静的工具，尺身正面名、背面实，中间游标可滑。她先量了自己想发出的那句话。',
+ '她本来想说的是：对不起，那张图是我转的，我没核实，对不起。铜尺把这句话拆成词与所指，高亮出两处错位。'
+ ],
+ notes:[
+  {k:'UI',v:'名实铜尺 · 错位一：「对不起」——她想表达的是我想为造成的后果负责（动机之名），但落进陈砚耳朵，会被读成我承认全部责任、且以为一句抱歉能抵消关店（结果之名）。两个实没钉牢。'},
+  {k:'UI',v:'名实铜尺 · 错位二：「那张图是我转的」事实真，钉得牢；可「我没核实」如果只跟在后面，会被混进所以我说的是假的那种自我定罪里。邓析第一轮教过她——事件的真和报告的假，是两件事，不能拿一个去吞另一个。'},
+  {k:'系统',v:'她删掉重打，一个字一个字地慢。'}
+ ],
+ dlg:[
+  {who:'谈微 · 发出的那条消息',c:'#9dcfc2',t:'我是去年转那条奶茶店图的人。图是恶意拍摄，我没核实就转了，店后来关了。这句「真」和「假」我要分开说：店关了是事实，我那句陈述不准也是事实。我想为这件事负责——不是一句抱歉就能抵掉什么，是我欠你一个说清楚。如果你愿意，我想当面跟你说。'}
+ ],
+ tip:'回到现实这一节是检验本层有没有「用掉」的关键。建议让学生对比：谈微若按旧习惯秒发「对不起我错了」，和现在这版，差别不在真诚，而在名实是否钉牢。可让他们用铜尺现场量自己最近发过的一条消息。',
+ bodyTail:[],
+ hook:'这是她第一次体会到把话说慢一点是什么感觉：不是吞回去不说，是把那句话在脑子里多停了三秒，让名先站到实上，再放出去。廌始终没响。',
+ btn:'看这一次的结果'
+},
+{
+ type:'summary', tone:'', sc:'本层结算', title:'名实之门 · 已过',
+ body:[
+ '你已勘过道场，念过七道题，接过邓析三轮论辩。两手各多了一样东西：一柄尺，一个没有答案的问。'
+ ],
+ notes:[
+  {k:'下一步',v:'第二层 · 三物之台（墨子）——你将得到「定义的四把刀」；第四现实章你将用这柄铜尺拆解更多名不副实的话。'},
+  {k:'已埋伏笔',v:'左门第三砖的褶皱，会在往上爬的过程中慢慢舒展。它现在还吃不饱。'}
+ ],
+ meta:'',
+ btn:'返回扉页 · 重读本层'
+}
+];
+load();render();
+</script>
+</body>
+</html>
