@@ -1,0 +1,2243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#6C5CE7">
+<title>语文闯关大冒险 · 一年级上册</title>
+<style>
+/* ===================== 基础 ===================== */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Heiti SC",sans-serif;
+  background:#EDF1FA;color:#22314A;
+  display:flex;align-items:center;justify-content:center;
+  user-select:none;
+}
+#app{
+  width:100%;max-width:460px;height:100%;max-height:940px;
+  background:linear-gradient(170deg,#F7F9FF 0%,#EDF1FA 55%,#E8EEFB 100%);
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:0 12px 60px rgba(70,90,160,.18);
+}
+@media(min-width:520px) and (min-height:800px){
+  #app{border-radius:26px;}
+}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* ===================== 通用组件 ===================== */
+.btn{
+  border:none;border-radius:16px;font-family:inherit;font-weight:800;
+  cursor:pointer;transition:transform .12s,box-shadow .12s,filter .12s;
+  font-size:17px;padding:14px 22px;color:#fff;
+  background:linear-gradient(180deg,#7C6BF0,#6350E0);
+  box-shadow:0 4px 0 #4C3BC4,0 8px 18px rgba(99,80,224,.35);
+  letter-spacing:.5px;
+}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #4C3BC4,0 4px 10px rgba(99,80,224,.3);}
+.btn.green{background:linear-gradient(180deg,#4ED08B,#2FB86E);box-shadow:0 4px 0 #21A05C,0 8px 18px rgba(47,184,110,.32);}
+.btn.orange{background:linear-gradient(180deg,#FFB347,#FF9524);box-shadow:0 4px 0 #E07C10,0 8px 18px rgba(255,149,36,.32);}
+.btn.red{background:linear-gradient(180deg,#FF7A7A,#F05252);box-shadow:0 4px 0 #CE3A3A,0 8px 18px rgba(240,82,82,.3);}
+.btn.gray{background:linear-gradient(180deg,#B9C3D6,#9AA6BF);box-shadow:0 4px 0 #7E8AA3;}
+.btn.sm{font-size:15px;padding:10px 18px;border-radius:13px;}
+.pill{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.85);border-radius:999px;
+  padding:6px 13px;font-size:14px;font-weight:800;color:#3A4A68;
+  box-shadow:0 2px 8px rgba(80,100,160,.13);
+}
+.card{
+  background:#fff;border-radius:20px;padding:16px;
+  box-shadow:0 4px 20px rgba(80,100,160,.13);
+}
+
+/* ===================== 首页 ===================== */
+#home{padding:0;overflow-y:auto;}
+.home-bg{
+  position:absolute;inset:0;pointer-events:none;overflow:hidden;
+}
+.bubble{position:absolute;border-radius:50%;opacity:.5;}
+.hb1{width:190px;height:190px;background:radial-gradient(circle at 30% 30%,#C9D8FF,#EAF0FF);top:-60px;left:-50px;}
+.hb2{width:150px;height:150px;background:radial-gradient(circle at 30% 30%,#FFE1C4,#FFF3E6);top:120px;right:-55px;}
+.hb3{width:120px;height:120px;background:radial-gradient(circle at 30% 30%,#D3F5E4,#EDFBF4);bottom:210px;left:-40px;}
+.hb4{width:170px;height:170px;background:radial-gradient(circle at 30% 30%,#EDDCFF,#F7F1FF);bottom:-50px;right:-45px;}
+.home-inner{position:relative;z-index:1;padding:26px 20px 26px;display:flex;flex-direction:column;gap:15px;min-height:100%;}
+.logo-emoji{font-size:54px;text-align:center;animation:float 3s ease-in-out infinite;line-height:1;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.title-main{
+  text-align:center;font-size:29px;font-weight:900;letter-spacing:2px;
+  background:linear-gradient(95deg,#6C5CE7,#3FB8AF 55%,#FF9524);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  line-height:1.25;
+}
+.title-sub{text-align:center;font-size:13.5px;color:#6B7A99;font-weight:700;letter-spacing:.6px;margin-top:4px;}
+.stat-row{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;}
+.timer-box{
+  background:#fff;border-radius:22px;padding:14px 16px;
+  box-shadow:0 4px 20px rgba(80,100,160,.14);
+}
+.timer-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.timer-label{font-size:13.5px;font-weight:800;color:#6B7A99;}
+.timer-val{font-size:15px;font-weight:900;color:#6C5CE7;font-variant-numeric:tabular-nums;}
+.bar{height:12px;background:#EDF0F8;border-radius:999px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#7C6BF0,#4ED08B);transition:width .4s;width:0;}
+.avatar-row{display:flex;align-items:center;gap:12px;}
+.avatar{
+  width:58px;height:58px;border-radius:50%;background:linear-gradient(145deg,#FFF0D6,#FFE0B0);
+  display:flex;align-items:center;justify-content:center;font-size:31px;flex:0 0 auto;
+  box-shadow:0 3px 12px rgba(200,150,60,.25);
+}
+.avatar-info{flex:1;min-width:0;}
+.avatar-title{font-size:16px;font-weight:900;color:#2C3B57;display:flex;align-items:center;gap:5px;}
+.avatar-desc{font-size:12px;color:#8391AB;font-weight:700;margin-top:3px;}
+
+/* ===================== 地图页 ===================== */
+#map{overflow:hidden;}
+.topbar{
+  flex:0 0 auto;padding:12px 14px 10px;display:flex;align-items:center;gap:9px;
+  background:rgba(255,255,255,.72);backdrop-filter:blur(9px);
+  border-bottom:1px solid rgba(140,160,210,.16);z-index:5;
+}
+.topbar .t-title{flex:1;font-size:16.5px;font-weight:900;color:#2C3B57;}
+.icon-btn{
+  width:37px;height:37px;border-radius:12px;border:none;background:#fff;
+  font-size:18px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 9px rgba(80,100,160,.15);cursor:pointer;flex:0 0 auto;
+}
+.icon-btn:active{transform:scale(.94);}
+.map-scroll{flex:1;overflow-y:auto;padding:16px 14px 90px;-webkit-overflow-scrolling:touch;}
+.unit{
+  background:#fff;border-radius:22px;padding:14px;margin-bottom:14px;
+  box-shadow:0 4px 18px rgba(80,100,160,.11);position:relative;overflow:hidden;
+}
+.unit::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--uc,#6C5CE7);
+}
+.unit-head{display:flex;align-items:center;gap:11px;margin-bottom:12px;}
+.unit-icon{
+  width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;
+  font-size:25px;flex:0 0 auto;background:var(--uct,#EDF0FB);
+}
+.unit-meta{flex:1;min-width:0;}
+.unit-name{font-size:16px;font-weight:900;color:#2C3B57;}
+.unit-prog{font-size:11.5px;color:#8895AE;font-weight:800;margin-top:3px;}
+.unit-progbar{height:6px;background:#EDF0F8;border-radius:99px;overflow:hidden;margin-top:6px;}
+.unit-progbar i{display:block;height:100%;background:var(--uc,#6C5CE7);border-radius:99px;transition:width .4s;width:0;}
+.subs{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;}
+.sub{
+  display:flex;align-items:center;gap:8px;padding:11px 11px;
+  border-radius:15px;background:#F6F8FE;border:2px solid transparent;
+  cursor:pointer;transition:transform .12s,background .15s;
+  position:relative;overflow:hidden;
+}
+.sub:active{transform:scale(.97);}
+.sub .sn{
+  width:25px;height:25px;border-radius:9px;background:#fff;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12.5px;font-weight:900;color:#7C8BA6;box-shadow:0 1px 4px rgba(80,100,160,.14);
+}
+.sub .st{font-size:12.5px;font-weight:800;color:#3F4E6B;line-height:1.3;flex:1;min-width:0;}
+.sub.done{background:#EAF9F1;}
+.sub.done .sn{background:#2FB86E;color:#fff;}
+.sub.locked{opacity:.5;}
+.sub.locked .sn{background:#DFE4EF;color:#98A5BC;}
+.sub .star-mini{font-size:10px;color:#FFB800;position:absolute;right:6px;top:5px;letter-spacing:-1px;}
+.chest-row{
+  display:flex;align-items:center;gap:11px;padding:12px 14px;margin-top:11px;
+  border-radius:16px;background:linear-gradient(100deg,#FFF7E4,#FFEFD2);
+  border:2px dashed #F0C97A;
+}
+.chest-row.ready{background:linear-gradient(100deg,#FFF0CE,#FFE2A6);border-color:#E8A93B;animation:pulseChest 1.6s infinite;}
+@keyframes pulseChest{0%,100%{box-shadow:0 0 0 0 rgba(232,169,59,.4)}50%{box-shadow:0 0 0 9px rgba(232,169,59,0)}}
+.chest-emoji{font-size:28px;}
+.chest-txt{flex:1;font-size:12.5px;font-weight:800;color:#8A6218;line-height:1.4;}
+
+/* ===================== 底部导航 ===================== */
+.tabbar{
+  flex:0 0 auto;display:flex;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);
+  border-top:1px solid rgba(140,160,210,.16);padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  z-index:6;
+}
+.tab{
+  flex:1;border:none;background:none;padding:6px 2px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  font-family:inherit;color:#9AA6BF;font-weight:800;font-size:10.5px;
+}
+.tab .ti{font-size:20px;line-height:1;}
+.tab.on{color:#6C5CE7;}
+
+/* ===================== 答题页 ===================== */
+#play{background:#F4F7FD;}
+.play-top{
+  flex:0 0 auto;padding:11px 14px;display:flex;align-items:center;gap:9px;
+  background:rgba(255,255,255,.82);backdrop-filter:blur(9px);
+  border-bottom:1px solid rgba(140,160,210,.16);
+}
+.play-top .pt-title{flex:1;font-size:14.5px;font-weight:900;color:#2C3B57;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.qbar{height:8px;background:#E6EAF5;border-radius:99px;overflow:hidden;margin:0 14px;}
+.qbar i{display:block;height:100%;background:linear-gradient(90deg,#FFB347,#FF9524);border-radius:99px;transition:width .35s;width:0;}
+.hud{display:flex;gap:7px;justify-content:center;padding:11px 14px 0;flex-wrap:wrap;}
+.play-body{flex:1;overflow-y:auto;padding:16px 16px 20px;-webkit-overflow-scrolling:touch;}
+.qtext{
+  font-size:19px;font-weight:900;color:#25344F;line-height:1.55;margin-bottom:16px;
+  letter-spacing:.3px;
+}
+.qtext .hl{color:#6C5CE7;}
+.opts{display:flex;flex-direction:column;gap:11px;}
+.opt{
+  display:flex;align-items:center;gap:12px;padding:15px 15px;border-radius:17px;
+  background:#fff;border:2.5px solid #E6EAF5;cursor:pointer;
+  font-size:16.5px;font-weight:800;color:#2C3B57;line-height:1.42;text-align:left;
+  font-family:inherit;transition:transform .12s,border-color .15s,background .15s;
+  box-shadow:0 2px 9px rgba(80,100,160,.08);width:100%;
+}
+.opt:active{transform:scale(.98);}
+.opt .badge{
+  width:31px;height:31px;border-radius:11px;background:#F1F4FC;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14.5px;font-weight:900;color:#7C8BA6;
+}
+.opt.right{background:#E9FBF1;border-color:#2FB86E;}
+.opt.right .badge{background:#2FB86E;color:#fff;}
+.opt.wrong{background:#FEEEEC;border-color:#F05252;animation:shake .4s;}
+.opt.wrong .badge{background:#F05252;color:#fff;}
+.opt.dim{opacity:.42;}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.opt.big{font-size:24px;justify-content:center;}
+
+/* 拼音卡 */
+.pinyin-card{
+  background:#fff;border-radius:22px;padding:22px 16px;text-align:center;
+  box-shadow:0 4px 20px rgba(80,100,160,.13);margin-bottom:16px;
+}
+.py-line{font-size:52px;font-weight:900;color:#6C5CE7;letter-spacing:3px;line-height:1.25;}
+.py-line .py-sp{color:#3FB8AF;}
+.py-hint{font-size:14px;color:#8895AE;font-weight:800;margin-top:9px;}
+
+/* 大字卡 */
+.bigchar{
+  background:linear-gradient(150deg,#FFF9EE,#FFF3DE);border-radius:22px;
+  padding:26px 16px;text-align:center;margin-bottom:16px;
+  border:2.5px solid #F5E2BE;
+}
+.bigchar .bc-char{font-size:74px;font-weight:900;color:#B8791B;line-height:1.1;}
+.bigchar .bc-py{font-size:19px;font-weight:800;color:#C9973F;margin-top:8px;letter-spacing:1px;}
+.bigchar .bc-tip{font-size:12.5px;font-weight:700;color:#A98653;margin-top:8px;}
+
+/* 田字格 */
+.tian{
+  width:150px;height:150px;margin:0 auto 14px;position:relative;
+  background:#fff;border:3px solid #E4B96A;border-radius:12px;
+}
+.tian::before,.tian::after{content:'';position:absolute;background:repeating-linear-gradient(to right,#F0C97A 0 6px,transparent 6px 12px);}
+.tian::before{left:0;right:0;top:50%;height:2px;transform:translateY(-1px);}
+.tian::after{top:0;bottom:0;left:50%;width:2px;transform:translateX(-1px);
+  background:repeating-linear-gradient(to bottom,#F0C97A 0 6px,transparent 6px 12px);}
+.tian .ch{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:100px;font-weight:900;color:#2C3B57;line-height:1;
+}
+
+/* 排序题 */
+.order-area{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.order-slot{
+  min-height:56px;border-radius:16px;border:2.5px dashed #C9D3E8;background:#FAFBFF;
+  display:flex;align-items:center;gap:7px;padding:8px 11px;flex-wrap:wrap;
+}
+.order-slot.filled{border-style:solid;border-color:#B9C3D6;}
+.chip{
+  padding:11px 15px;border-radius:14px;background:linear-gradient(180deg,#8B7BF5,#6C5CE7);
+  color:#fff;font-size:16.5px;font-weight:800;cursor:pointer;border:none;font-family:inherit;
+  box-shadow:0 3px 0 #4C3BC4;transition:transform .12s;
+}
+.chip:active{transform:translateY(2px);}
+.chip.sel{background:linear-gradient(180deg,#5FD9A6,#2FB86E);box-shadow:0 3px 0 #21A05C;}
+.chip.pool{background:linear-gradient(180deg,#AEB9CE,#93A0B9);box-shadow:0 3px 0 #7A879F;}
+.order-pool{display:flex;gap:9px;flex-wrap:wrap;padding:12px;border-radius:16px;background:#fff;min-height:64px;
+  box-shadow:0 2px 10px rgba(80,100,160,.09);}
+
+/* 分类题 */
+.cats{display:flex;flex-direction:column;gap:11px;margin-bottom:13px;}
+.cat{
+  background:#fff;border-radius:17px;padding:12px;box-shadow:0 2px 11px rgba(80,100,160,.09);
+  border:2.5px solid transparent;transition:border-color .15s,background .15s;
+}
+.cat.hot{border-color:#6C5CE7;background:#F5F3FF;}
+.cat-title{font-size:13.5px;font-weight:900;color:#5A6A88;margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+.cat-title .dot{width:9px;height:9px;border-radius:50%;background:#6C5CE7;flex:0 0 auto;}
+.cat-items{display:flex;gap:7px;flex-wrap:wrap;min-height:42px;align-content:flex-start;}
+.pool-wrap{background:#F6F8FE;border-radius:17px;padding:12px;border:2px dashed #C9D3E8;}
+.pool-title{font-size:12.5px;font-weight:900;color:#8895AE;margin-bottom:9px;}
+.pool-items{display:flex;gap:8px;flex-wrap:wrap;min-height:44px;}
+
+/* 反馈浮层 */
+.fb{
+  position:absolute;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));
+  border-radius:20px;padding:15px 16px;z-index:30;
+  box-shadow:0 -4px 30px rgba(60,80,140,.2);
+  transform:translateY(160%);transition:transform .32s cubic-bezier(.2,1.1,.4,1);
+}
+.fb.show{transform:translateY(0);}
+.fb.ok{background:linear-gradient(180deg,#EAFBF2,#DBF7E9);border:2.5px solid #7ED9A9;}
+.fb.no{background:linear-gradient(180deg,#FFF0EE,#FFE2DF);border:2.5px solid #F5A9A2;}
+.fb-head{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:900;margin-bottom:8px;}
+.fb.ok .fb-head{color:#1E9A5C;}
+.fb.no .fb-head{color:#D63C3C;}
+.fb-tip{font-size:14px;font-weight:700;color:#4A5A78;line-height:1.5;margin-bottom:12px;}
+.fb-tip b{color:#2C3B57;}
+.fb-row{display:flex;gap:9px;}
+
+/* 结算页 */
+#result{background:linear-gradient(170deg,#FFF8EA,#EFF3FC);}
+.res-inner{flex:1;overflow-y:auto;padding:22px 18px 20px;text-align:center;}
+.res-star{font-size:60px;line-height:1;animation:pop .55s cubic-bezier(.2,1.6,.5,1);}
+@keyframes pop{0%{transform:scale(0) rotate(-40deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}
+.res-title{font-size:25px;font-weight:900;margin-top:10px;color:#2C3B57;}
+.res-sub{font-size:14px;color:#7C8BA6;font-weight:800;margin-top:6px;}
+.res-card{background:#fff;border-radius:20px;padding:15px;margin-top:16px;box-shadow:0 4px 18px rgba(80,100,160,.12);}
+.res-line{display:flex;justify-content:space-between;font-size:14.5px;font-weight:800;color:#4A5A78;padding:7px 2px;}
+.res-line b{color:#6C5CE7;font-size:16px;}
+.res-line.err b{color:#F05252;}
+.wrong-list{margin-top:14px;text-align:left;}
+.wrong-item{
+  background:#FFF7F6;border-left:4px solid #F5A9A2;border-radius:11px;
+  padding:11px 12px;margin-bottom:9px;
+}
+.wrong-item .wq{font-size:13.5px;font-weight:900;color:#3F4E6B;line-height:1.45;}
+.wrong-item .wa{font-size:12.5px;font-weight:700;color:#D63C3C;margin-top:5px;line-height:1.45;}
+
+/* ===================== 弹窗 ===================== */
+.modal{
+  position:absolute;inset:0;background:rgba(30,42,70,.5);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;padding:22px;z-index:60;
+}
+.modal.show{display:flex;}
+.modal-box{
+  background:#fff;border-radius:24px;padding:22px 18px;width:100%;max-height:82%;overflow-y:auto;
+  box-shadow:0 16px 50px rgba(30,42,70,.3);animation:pop .35s cubic-bezier(.2,1.4,.5,1);
+}
+.modal-title{font-size:19px;font-weight:900;text-align:center;color:#2C3B57;margin-bottom:14px;}
+.modal-actions{display:flex;gap:9px;margin-top:16px;}
+.modal-actions .btn{flex:1;}
+
+/* 知识卡 */
+.kc-lessons{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:13px;}
+.kc-lesson{
+  font-size:11.5px;font-weight:800;color:#6C5CE7;background:#F1EEFF;
+  border-radius:9px;padding:5px 9px;
+}
+.kc-point{
+  font-size:13.5px;font-weight:700;color:#3F4E6B;line-height:1.62;
+  padding:10px 12px;background:#F7F9FE;border-radius:13px;margin-bottom:8px;
+  border-left:4px solid #A99BF5;
+}
+.kc-poem{
+  background:linear-gradient(150deg,#FFF9EE,#FFF3DE);border-radius:15px;padding:13px 14px;margin-bottom:9px;
+  border:2px solid #F5E2BE;
+}
+.kc-poem .kp-t{font-size:15px;font-weight:900;color:#B8791B;}
+.kc-poem .kp-a{font-size:11.5px;font-weight:800;color:#C9973F;margin:3px 0 7px;}
+.kc-poem .kp-c{font-size:14px;font-weight:700;color:#7A5A22;line-height:1.7;}
+
+/* 勋章墙 */
+.wall{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:6px;}
+.badge-it{
+  background:#F7F9FE;border-radius:16px;padding:12px 6px;text-align:center;
+}
+.badge-it.on{background:linear-gradient(160deg,#FFF4DC,#FFE9BE);box-shadow:0 2px 10px rgba(220,170,60,.2);}
+.badge-it .bi-e{font-size:27px;line-height:1;filter:grayscale(1);opacity:.35;}
+.badge-it.on .bi-e{filter:none;opacity:1;}
+.badge-it .bi-n{font-size:10.5px;font-weight:900;color:#8895AE;margin-top:6px;line-height:1.25;}
+.badge-it.on .bi-n{color:#8A6218;}
+
+/* 宝箱动画 */
+.chest-modal{background:rgba(30,42,70,.62);}
+.chest-open{text-align:center;padding:8px 0 4px;}
+.chest-big{font-size:82px;display:inline-block;animation:chestShake .55s ease-in-out infinite;}
+@keyframes chestShake{0%,100%{transform:rotate(-7deg) scale(1)}50%{transform:rotate(7deg) scale(1.09)}}
+.chest-reward{
+  margin-top:16px;background:linear-gradient(160deg,#FFF6E0,#FFEABC);
+  border-radius:18px;padding:17px;border:2.5px solid #F0C97A;
+}
+.chest-reward .cr-e{font-size:46px;line-height:1;}
+.chest-reward .cr-n{font-size:18px;font-weight:900;color:#8A6218;margin-top:8px;}
+.chest-reward .cr-d{font-size:12.5px;font-weight:700;color:#A98653;margin-top:6px;line-height:1.5;}
+
+/* 时间到 */
+.timeup-emoji{font-size:66px;text-align:center;line-height:1;}
+.timeup-title{font-size:21px;font-weight:900;text-align:center;color:#2C3B57;margin-top:12px;}
+.timeup-desc{font-size:14px;font-weight:700;color:#7C8BA6;text-align:center;line-height:1.62;margin-top:11px;}
+
+/* 飞星 */
+.fly{
+  position:absolute;font-size:28px;pointer-events:none;z-index:80;
+  animation:flyUp 1s ease-out forwards;
+}
+@keyframes flyUp{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-120px) scale(1.7)}}
+/* 彩带 */
+.confetti{position:absolute;width:9px;height:15px;pointer-events:none;z-index:75;border-radius:2px;}
+@keyframes fall{0%{transform:translateY(-30px) rotate(0);opacity:1}100%{transform:translateY(105vh) rotate(720deg);opacity:.15}}
+/* 提示条 */
+.toast{
+  position:absolute;left:50%;top:calc(50% - 130px);transform:translate(-50%,-50%) scale(.85);
+  background:rgba(35,48,76,.94);color:#fff;font-size:15.5px;font-weight:800;
+  padding:13px 22px;border-radius:16px;z-index:90;opacity:0;transition:opacity .25s,transform .25s;
+  pointer-events:none;text-align:center;max-width:88%;line-height:1.45;
+}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+::-webkit-scrollbar{width:0;height:0;}
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 首页 ============ -->
+  <div class="screen active" id="home">
+    <div class="home-bg">
+      <div class="bubble hb1"></div><div class="bubble hb2"></div>
+      <div class="bubble hb3"></div><div class="bubble hb4"></div>
+    </div>
+    <div class="home-inner">
+      <div class="logo-emoji" id="homeAvatar">🐣</div>
+      <div>
+        <div class="title-main">语文闯关大冒险</div>
+        <div class="title-sub">一年级上册 · 统编版（2024）</div>
+      </div>
+
+      <div class="timer-box">
+        <div class="timer-top">
+          <div class="timer-label">⏱️ 今日学习时间</div>
+          <div class="timer-val" id="todayTimer">0 / 20 分钟</div>
+        </div>
+        <div class="bar"><i class="bar-fill" id="todayBar"></i></div>
+        <div style="display:flex;justify-content:space-between;margin-top:9px;font-size:11.5px;font-weight:800;color:#8895AE;">
+          <span id="todayStars">今日 ⭐ 0</span>
+          <span id="streakTxt">🔥 连续 0 天</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="avatar-row">
+          <div class="avatar" id="avatarBox">🐣</div>
+          <div class="avatar-info">
+            <div class="avatar-title" id="titleName">🌱 语文小新芽</div>
+            <div class="avatar-desc" id="titleDesc">再获得 15 颗星星升级！</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:7px;margin-top:13px;justify-content:center;flex-wrap:wrap;">
+          <span class="pill">⭐ <b id="pStars">0</b></span>
+          <span class="pill">🪙 <b id="pCoins">0</b></span>
+          <span class="pill">🎖️ <b id="pBadges">0</b></span>
+          <span class="pill">📦 <b id="pChests">0</b></span>
+        </div>
+      </div>
+
+      <button class="btn" style="font-size:19px;padding:17px;" onclick="startAdventure()">🚀 开始闯关</button>
+
+      <div style="display:flex;gap:9px;">
+        <button class="btn sm gray" style="flex:1" onclick="openWall()">🎖️ 勋章墙</button>
+        <button class="btn sm gray" style="flex:1" onclick="openWrongBook()">📕 错题本</button>
+        <button class="btn sm gray" style="flex:1" onclick="openSettings()">⚙️ 设置</button>
+      </div>
+
+      <div style="text-align:center;font-size:11.5px;color:#98A5BC;font-weight:700;line-height:1.6;padding:0 8px;">
+        每天坚持 20 分钟，8 大关卡 40+ 小关等你挑战！<br>
+        学完一个单元就回来复习一次，记得更牢哦～
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 闯关地图 ============ -->
+  <div class="screen" id="map">
+    <div class="topbar">
+      <button class="icon-btn" onclick="show('home')">🏠</button>
+      <div class="t-title">选择关卡</div>
+      <span class="pill" style="padding:5px 10px;font-size:12.5px;">⭐ <b id="mStars">0</b></span>
+      <span class="pill" style="padding:5px 10px;font-size:12.5px;">🪙 <b id="mCoins">0</b></span>
+    </div>
+    <div class="map-scroll" id="mapScroll"></div>
+  </div>
+
+  <!-- ============ 答题页 ============ -->
+  <div class="screen" id="play">
+    <div class="play-top">
+      <button class="icon-btn" onclick="quitPlay()">✕</button>
+      <div class="pt-title" id="playTitle">关卡</div>
+      <span class="pill" style="padding:5px 9px;font-size:12.5px;">❤️ <b id="hpHud">3</b></span>
+    </div>
+    <div class="qbar" style="margin-top:10px;"><i id="qbarFill"></i></div>
+    <div class="hud">
+      <span class="pill" style="padding:5px 10px;font-size:12px;">第 <b id="qIdx">1</b>/<b id="qTotal">10</b> 题</span>
+      <span class="pill" style="padding:5px 10px;font-size:12px;">⚡ <b id="comboHud">0</b> 连对</span>
+      <span class="pill" style="padding:5px 10px;font-size:12px;">⭐ <b id="starHud">0</b></span>
+    </div>
+    <div class="play-body" id="playBody"></div>
+    <div class="fb" id="fb">
+      <div class="fb-head" id="fbHead"></div>
+      <div class="fb-tip" id="fbTip"></div>
+      <div class="fb-row"><button class="btn green" style="flex:1" id="fbBtn" onclick="nextQuestion()">继续</button></div>
+    </div>
+  </div>
+
+  <!-- ============ 结算页 ============ -->
+  <div class="screen" id="result">
+    <div class="res-inner" id="resInner"></div>
+  </div>
+
+  <!-- ============ 通用弹窗 ============ -->
+  <div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box" id="modalBox"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* =========================================================================
+   一年级上册语文（统编版2024）闯关大冒险 —— 题库数据
+   教材结构：我上学了 + 8个单元（识字/汉语拼音/阅读）
+   ========================================================================= */
+
+/* ---------- 1. 声母 / 韵母 / 整体认读音节 ---------- */
+const PINYIN_TABLE = {
+  shengmu: ['b','p','m','f','d','t','n','l','g','k','h','j','q','x','zh','ch','sh','r','z','c','s','y','w'],
+  danyun:  ['a','o','e','i','u','ü'],
+  fuyun:   ['ai','ei','ui','ao','ou','iu','ie','üe','er'],
+  qianbi:  ['an','en','in','un','ün'],
+  houbi:   ['ang','eng','ing','ong'],
+  zhengti: ['zhi','chi','shi','ri','zi','ci','si','yi','wu','yu','ye','yue','yuan','yin','yun','ying']
+};
+
+/* ---------- 2. 每单元知识卡（学习/复习用） ---------- */
+const UNIT_CARDS = {
+  u1: {
+    title: '第一单元 · 识字',
+    lessons: ['1 天地人','2 金木水火土','3 口耳目手足','4 日月山川','语文园地一'],
+    points: [
+      '会认：天 地 人 你 我 他 一 二 三 四 五 上 下 口 耳 目 手 足 站 坐 日 月 山 川 水 火 田 禾 六 七 八 九 十',
+      '会写：一 二 三 上 口 耳 目 手 日 火 田 禾 六 七 八 十',
+      '笔画：横(一) 竖(丨) 横折(口) 撇(手) 弯钩(了) 捺(大) 点(火) 竖折(山)',
+      '笔顺：先横后竖（十）·先撇后捺（人）·先外后里再封口（日 田）·从上到下（三）',
+      '反义词：天—地  上—下  日—月  今—古',
+      '身体部位：口 耳 目 手 足     动作：站如松，坐如钟，行如风，卧如弓'
+    ],
+    poems: [{ title: '咏鹅', author: '唐·骆宾王', text: '鹅，鹅，鹅，曲项向天歌。白毛浮绿水，红掌拨清波。' }]
+  },
+  u2: {
+    title: '第二单元 · 汉语拼音（一）',
+    lessons: ['1 a o e','2 i u ü','3 b p m f','4 d t n l','语文园地二'],
+    points: [
+      '单韵母6个：a o e i u ü —— 张大嘴巴a a a，圆圆嘴巴o o o，扁扁嘴巴e e e，牙齿对齐i i i，嘴巴突出u u u，吹哨嘴巴ü ü ü',
+      '声母：b p m f d t n l',
+      '整体认读音节：yi wu yu zhi chi shi ri zi ci si',
+      '口诀：右下半圆b b b，左下半圆d d d；右上半圆p p p；一个门洞n n n，两个门洞m m m；一根拐棍f f f，伞把朝下t t t',
+      '两拼法：前音轻短后音重，两音相连猛一碰。（b-à→bà）'
+    ],
+    poems: []
+  },
+  u3: {
+    title: '第三单元 · 汉语拼音（二）',
+    lessons: ['5 g k h','6 j q x','7 z c s','8 zh ch sh r','9 y w','语文园地三'],
+    points: [
+      '声母：g k h j q x z c s zh ch sh r y w',
+      '平舌音：z c s      翘舌音：zh ch sh r',
+      'j q x 遇到 ü，两点要摘掉：ju qu xu（小ü小ü有礼貌，见了j q x就脱帽）',
+      'z c s 后面加 h 变翘舌：zh ch sh；加 i 变整体认读：zhi chi shi ri zi ci si',
+      '三拼法：声轻介快韵母响，三音连拼很顺当。（g-u-ā→guā）'
+    ],
+    poems: []
+  },
+  u4: {
+    title: '第四单元 · 汉语拼音（三）',
+    lessons: ['10 ai ei ui','11 ao ou iu','12 ie üe er','13 an en in un ün','14 ang eng ing ong','语文园地四'],
+    points: [
+      '复韵母8个：ai ei ui ao ou iu ie üe     特殊韵母：er（不和声母相拼，自成音节）',
+      '前鼻韵母5个：an en in un ün（例：天安门an 摁门铃en 树荫in 温水un 白云ün）',
+      '后鼻韵母4个：ang eng ing ong（例：昂着头ang 台灯eng 老鹰ing 敲大钟ong）',
+      '标调歌：有a先找a，没a找o e，i u并列标在后，单个韵母不放过。',
+      '句子：一年之计在于春，一日之计在于晨。一寸光阴一寸金，寸金难买寸光阴。'
+    ],
+    poems: []
+  },
+  u5: {
+    title: '第五单元 · 阅读（一）',
+    lessons: ['1 秋天','2 江南','3 雪地里的小画家','4 四季','语文园地五'],
+    points: [
+      '《秋天》：天气凉了，树叶黄了，一片片叶子从树上落下来。一群大雁往南飞，一会儿排成个“人”字，一会儿排成个“一”字。',
+      '《江南》：江南可采莲，莲叶何田田。鱼戏莲叶间。鱼戏莲叶东，鱼戏莲叶西，鱼戏莲叶南，鱼戏莲叶北。',
+      '《雪地里的小画家》：小鸡画竹叶，小狗画梅花，小鸭画枫叶，小马画月牙。青蛙为什么没参加？他在洞里睡着啦！',
+      '《四季》：草芽尖尖—春天；荷叶圆圆—夏天；谷穗弯弯—秋天；雪人大肚子一挺—冬天。',
+      '日积月累：《悯农》锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。'
+    ],
+    poems: [
+      { title: '江南', author: '汉乐府', text: '江南可采莲，莲叶何田田。鱼戏莲叶间。鱼戏莲叶东，鱼戏莲叶西，鱼戏莲叶南，鱼戏莲叶北。' },
+      { title: '悯农', author: '唐·李绅', text: '锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。' }
+    ]
+  },
+  u6: {
+    title: '第六单元 · 识字（二）',
+    lessons: ['5 对韵歌','6 日月明','7 小书包','8 升国旗','语文园地六'],
+    points: [
+      '《对韵歌》：云对雨，雪对风。花对树，鸟对虫。山清对水秀，柳绿对桃红。',
+      '《日月明》：日月明，田力男。小大尖，小土尘。二人从，三人众。双木林，三木森。一人不成众，独木不成林。众人一条心，黄土变成金。',
+      '《小书包》：橡皮 尺子 作业本 铅笔 转笔刀 —— 会写的字：尺 本 刀 不 少',
+      '《升国旗》：五星红旗，我们的国旗。国歌声中，徐徐升起。迎风飘扬，多么美丽。向着国旗，我们立正，望着国旗，我们敬礼。',
+      '方位儿歌：早晨起来，面向太阳。前面是东，后面是西。左面是北，右面是南。',
+      '日积月累：《古朗月行》小时不识月，呼作白玉盘。又疑瑶台镜，飞在青云端。'
+    ],
+    poems: [
+      { title: '古朗月行（节选）', author: '唐·李白', text: '小时不识月，呼作白玉盘。又疑瑶台镜，飞在青云端。' }
+    ]
+  },
+  u7: {
+    title: '第七单元 · 阅读（二）',
+    lessons: ['5 小小的船','6 影子','7 两件宝','语文园地七'],
+    points: [
+      '《小小的船》：弯弯的月儿小小的船，小小的船儿两头尖。我在小小的船里坐，只看见闪闪的星星蓝蓝的天。',
+      '《影子》：影子在前，影子在后，影子常常跟着我，就像一条小黑狗。影子在左，影子在右，影子常常陪着我，它是我的好朋友。',
+      '《两件宝》：人有两件宝，双手和大脑。双手会做工，大脑会思考。用手又用脑，才能有创造。',
+      '形容词搭配：小小的船 弯弯的月儿 闪闪的星星 蓝蓝的天',
+      '日积月累：种瓜得瓜，种豆得豆。前人栽树，后人乘凉。千里之行，始于足下。'
+    ],
+    poems: []
+  },
+  u8: {
+    title: '第八单元 · 阅读（三）',
+    lessons: ['8 比尾巴','9 乌鸦喝水','10 雨点儿','语文园地八'],
+    points: [
+      '《比尾巴》：猴子的尾巴长，兔子的尾巴短，松鼠的尾巴好像一把伞。公鸡的尾巴弯，鸭子的尾巴扁，孔雀的尾巴最好看。',
+      '《乌鸦喝水》：乌鸦把石子一颗一颗放进瓶子里，瓶子里的水渐渐升高，乌鸦就喝着水了。',
+      '《雨点儿》：数不清的雨点儿从云彩里飘落下来。有花有草的地方，花更红了，草更绿了。',
+      '词语积累：牛 羊 果 白',
+      '句子的世界：谁 + 在哪里 + 做什么'
+    ],
+    poems: []
+  }
+};
+
+/* ---------- 3. 闯关地图（8大关，共40小关） ---------- */
+const LEVELS = [
+  { id:'u1', name:'天地人秘境', emoji:'🌏', unit:1, color:'#4A90D9',
+    subs:[
+      { name:'认字小达人（一）', kind:'pic' },
+      { name:'认字小达人（二）', kind:'pic' },
+      { name:'笔画小侦探', kind:'stroke' },
+      { name:'笔顺小老师', kind:'order' },
+      { name:'象形字寻宝', kind:'listen' },
+      { name:'咏鹅挑战', kind:'fill', poem:0 },
+      { name:'字词大闯关', kind:'quiz' }
+    ]},
+  { id:'u2', name:'a o e 森林', emoji:'🌳', unit:2, color:'#52B788',
+    subs:[
+      { name:'单韵母之声', kind:'listen' },
+      { name:'声母认认认', kind:'pic' },
+      { name:'两拼小火车', kind:'blend' },
+      { name:'拼音找朋友', kind:'quiz' },
+      { name:'整体认读', kind:'listen' },
+      { name:'拼音大闯关', kind:'quiz' }
+    ]},
+  { id:'u3', name:'声母魔法屋', emoji:'🏰', unit:3, color:'#9B72CF',
+    subs:[
+      { name:'平翘舌大比拼', kind:'listen' },
+      { name:'jqx脱帽记', kind:'blend' },
+      { name:'三拼小能手', kind:'blend' },
+      { name:'声母分类', kind:'quiz' },
+      { name:'音节小医生', kind:'quiz' },
+      { name:'声母大闯关', kind:'quiz' }
+    ]},
+  { id:'u4', name:'韵母星河', emoji:'✨', unit:4, color:'#3FB8AF',
+    subs:[
+      { name:'复韵母列车', kind:'listen' },
+      { name:'前后鼻音挑战', kind:'group' },
+      { name:'标调小法官', kind:'blend' },
+      { name:'韵母分类', kind:'group' },
+      { name:'音节小医生', kind:'quiz' },
+      { name:'韵母大闯关', kind:'quiz' }
+    ]},
+  { id:'u5', name:'秋天文学园', emoji:'🍁', unit:5, color:'#E8873A',
+    subs:[
+      { name:'课文填空', kind:'fill', poem:0 },
+      { name:'悯农挑战', kind:'fill', poem:1 },
+      { name:'课文大问答', kind:'quiz' },
+      { name:'连词成句', kind:'order' },
+      { name:'我会背', kind:'recite' },
+      { name:'阅读大闯关', kind:'quiz' }
+    ]},
+  { id:'u6', name:'国旗识字营', emoji:'🚩', unit:6, color:'#D9534F',
+    subs:[
+      { name:'对韵歌闯关', kind:'quiz' },
+      { name:'日月明解密', kind:'quiz' },
+      { name:'古朗月行', kind:'fill', poem:0 },
+      { name:'方位大挑战', kind:'pic' },
+      { name:'偏旁找家', kind:'quiz' },
+      { name:'识字大闯关', kind:'quiz' }
+    ]},
+  { id:'u7', name:'小小船夜航', emoji:'⛵', unit:7, color:'#4A6FA5',
+    subs:[
+      { name:'影子大猜想', kind:'quiz' },
+      { name:'两件宝连词', kind:'order' },
+      { name:'反义词大作战', kind:'quiz' },
+      { name:'量词小博士', kind:'quiz' },
+      { name:'比喻句魔法', kind:'quiz' },
+      { name:'阅读大闯关', kind:'quiz' }
+    ]},
+  { id:'u8', name:'比尾巴王国', emoji:'🦚', unit:8, color:'#E0A800',
+    subs:[
+      { name:'比尾巴挑战', kind:'quiz' },
+      { name:'乌鸦喝水', kind:'quiz' },
+      { name:'雨点儿填空', kind:'fill', poem:0 },
+      { name:'句子小工匠', kind:'order' },
+      { name:'汉字变魔法', kind:'piggy' },
+      { name:'期末大BOSS', kind:'boss' }
+    ]}
+];
+
+</script>
+<script>
+/* =========================================================================
+   题库 —— 一年级上册语文（统编版2024）
+   题型：
+     quiz   : 选择题  {q, opts:[], a:index, tip}
+     fill   : 古诗/课文填空（选正确的一句）
+     order  : 排序题，按顺序点击  {q, items:[正确顺序], tip}
+     pic    : 选字词（同 quiz，界面呈现为“选一选”）
+     group  : 分类拖点  {q, cats:{猫名:[项...]}, pool:[]}
+     blend  : 拼音拼读  {q, parts:['b','à'], a:'bà', opts:[]}
+     stroke : 数笔画 / 认笔画
+     listen : 读音认字母
+     recite : 背诵接龙
+     piggy  : 汉字变魔法（加一笔/加偏旁）
+     boss   : 综合大BOSS
+   ========================================================================= */
+
+const QUESTIONS = {
+
+/* ------------------------------------------------------------------ 第一单元 */
+u1_0: [ // 认字小达人（一）
+  {t:'pic', q:'“天”字的拼音是哪个？', opts:['tiān','tān','diān','tián'], a:0, tip:'天 tiān —— 天空那么蓝。'},
+  {t:'pic', q:'“地”字的拼音是哪个？', opts:['dì','tì','dǐ','bì'], a:0, tip:'地 dì —— 天地分上下。'},
+  {t:'pic', q:'“人”字的拼音是哪个？', opts:['rén','yín','lén','réng'], a:0, tip:'人 rén —— 我们都是中国人。'},
+  {t:'pic', q:'“你、我、他”这三个字都是表示什么的词？', opts:['人称词','数量词','颜色词','动物名'], a:0, tip:'你、我、他是人称词。'},
+  {t:'pic', q:'下面哪个字表示“太阳”？', opts:['日','月','山','川'], a:0, tip:'日 rì 就是太阳。日月照今古。'},
+  {t:'pic', q:'“月”字的拼音是哪个？', opts:['yuè','yuē','yè','ruè'], a:0, tip:'月 yuè —— 弯弯的月儿小小的船。'},
+  {t:'pic', q:'“山”和“川”分别指什么？', opts:['山和河流','石头和树','天和地','日和月'], a:0, tip:'山是高山，川是河流。'},
+  {t:'pic', q:'“水”字的拼音是哪个？', opts:['shuǐ','shǔi','suǐ','shuī'], a:0, tip:'水 shuǐ —— 白毛浮绿水。'},
+  {t:'pic', q:'“火”字的拼音是哪个？', opts:['huǒ','hǒu','hǔo','fǒ'], a:0, tip:'火 huǒ —— 金木水火土。'},
+  {t:'pic', q:'“田”和“禾”分别指什么？', opts:['田地和禾苗','天和地','树和花','水和土'], a:0, tip:'田是田地，禾是禾苗。锄禾日当午。'}
+],
+u1_1: [ // 认字小达人（二）
+  {t:'pic', q:'数字“一、二、三、四、五”后面接着是？', opts:['六、七、八、九、十','六、八、十','十、九、八','五、六、七'], a:0, tip:'一二三四五，六七八九十。'},
+  {t:'pic', q:'“上”和“下”是一对什么词？', opts:['反义词（相对词）','同义词','近义词','数量词'], a:0, tip:'天地分上下 —— 上和下是相对的词。'},
+  {t:'pic', q:'“口、耳、目、手、足”都是表示什么的字？', opts:['身体部位','数字','动物','颜色'], a:0, tip:'口是嘴巴，耳是耳朵，目是眼睛，手和足都是身体部位。'},
+  {t:'pic', q:'“目”指的是身体的哪个部位？', opts:['眼睛','嘴巴','耳朵','鼻子'], a:0, tip:'目 mù 就是眼睛 —— 目光、耳目。'},
+  {t:'pic', q:'“足”指的是身体的哪个部位？', opts:['脚','手','头','背'], a:0, tip:'足 zú 就是脚 —— 十足、手足。'},
+  {t:'pic', q:'“十”字的拼音是哪个？', opts:['shí','shì','sí','shī'], a:0, tip:'十 shí —— 十片、十年。'},
+  {t:'pic', q:'“六、七、八、九”中，哪个字的拼音是 qī？', opts:['七','六','八','九'], a:0, tip:'七 qī —— 七个、七月。'},
+  {t:'pic', q:'“九”字的拼音是哪个？', opts:['jiǔ','jiù','jǔ','qiǔ'], a:0, tip:'九 jiǔ —— 九片、九天。'},
+  {t:'pic', q:'“王”字的拼音是哪个？', opts:['wáng','wǎng','huáng','wán'], a:0, tip:'王 wáng —— 王子、大王。'},
+  {t:'pic', q:'“坐”和“站”是什么词？', opts:['表示动作的词','表示数量的词','表示人称的词','表示颜色的词'], a:0, tip:'站如松，坐如钟 —— 都是动作词。'}
+],
+u1_2: [ // 笔画小侦探
+  {t:'stroke', q:'“一”是什么笔画？', opts:['横','竖','撇','点'], a:0, tip:'一 —— 横（héng）。'},
+  {t:'stroke', q:'“十”的第一笔是什么？', opts:['横','竖','撇','捺'], a:0, tip:'十的笔顺：先横后竖。'},
+  {t:'stroke', q:'“口”字的第二笔是什么笔画？', opts:['横折','竖','横','竖折'], a:0, tip:'口：竖 → 横折 → 横。第二笔是横折。'},
+  {t:'stroke', q:'“手”的第四笔是什么笔画？', opts:['弯钩','竖钩','竖','撇'], a:0, tip:'手：撇 → 横 → 横 → 弯钩。第四笔是弯钩，不要写成竖钩。'},
+  {t:'stroke', q:'“山”的第一笔是什么？', opts:['竖','竖折','横','撇'], a:0, tip:'山：先写中间的竖，再写竖折和右边的竖。'},
+  {t:'stroke', q:'“火”字的第一笔是什么？', opts:['点','撇','捺','横'], a:0, tip:'火：先写点和短撇，再写长撇和捺。'},
+  {t:'stroke', q:'“禾”字的第一笔是什么？', opts:['撇','横','竖','捺'], a:0, tip:'禾的第一笔是撇，不是横。'},
+  {t:'stroke', q:'“日”一共有几笔？', opts:['4笔','5笔','3笔','6笔'], a:0, tip:'日：竖 → 横折 → 横 → 横，共4笔。'},
+  {t:'stroke', q:'“田”一共有几笔？', opts:['5笔','4笔','6笔','7笔'], a:0, tip:'田共5笔：竖→横折→横→竖→横。'},
+  {t:'stroke', q:'“大”的最后一笔是什么？', opts:['捺','撇','点','横'], a:0, tip:'大：横 → 撇 → 捺。先撇后捺。'},
+  {t:'stroke', q:'“八”字的写法要注意什么？', opts:['撇低捺高','撇高捺低','两笔一样高','先捺后撇'], a:0, tip:'八：撇低捺高，先撇后捺。'},
+  {t:'stroke', q:'“耳”字里面有多少横？', opts:['两横','一横','三横','没有横'], a:0, tip:'耳内部是两横，不要写少。'}
+],
+u1_3: [ // 笔顺小老师
+  {t:'order', q:'“十”的正确笔顺是？', items:['横','竖'], tip:'先横后竖 —— 十。'},
+  {t:'order', q:'“人”的正确笔顺是？', items:['撇','捺'], tip:'先撇后捺 —— 人。'},
+  {t:'order', q:'“三”的正确笔顺是？', items:['第一横','第二横','第三横'], tip:'从上到下，一笔一笔写。'},
+  {t:'order', q:'“日”的正确笔顺是？', items:['竖','横折','横','横'], tip:'先外后里再封口 —— 日。'},
+  {t:'order', q:'“口”的正确笔顺是？', items:['竖','横折','横'], tip:'口：竖 → 横折 → 横。'},
+  {t:'order', q:'“火”的正确笔顺是？', items:['点','短撇','长撇','捺'], tip:'火先写点和短撇，再写长撇和捺。'},
+  {t:'order', q:'“禾”的正确笔顺是？', items:['撇','横','竖','撇','捺'], tip:'禾：第一笔是撇，最后是撇和捺。'},
+  {t:'order', q:'“山”的正确笔顺是？', items:['竖','竖折','竖'], tip:'山：先写中间的竖，再写左边的竖折，最后右边的竖。'},
+  {t:'order', q:'“小”的正确笔顺是？', items:['竖钩','左点','右点'], tip:'先中间后两边 —— 小。'},
+  {t:'order', q:'“手”的正确笔顺是？', items:['撇','横','横','弯钩'], tip:'手共4笔，最后一笔是弯钩。'}
+],
+u1_4: [ // 象形字寻宝
+  {t:'listen', q:'“日”字最早是根据什么形状造出来的？', opts:['太阳的样子','月亮的弯钩','树枝','人的样子'], a:0, tip:'日是最古老的象形字，像太阳。'},
+  {t:'listen', q:'“月”字是根据什么造出来的？', opts:['弯弯的月亮','圆圆的太阳','一棵树','一条河'], a:0, tip:'月像一个弯弯的月牙。'},
+  {t:'listen', q:'“山”字是根据什么造出来的？', opts:['三个山峰','一条河流','一片田','一朵云'], a:0, tip:'山就像三座连着的山峰。'},
+  {t:'listen', q:'“川”指的是什么？', opts:['河流','高山','田地','太阳'], a:0, tip:'川是河流，像流水一样。'},
+  {t:'listen', q:'“田”字像什么？', opts:['一块块方方的田地','一棵树','一轮太阳','一个房子'], a:0, tip:'田就像农民伯伯种的田，方方正正。'},
+  {t:'listen', q:'“禾”指的是什么？', opts:['禾苗、庄稼','树木','石头','河流'], a:0, tip:'禾是禾苗，锄禾日当午。'},
+  {t:'listen', q:'“目”字是根据什么造出来的？', opts:['人的眼睛','人的嘴巴','人的耳朵','人的手'], a:0, tip:'古人把眼睛竖起来画，就是“目”。'},
+  {t:'listen', q:'“口”字是根据什么造出来的？', opts:['人的嘴巴','人的鼻子','人的头顶','人的肩膀'], a:0, tip:'口像张开的嘴巴。'},
+  {t:'listen', q:'“水”字是根据什么造出来的？', opts:['流动的水波','树上的叶子','天上的星星','地上的石头'], a:0, tip:'水字中间是主流，两边是水花。'},
+  {t:'listen', q:'“木”字是根据什么造出来的？', opts:['一棵树','一朵花','一座山','一条鱼'], a:0, tip:'木像一棵树，上面是枝，下面是根。'}
+],
+u1_5: [ // 咏鹅挑战
+  {t:'fill', q:'《咏鹅》第一句是？', opts:['鹅，鹅，鹅，曲项向天歌。','鹅鹅鹅，红掌拨清波。','白毛浮绿水，曲项向天歌。','鹅，鹅，鹅，白毛浮绿水。'], a:0, tip:'鹅，鹅，鹅，曲项向天歌。'},
+  {t:'fill', q:'“白毛浮绿水”的下一句是？', opts:['红掌拨清波','曲项向天歌','鹅鹅鹅','向天歌'], a:0, tip:'白毛浮绿水，红掌拨清波。'},
+  {t:'fill', q:'《咏鹅》的作者是谁？', opts:['骆宾王','李白','李绅','白居易'], a:0, tip:'《咏鹅》是唐代骆宾王七岁时写的。'},
+  {t:'fill', q:'“曲项向天歌”中的“曲项”指的是鹅的什么？', opts:['弯弯的脖子','弯弯的尾巴','红色的脚掌','白色的羽毛'], a:0, tip:'曲项就是弯弯的脖子。'},
+  {t:'fill', q:'“红掌拨清波”中的“红掌”指的是什么？', opts:['鹅红色的脚掌','红色的手掌','红色的荷叶','红色的花'], a:0, tip:'红掌就是鹅红色的脚掌。'},
+  {t:'fill', q:'《咏鹅》描写的是什么动物？', opts:['白鹅','鸭子','小鸟','公鸡'], a:0, tip:'整首诗都在写白鹅。'},
+  {t:'fill', q:'“白毛浮绿水”中，“浮”字的意思最接近？', opts:['漂在水面上','沉到水底','飞到天上','跑上岸来'], a:0, tip:'浮就是漂在水面上。'},
+  {t:'fill', q:'鹅在“绿水”上，说明水是什么颜色的？', opts:['绿色的','红色的','白色的','蓝色的'], a:0, tip:'绿叶映得水是绿的。'}
+],
+u1_6: [ // 字词大闯关
+  {t:'quiz', q:'“金木水火土”中，“金”指的是什么？', opts:['金属','金子做的树','太阳','石头'], a:0, tip:'金木水火土是五行，金指金属。'},
+  {t:'quiz', q:'“天地分上下，日月照今古”出自哪一课？', opts:['《金木水火土》','《天地人》','《日月山川》','《口耳目手足》'], a:0, tip:'出自识字2《金木水火土》。'},
+  {t:'quiz', q:'“站如松，坐如钟”是说人的什么？', opts:['站和坐的姿势要端正','要站在松树下面','要坐着敲钟','要像树一样高'], a:0, tip:'站着要像松树一样挺拔，坐着要像钟一样端正。'},
+  {t:'quiz', q:'“行如风，卧如弓”中的“卧”是什么意思？', opts:['躺下睡觉','走路','跑步','站立'], a:0, tip:'卧就是躺下，睡觉时要侧卧像弓。'},
+  {t:'quiz', q:'田字格中间的十字线叫什么？', opts:['横中线和竖中线','对角线','边框线','格子线'], a:0, tip:'田字格有横中线、竖中线，交叉是中心点。'},
+  {t:'quiz', q:'“一片两片三四片，五片六片七八片”后面接着是？', opts:['九片十片无数片，飞入水中都不见','九片十片十一片','飞入花中都不见','十片百片无数片'], a:0, tip:'九片十片无数片，飞入水中都不见。'},
+  {t:'quiz', q:'“站如松”体现了中国人怎样的精神？', opts:['挺拔、有精神','懒散','害怕','骄傲'], a:0, tip:'站得挺拔，像松树一样有精神。'},
+  {t:'quiz', q:'下面哪个字和“今”意思相反？', opts:['古','日','月','天'], a:0, tip:'日月照今古 —— 今和古相反。'},
+  {t:'quiz', q:'“一二三四五”后面一句是？', opts:['金木水火土','天地分上下','日月照今古','你我他'], a:0, tip:'一二三四五，金木水火土。'},
+  {t:'quiz', q:'用“日”组词，下面哪个是对的？', opts:['日子','日桌','日书','日门'], a:0, tip:'日子、日月、今日、日出。'}
+],
+
+/* ------------------------------------------------------------------ 第二单元 */
+u2_0: [ // 单韵母之声
+  {t:'listen', q:'“a”的记忆口诀是什么？', opts:['张大嘴巴 a a a','圆圆嘴巴 a a a','扁扁嘴巴 a a a','牙齿对齐 a a a'], a:0, tip:'张大嘴巴 a a a。'},
+  {t:'listen', q:'“o”的记忆口诀是什么？', opts:['圆圆嘴巴 o o o','张大嘴巴 o o o','扁扁嘴巴 o o o','嘴巴突出 o o o'], a:0, tip:'圆圆嘴巴 o o o。'},
+  {t:'listen', q:'“e”的记忆口诀是什么？', opts:['扁扁嘴巴 e e e','圆圆嘴巴 e e e','牙齿对齐 e e e','吹哨嘴巴 e e e'], a:0, tip:'扁扁嘴巴 e e e。'},
+  {t:'listen', q:'“i”的记忆口诀是什么？', opts:['牙齿对齐 i i i','张大嘴巴 i i i','嘴巴突出 i i i','圆圆嘴巴 i i i'], a:0, tip:'牙齿对齐 i i i。'},
+  {t:'listen', q:'“u”的记忆口诀是什么？', opts:['嘴巴突出 u u u','吹哨嘴巴 u u u','牙齿对齐 u u u','扁扁嘴巴 u u u'], a:0, tip:'嘴巴突出 u u u。'},
+  {t:'listen', q:'“ü”的记忆口诀是什么？', opts:['吹哨嘴巴 ü ü ü','嘴巴突出 ü ü ü','圆圆嘴巴 ü ü ü','张大嘴巴 ü ü ü'], a:0, tip:'嘴吹口哨 ü ü ü。'},
+  {t:'listen', q:'单韵母一共几个？', opts:['6个','5个','7个','8个'], a:0, tip:'a o e i u ü，共6个。'},
+  {t:'listen', q:'“ü”上面为什么有两点？', opts:['表示是ü不是u','是装饰','表示读音高','随便加的'], a:0, tip:'两点是区分u和ü的标志。'},
+  {t:'listen', q:'“一声”的声调符号是什么样的？', opts:['平平的一横（ā）','向上升（á）','先降后升（ǎ）','向下降（à）'], a:0, tip:'一声平，二声扬，三声拐弯，四声降。'},
+  {t:'listen', q:'“à”这是第几声？', opts:['第四声','第一声','第二声','第三声'], a:0, tip:'四声降，像下坡。'}
+],
+u2_1: [ // 声母认认认
+  {t:'pic', q:'“右下半圆”是哪个声母？', opts:['b','d','p','q'], a:0, tip:'右下半圆 b b b。'},
+  {t:'pic', q:'“左下半圆”是哪个声母？', opts:['d','b','p','g'], a:0, tip:'左下半圆 d d d。'},
+  {t:'pic', q:'“右上半圆”是哪个声母？', opts:['p','q','b','d'], a:0, tip:'右上半圆 p p p。'},
+  {t:'pic', q:'“两个门洞”是哪个声母？', opts:['m','n','h','w'], a:0, tip:'两个门洞 m m m。'},
+  {t:'pic', q:'“一个门洞”是哪个声母？', opts:['n','m','l','r'], a:0, tip:'一个门洞 n n n。'},
+  {t:'pic', q:'“一根拐棍”是哪个声母？', opts:['f','t','l','k'], a:0, tip:'一根拐棍 f f f。'},
+  {t:'pic', q:'“伞把朝下”是哪个声母？', opts:['t','f','d','g'], a:0, tip:'伞把朝下 t t t。'},
+  {t:'pic', q:'“一根小棍”是哪个声母？', opts:['l','n','i','t'], a:0, tip:'一根小棍 l l l。'},
+  {t:'pic', q:'b p m f 中，哪个是双唇音？', opts:['b p m 都是','f','只有b','只有m'], a:0, tip:'b p m 是双唇音，f 是唇齿音。'},
+  {t:'pic', q:'声母“d”和“b”最容易混淆，可以怎么记？', opts:['右下半圆b，左下半圆d','b在上d在下','b有尾巴d没有','b是圆的d是方的'], a:0, tip:'右下半圆b b b，左下半圆d d d。'},
+  {t:'pic', q:'“f”的记忆口诀是什么？', opts:['一根拐棍 f f f','伞把朝下 f f f','两个门洞 f f f','一把椅子 f f f'], a:0, tip:'一根拐棍 f f f。'},
+  {t:'pic', q:'小学阶段一共有多少个声母？', opts:['23个','24个','26个','21个'], a:0, tip:'声母23个，韵母24个。'}
+],
+u2_2: [ // 两拼小火车
+  {t:'blend', q:'b - à 拼成什么音节？', parts:['b','à'], a:'bà', opts:['bà','pà','bá','bǎ'], tip:'前音轻短后音重，两音相连猛一碰 → bà（爸）。'},
+  {t:'blend', q:'m - ā 拼成什么音节？', parts:['m','ā'], a:'mā', opts:['mā','má','mǎ','mà'], tip:'mā（妈）。'},
+  {t:'blend', q:'p - ó 拼成什么音节？', parts:['p','ó'], a:'pó', opts:['pó','bó','pō','pǒ'], tip:'pó（婆）。'},
+  {t:'blend', q:'f - ù 拼成什么音节？', parts:['f','ù'], a:'fù', opts:['fù','hù','fú','bù'], tip:'fù（父、付）。'},
+  {t:'blend', q:'d - à 拼成什么音节？', parts:['d','à'], a:'dà', opts:['dà','tà','dá','dǎ'], tip:'dà（大）。'},
+  {t:'blend', q:'t - ù 拼成什么音节？', parts:['t','ù'], a:'tù', opts:['tù','dù','tú','tǔ'], tip:'tù（兔）。'},
+  {t:'blend', q:'n - ǚ 拼成什么音节？', parts:['n','ǚ'], a:'nǚ', opts:['nǚ','nǔ','lǚ','nú'], tip:'nǚ（女）—— n和l跟ü相拼，两点不能省。'},
+  {t:'blend', q:'l - ǜ 拼成什么音节？', parts:['l','ǜ'], a:'lǜ', opts:['lǜ','lù','nǜ','lú'], tip:'lǜ（绿）。'},
+  {t:'blend', q:'m - ǐ 拼成什么音节？', parts:['m','ǐ'], a:'mǐ', opts:['mǐ','mí','nǐ','mì'], tip:'mǐ（米）。'},
+  {t:'blend', q:'两拼法的口诀是什么？', parts:['前音','后音'], a:'前音轻短后音重，两音相连猛一碰', opts:['前音轻短后音重，两音相连猛一碰','声轻介快韵母响','一声平二声扬','张大嘴巴a a a'], tip:'这是两拼法口诀。'},
+  {t:'blend', q:'b - á 拼成什么音节？', parts:['b','á'], a:'bá', opts:['bá','bà','pá','bǎ'], tip:'bá（拔）。'},
+  {t:'blend', q:'n - í 拼成什么音节？', parts:['n','í'], a:'ní', opts:['ní','lí','nì','nǐ'], tip:'ní（泥）。'}
+],
+u2_3: [ // 拼音找朋友
+  {t:'quiz', q:'下面哪个是整体认读音节？', opts:['yi','bi','pi','mi'], a:0, tip:'yi 是整体认读音节，要整体记、直接读。'},
+  {t:'quiz', q:'下面哪个是整体认读音节？', opts:['wu','bu','pu','mu'], a:0, tip:'wu 是整体认读音节。'},
+  {t:'quiz', q:'下面哪个是整体认读音节？', opts:['yu','nu','lu','du'], a:0, tip:'yu 是整体认读音节。'},
+  {t:'quiz', q:'整体认读音节要怎么读？', opts:['直接读出整个音节，不用拼','拆开拼读','只读声母','只读韵母'], a:0, tip:'整体认读音节不拼读，直接读出。'},
+  {t:'quiz', q:'“b”和“a”能拼成什么？', opts:['ba','ab','b','a'], a:0, tip:'声母b + 韵母a = ba。'},
+  {t:'quiz', q:'下面哪一组都是声母？', opts:['b p m f','a o e i','ai ei ui','zhi chi shi'], a:0, tip:'b p m f 是声母；a o e i 是韵母；zhi chi shi 是整体认读音节。'},
+  {t:'quiz', q:'下面哪一组都是单韵母？', opts:['a o e i u ü','ai ei ui','an en in','ang eng ing'], a:0, tip:'单韵母共6个。'},
+  {t:'quiz', q:'“māma”（妈妈）这个词里第二个“ma”读什么调？', opts:['轻声','第一声','第二声','第四声'], a:0, tip:'妈妈的后一个字读轻声。'},
+  {t:'quiz', q:'“大”和“小”是一对？', opts:['反义词','同义词','数量词','人称词'], a:0, tip:'大和小意思相反。'},
+  {t:'quiz', q:'下面哪个音节是错的？', opts:['bu','pu','mu','fu'], a:0, tip:'提醒：b p m f 不与 ü 相拼，只与 u 相拼；四个音节都是对的，本题考“声母+u”的拼读。正确答案是它们都能拼。'},
+  {t:'quiz', q:'音节“dì”是第几声？', opts:['第四声','第一声','第二声','第三声'], a:0, tip:'dì 是第四声，表示“地”。'},
+  {t:'quiz', q:'拼音一共有几个声调？', opts:['4个','3个','5个','6个'], a:0, tip:'四个声调：一声平、二声扬、三声拐弯、四声降。'}
+],
+u2_4: [ // 整体认读
+  {t:'listen', q:'“zhi”是怎么来的？', opts:['z加椅子（h）','z加i','z加u','z加a'], a:0, tip:'z加椅子 zh zh zh，再加i成整体认读 zhi。'},
+  {t:'listen', q:'“chi”是怎么来的？', opts:['c加椅子（h）再加i','c加a','c加u','c加o'], a:0, tip:'c加椅子 ch ch ch，再加i成 chi。'},
+  {t:'listen', q:'“shi”是怎么来的？', opts:['s加椅子（h）再加i','s加a','s加e','s加o'], a:0, tip:'s加椅子 sh sh sh，再加i成 shi。'},
+  {t:'listen', q:'小学一共要学多少个整体认读音节？', opts:['16个','10个','23个','24个'], a:0, tip:'整体认读音节共16个。'},
+  {t:'listen', q:'“ri”属于哪一类？', opts:['整体认读音节','单韵母','声母','复韵母'], a:0, tip:'ri 是16个整体认读音节之一。'},
+  {t:'listen', q:'“zi ci si”这三个音节的声母是什么？', opts:['z c s（平舌音）','zh ch sh（翘舌音）','j q x','g k h'], a:0, tip:'z c s 是平舌音，加i成整体认读。'},
+  {t:'listen', q:'“yi”的读音和哪个韵母一样？', opts:['i','u','ü','a'], a:0, tip:'yi 读起来就是 i 的音。'},
+  {t:'listen', q:'“wu”的读音和哪个韵母一样？', opts:['u','i','ü','o'], a:0, tip:'wu 读起来就是 u 的音。'},
+  {t:'listen', q:'“yu”的读音和哪个韵母一样？', opts:['ü','u','i','e'], a:0, tip:'yu 读起来就是 ü 的音，两点去掉了。'},
+  {t:'listen', q:'“ye”的读音和下面哪组一样？', opts:['ie','üe','ei','ia'], a:0, tip:'ye 就是复韵母 ie 的整体认读形式。'},
+  {t:'listen', q:'“yuan”的读音和下面哪组一样？', opts:['üan','ian','uan','ün'], a:0, tip:'yuan 对应 üan。'},
+  {t:'listen', q:'“ying”和“yin”的区别是什么？', opts:['ying是后鼻音，yin是前鼻音','ying是前鼻音','完全一样','ying有两点'], a:0, tip:'yin 前鼻音，ying 后鼻音。'}
+],
+u2_5: [ // 拼音大闯关
+  {t:'quiz', q:'“ā”是第几声？', opts:['第一声','第二声','第三声','第四声'], a:0, tip:'一声平。'},
+  {t:'quiz', q:'“ǎ”是第几声？', opts:['第三声','第一声','第二声','第四声'], a:0, tip:'三声拐弯。'},
+  {t:'quiz', q:'“bàba”（爸爸）中第二个“ba”读什么？', opts:['轻声','第四声','第一声','第二声'], a:0, tip:'爸爸的后一个字读轻声。'},
+  {t:'quiz', q:'下面哪个字读 mā？', opts:['妈','马','骂','麻'], a:0, tip:'妈读第一声 mā。'},
+  {t:'quiz', q:'“马”的拼音是？', opts:['mǎ','mā','mà','má'], a:0, tip:'马 mǎ，第三声。'},
+  {t:'quiz', q:'“土”的拼音是？', opts:['tǔ','tú','dǔ','tù'], a:0, tip:'土 tǔ。'},
+  {t:'quiz', q:'“不”的拼音是？', opts:['bù','pù','bú','mù'], a:0, tip:'不 bù。'},
+  {t:'quiz', q:'“画”的拼音是？', opts:['huà','hà','huǎ','wà'], a:0, tip:'画 huà，三拼：h-u-à。'},
+  {t:'quiz', q:'“打鼓”的拼音是？', opts:['dǎ gǔ','dà gǔ','dǎ kǔ','tǎ gǔ'], a:0, tip:'打鼓 dǎ gǔ。'},
+  {t:'quiz', q:'“下棋”的拼音是？', opts:['xià qí','xià qǐ','xiā qí','sà qí'], a:0, tip:'下棋 xià qí。'},
+  {t:'quiz', q:'“小鸡”的拼音是？', opts:['xiǎo jī','xǎo jī','xiǎo qī','xiāo jī'], a:0, tip:'小鸡 xiǎo jī，三拼。'},
+  {t:'quiz', q:'“写字”的拼音是？', opts:['xiě zì','xě zì','xiě zhì','shě zì'], a:0, tip:'写字 xiě zì。'}
+],
+
+/* ------------------------------------------------------------------ 第三单元 */
+u3_0: [ // 平翘舌大比拼
+  {t:'listen', q:'下面哪些是平舌音？', opts:['z c s','zh ch sh','j q x','g k h'], a:0, tip:'z c s 是平舌音。'},
+  {t:'listen', q:'下面哪些是翘舌音？', opts:['zh ch sh r','z c s','b p m','d t n'], a:0, tip:'zh ch sh r 是翘舌音，也叫卷舌音。'},
+  {t:'listen', q:'“三”的拼音是平舌还是翘舌？', opts:['平舌 sān','翘舌 shān','都不是','都是'], a:0, tip:'三 sān 是平舌音。'},
+  {t:'listen', q:'“山”的拼音是什么？', opts:['shān','sān','zhān','chān'], a:0, tip:'山 shān 是翘舌音。'},
+  {t:'listen', q:'“四”的拼音是什么？', opts:['sì','shì','zì','cì'], a:0, tip:'四 sì 是平舌音。'},
+  {t:'listen', q:'“是”的拼音是什么？', opts:['shì','sì','zhì','chì'], a:0, tip:'是 shì 是翘舌音。'},
+  {t:'listen', q:'“组”和“主”的拼音分别是？', opts:['zǔ、zhǔ','zhǔ、zǔ','cǔ、zhǔ','zǔ、zù'], a:0, tip:'组 zǔ（平舌），主 zhǔ（翘舌）。'},
+  {t:'listen', q:'“次”和“吃”的拼音分别是？', opts:['cì、chī','chī、cì','zì、chī','cì、zhī'], a:0, tip:'次 cì（平舌），吃 chī（翘舌）。'},
+  {t:'listen', q:'“粽子”的拼音是？', opts:['zòng zi','zhòng zi','zǒng zi','còng zi'], a:0, tip:'粽子 zòng zi，平舌。'},
+  {t:'listen', q:'“直尺”的拼音是？', opts:['zhí chǐ','zí cǐ','zhí cǐ','zí chǐ'], a:0, tip:'直尺 zhí chǐ，都是翘舌音。'},
+  {t:'listen', q:'“日出”的拼音是？', opts:['rì chū','rì cū','lì chū','yì chū'], a:0, tip:'日出 rì chū，都是翘舌音。'},
+  {t:'listen', q:'“松树”的拼音是？', opts:['sōng shù','shōng sù','sōng sù','zhōng shù'], a:0, tip:'松树 sōng shù，s平舌、sh翘舌。'}
+],
+u3_1: [ // jqx脱帽记
+  {t:'blend', q:'j - ü 拼成什么？', parts:['j','ü'], a:'ju', opts:['ju','jü','jüu','jv'], tip:'小ü小ü有礼貌，见了j q x就脱帽 → ju。'},
+  {t:'blend', q:'q - ü 拼成什么？', parts:['q','ü'], a:'qu', opts:['qu','qü','qiu','qv'], tip:'q + ü → qu（去）。'},
+  {t:'blend', q:'x - ü 拼成什么？', parts:['x','ü'], a:'xu', opts:['xu','xü','xiu','xv'], tip:'x + ü → xu（许）。'},
+  {t:'blend', q:'y - ü 拼成什么？', parts:['y','ü'], a:'yu', opts:['yu','yü','ye','you'], tip:'小ü见了大y，去掉两点还读ü → yu。'},
+  {t:'blend', q:'j - ü - ǎn 拼成什么？', parts:['j','ü','ǎn'], a:'juǎn', opts:['juǎn','jüǎn','jǎn','juàn'], tip:'三拼：j-ü-ǎn → juǎn（卷）。'},
+  {t:'blend', q:'q - ü - é 拼成什么？', parts:['q','ü','é'], a:'qué', opts:['qué','qüé','qié','què'], tip:'q-ü-é → qué。'},
+  {t:'blend', q:'j - i - ā 拼成什么？', parts:['j','i','ā'], a:'jiā', opts:['jiā','jā','jià','zhiā'], tip:'三拼：声轻介快韵母响 → jiā（家）。'},
+  {t:'blend', q:'q - i - áo 拼成什么？', parts:['q','i','áo'], a:'qiáo', opts:['qiáo','qáo','qiào','jiáo'], tip:'q-i-áo → qiáo（桥）。'},
+  {t:'blend', q:'x - i - ǎo 拼成什么？', parts:['x','i','ǎo'], a:'xiǎo', opts:['xiǎo','xǎo','xiào','sǎo'], tip:'x-i-ǎo → xiǎo（小）。'},
+  {t:'blend', q:'j q x 为什么不和 u 相拼？', parts:['j q x','u'], a:'因为j q x后面跟的u其实是ü', opts:['因为j q x后面跟的u其实是ü（脱帽了）','因为u不好听','因为j q x只能单独用','因为u太少了'], tip:'j q x 从不和u在一起，写作ju qu xu，其实都是ü。'},
+  {t:'blend', q:'小ü遇到n和l，两点要不要去掉？', parts:['n l','ü'], a:'不能去掉', opts:['不能去掉（nǚ、lǜ）','要去掉','可去可不去','变成i'], tip:'ü拼n和l，两点省不得。'},
+  {t:'blend', q:'j - ǔn 拼成什么？', parts:['j','ǔn'], a:'jǔn', opts:['jǔn','jǚn','jùn','jūn'], tip:'直接声母+韵母：jǔn。'}
+],
+u3_2: [ // 三拼小能手
+  {t:'blend', q:'g - u - ā 拼成什么？', parts:['g','u','ā'], a:'guā', opts:['guā','gā','guà','kuā'], tip:'g-u-ā → guā（瓜）。'},
+  {t:'blend', q:'k - u - ò 拼成什么？', parts:['k','u','ò'], a:'kuò', opts:['kuò','kò','kuō','guò'], tip:'k-u-ò → kuò（阔）。'},
+  {t:'blend', q:'h - u - ā 拼成什么？', parts:['h','u','ā'], a:'huā', opts:['huā','hā','huà','guā'], tip:'h-u-ā → huā（花）。'},
+  {t:'blend', q:'g - u - ǒ 拼成什么？', parts:['g','u','ǒ'], a:'guǒ', opts:['guǒ','gǒ','guó','kuǒ'], tip:'g-u-ǒ → guǒ（果）。'},
+  {t:'blend', q:'zhuā 这个音节的三拼是？', parts:['zh','u','ā'], a:'zhuā', opts:['zhuā','zhā','zhuà','chuā'], tip:'zh-u-ā → zhuā（抓）。'},
+  {t:'blend', q:'k - u - ài 拼成什么？', parts:['k','u','ài'], a:'kuài', opts:['kuài','kài','kuǎi','guài'], tip:'k-u-ài → kuài（快）。'},
+  {t:'blend', q:'shuǐ 这个音节的三拼是？', parts:['sh','u','ǐ'], a:'shuǐ', opts:['shuǐ','shǐ','shuì','suǐ'], tip:'sh-u-ǐ → shuǐ（水）。'},
+  {t:'blend', q:'三拼法的口诀是什么？', parts:['三拼'], a:'声轻介快韵母响，三音连拼很顺当', opts:['声轻介快韵母响，三音连拼很顺当','前音轻短后音重','一声平二声扬','有a先找a'], tip:'这是三拼法口诀。'},
+  {t:'blend', q:'三拼音节里的“介母”是哪几个？', parts:['介母'], a:'i u ü', opts:['i u ü','a o e','b p m','z c s'], tip:'介母是 i、u、ü。'},
+  {t:'blend', q:'d - u - ō 拼成什么？', parts:['d','u','ō'], a:'duō', opts:['duō','dō','duó','tuō'], tip:'d-u-ō → duō（多）。'},
+  {t:'blend', q:'q - u - án 拼成什么？', parts:['q','u','án'], a:'quán', opts:['quán','qán','quǎn','juán'], tip:'q-u-án → quán（全）。'},
+  {t:'blend', q:'x - i - à 拼成什么？', parts:['x','i','à'], a:'xià', opts:['xià','xà','xiá','shà'], tip:'x-i-à → xià（下）。'}
+],
+u3_3: [ // 声母分类
+  {t:'quiz', q:'“g k h”这三个声母的发音部位是？', opts:['舌根音','双唇音','舌尖音','唇齿音'], a:0, tip:'g k h 是舌根音。'},
+  {t:'quiz', q:'“j q x”和“z c s”有什么不同？', opts:['j q x 是舌面音，z c s 是平舌音','完全一样','j q x 是翘舌音','z c s 是声母，j q x 不是'], a:0, tip:'j q x 是舌面音，z c s 是平舌音。'},
+  {t:'quiz', q:'“y”和“w”在拼音里的作用是什么？', opts:['做声母，与韵母相拼','是韵母','是整体认读音节','没有作用'], a:0, tip:'y、w 做声母：yī、wǔ。'},
+  {t:'quiz', q:'“z”的口诀是什么？', opts:['像个2字 z z z','半个圆圈 z z z','半个8字 z z z','一把椅子 z z z'], a:0, tip:'像个2字 z z z。'},
+  {t:'quiz', q:'“c”的口诀是什么？', opts:['半个圆圈 c c c','像个2字 c c c','半个8字 c c c','一根拐棍 c c c'], a:0, tip:'半个圆圈 c c c。'},
+  {t:'quiz', q:'“s”的口诀是什么？', opts:['半个8字 s s s','半个圆圈 s s s','像个2字 s s s','两个门洞 s s s'], a:0, tip:'半个8字 s s s。'},
+  {t:'quiz', q:'“j”的口诀是什么？', opts:['i下加钩 j j j','像个9字 j j j','一把椅子 j j j','刀切西瓜 j j j'], a:0, tip:'母鸡追蝶 j j j；i下加钩 j j j。'},
+  {t:'quiz', q:'“q”的口诀是什么？', opts:['像个9字 q q q','i下加钩 q q q','半个8字 q q q','一把椅子 q q q'], a:0, tip:'像个9字 q q q。'},
+  {t:'quiz', q:'“x”的口诀是什么？', opts:['刀切西瓜 x x x','像个9字 x x x','一把椅子 x x x','一根拐棍 x x x'], a:0, tip:'刀切西瓜 x x x。'},
+  {t:'quiz', q:'“h”的口诀是什么？', opts:['一把椅子 h h h','9字加钩 h h h','机枪向上 h h h','一根小棍 h h h'], a:0, tip:'一把椅子 h h h。'},
+  {t:'quiz', q:'“k”的口诀是什么？', opts:['机枪向上 k k k','一把椅子 k k k','9字加钩 k k k','一把雨伞 k k k'], a:0, tip:'机枪向上 k k k。'},
+  {t:'quiz', q:'“g”的口诀是什么？', opts:['9字加钩 g g g','机枪向上 g g g','一把椅子 g g g','像个6字 g g g'], a:0, tip:'9字加钩 g g g。'}
+],
+u3_4: [ // 音节小医生
+  {t:'quiz', q:'下面哪个音节写错了？', opts:['jü','ju','qu','xu'], a:0, tip:'j 和 ü 相拼要脱帽，应写成 ju，不能写 jü。'},
+  {t:'quiz', q:'“小ü见了j q x”应该怎么做？', opts:['去掉两点','加上两点','变成u再加点','保持不变'], a:0, tip:'小ü小ü有礼貌，见了j q x就脱帽。'},
+  {t:'quiz', q:'下面哪个是正确的？', opts:['nǚ','nu','nü（无点）','nua'], a:0, tip:'ü拼n和l，两点省不得 → nǚ。'},
+  {t:'quiz', q:'“lǜ”（绿）如果去掉两点会变成什么字？', opts:['lù（路）','lǚ','lú','lǔ'], a:0, tip:'去掉两点就变成 lù，读音和意思都变了。'},
+  {t:'quiz', q:'“花”的正确拼音是？', opts:['huā','hā','hua','huà'], a:0, tip:'花 huā，三拼 h-u-ā，第一声。'},
+  {t:'quiz', q:'“桌子”的正确拼音是？', opts:['zhuō zi','zuō zi','zhuō zǐ','zhōu zi'], a:0, tip:'桌子 zhuō zi，后一个字读轻声。'},
+  {t:'quiz', q:'标调时“有a先找a，没a找o e，i u并列标在……”？', opts:['后','前','上','中间'], a:0, tip:'i u并列标在后。'},
+  {t:'quiz', q:'“shuǐ”（水）的声调标在哪里？', opts:['i上（标在后）','u上','sh上','都不标'], a:0, tip:'u i 并列标在后，标在 i 上 → shuǐ。'},
+  {t:'quiz', q:'“jiù”（就）的声调标在哪里？', opts:['u上（标在后）','i上','j上','都不标'], a:0, tip:'i u 并列标在后 → jiù。'},
+  {t:'quiz', q:'给“xue”（雪）标上正确的声调是？', opts:['xuě','xué','xuè','xüě'], a:0, tip:'雪 xuě，第三声。'},
+  {t:'quiz', q:'给“niao”（鸟）标上正确的声调是？', opts:['niǎo','niáo','niaò','nǐao'], a:0, tip:'鸟 niǎo，第三声标在a上。'},
+  {t:'quiz', q:'给“yun”（云）标上正确的声调是？', opts:['yún','yǔn','yùn','yūn'], a:0, tip:'云 yún，第二声。'}
+],
+u3_5: [ // 声母大闯关
+  {t:'quiz', q:'“哥哥”的拼音是？', opts:['gē ge','gē gē','kē ke','gē gé'], a:0, tip:'哥哥 gē ge，第二个读轻声。'},
+  {t:'quiz', q:'“喝水”的拼音是？', opts:['hē shuǐ','hē suǐ','kē shuǐ','hē shuī'], a:0, tip:'喝水 hē shuǐ。'},
+  {t:'quiz', q:'“西瓜”的拼音是？', opts:['xī guā','xī guà','sī guā','xī kuā'], a:0, tip:'西瓜 xī guā。'},
+  {t:'quiz', q:'“骑车”的拼音是？', opts:['qí chē','qí cē','jí chē','qí zhē'], a:0, tip:'骑车 qí chē。'},
+  {t:'quiz', q:'“老师”的拼音是？', opts:['lǎo shī','lǎo sī','nǎo shī','lǎo shí'], a:0, tip:'老师 lǎo shī。'},
+  {t:'quiz', q:'“日出”的拼音是？', opts:['rì chū','lì chū','rì cū','yì chū'], a:0, tip:'日出 rì chū。'},
+  {t:'quiz', q:'“祖国”的拼音是？', opts:['zǔ guó','zhǔ guó','zǔ guǒ','cǔ guó'], a:0, tip:'祖国 zǔ guó。'},
+  {t:'quiz', q:'“下雨”的拼音是？', opts:['xià yǔ','xià yú','xià wǔ','sà yǔ'], a:0, tip:'下雨 xià yǔ。'},
+  {t:'quiz', q:'“汉字”的拼音是？', opts:['hàn zì','hàn zhì','hàn cì','hàng zì'], a:0, tip:'汉字 hàn zì。'},
+  {t:'quiz', q:'“音乐”的拼音是？', opts:['yīn yuè','yīn yè','yīng yuè','yīn lè'], a:0, tip:'音乐 yīn yuè。'},
+  {t:'quiz', q:'“数学”的拼音是？', opts:['shù xué','sù xué','shù xuě','shù xié'], a:0, tip:'数学 shù xué。'},
+  {t:'quiz', q:'“折纸”的拼音是？', opts:['zhé zhǐ','zé zhǐ','zhé zǐ','zhé zhī'], a:0, tip:'折纸 zhé zhǐ。'}
+],
+
+/* ------------------------------------------------------------------ 第四单元 */
+u4_0: [ // 复韵母列车
+  {t:'listen', q:'“ai”是怎么组成的？', parts:['a','i'], opts:['a+i，阿姨和我比高矮','a+o','e+i','u+i'], a:0, tip:'a+i → ai，阿姨和我比高矮。'},
+  {t:'listen', q:'“ei”是怎么组成的？', opts:['e+i，白鹅穿衣天上飞','a+i','u+i','o+u'], a:0, tip:'e+i → ei。'},
+  {t:'listen', q:'“ui”是怎么组成的？', opts:['u+i，我穿大衣要喝水','e+i','a+i','u+e'], a:0, tip:'u+i → ui。'},
+  {t:'listen', q:'“ao”是怎么组成的？', opts:['a+o，阿姨爱穿花棉袄','a+i','o+u','e+r'], a:0, tip:'a+o → ao。'},
+  {t:'listen', q:'“ou”是怎么组成的？', opts:['o+u，大海上空飞海鸥','a+o','u+i','i+u'], a:0, tip:'o+u → ou。'},
+  {t:'listen', q:'“iu”是怎么组成的？', opts:['i+u，邮筒前面把信邮','i+e','u+i','o+u'], a:0, tip:'i+u → iu。'},
+  {t:'listen', q:'“ie”是怎么组成的？', opts:['i+e，野鹅早餐吃树叶','i+u','ü+e','e+i'], a:0, tip:'i+e → ie。'},
+  {t:'listen', q:'“üe”是怎么组成的？', opts:['ü+e，小鱼骑鹅去访月','u+e','i+e','ü+n'], a:0, tip:'ü+e → üe。'},
+  {t:'listen', q:'“er”有什么特别的地方？', opts:['它是特殊韵母，不和声母相拼','它只能和b相拼','它是声母','它有两个字母'], a:0, tip:'er 独立自成音节，不和任何声母相拼。'},
+  {t:'listen', q:'复韵母一共有几个？', opts:['8个（+特殊韵母er共9个）','6个','5个','4个'], a:0, tip:'复韵母8个：ai ei ui ao ou iu ie üe，加上特殊的er共9个。'},
+  {t:'listen', q:'前鼻韵母有几个？', opts:['5个','4个','6个','3个'], a:0, tip:'前鼻韵母5个：an en in un ün。'},
+  {t:'listen', q:'后鼻韵母有几个？', opts:['4个','5个','6个','3个'], a:0, tip:'后鼻韵母4个：ang eng ing ong。'}
+],
+u4_1: [ // 前后鼻音挑战
+  {t:'group', q:'把下面的韵母分到“前鼻韵母”和“后鼻韵母”家里。',
+    cats:{'前鼻韵母':['an','en','in','un','ün'], '后鼻韵母':['ang','eng','ing','ong']},
+    pool:['an','eng','in','ong','un','ing','en','ang','ün'],
+    tip:'n结尾是前鼻音，ng结尾是后鼻音。'},
+  {t:'group', q:'把下面的字分到“前鼻音”和“后鼻音”家里。',
+    cats:{'前鼻音':['金','分','云','心'], '后鼻音':['京','风','用','星']},
+    pool:['金','京','分','风','云','用','心','星'],
+    tip:'金jīn/京jīng，分fēn/风fēng，云yún/用yòng，心xīn/星xīng。'},
+  {t:'group', q:'把下面的词按前鼻音、后鼻音分类。',
+    cats:{'前鼻音':['蓝天','森林'], '后鼻音':['阳光','朋友']},
+    pool:['蓝天','阳光','森林','朋友'],
+    tip:'蓝天lán tiān（前），阳光yáng guāng（后），森林sēn lín（前），朋友péng you（后）。'},
+  {t:'group', q:'下面的字哪些是前鼻音？哪些是后鼻音？',
+    cats:{'前鼻音':['山','门','田'], '后鼻音':['长','风','星']},
+    pool:['山','长','门','风','田','星'],
+    tip:'山shān、门mén、田tián是前鼻音；长cháng、风fēng、星xīng是后鼻音。'},
+  {t:'group', q:'把音节分到“带n（前鼻）”和“带ng（后鼻）”家里。',
+    cats:{'带n（前鼻）':['ban','ren','xin'], '带ng（后鼻）':['bang','reng','xing']},
+    pool:['ban','bang','ren','reng','xin','xing'],
+    tip:'看结尾字母：n 是前鼻，ng 是后鼻。'},
+  {t:'group', q:'把“三拼音节”和“两拼音节”分开。',
+    cats:{'两拼音节':['bà','mā','hǔ'], '三拼音节':['guā','huā','xiǎo']},
+    pool:['bà','guā','mā','huā','hǔ','xiǎo'],
+    tip:'两拼=声母+韵母；三拼=声母+介母+韵母。'},
+  {t:'group', q:'把音节分到“整体认读音节”和“需拼读音节”家里。',
+    cats:{'整体认读音节':['yi','wu','yu','ye'], '需拼读音节':['ba','ma','hu','xi']},
+    pool:['yi','ba','wu','ma','yu','hu','ye','xi'],
+    tip:'整体认读音节要整体记、直接读。'},
+  {t:'group', q:'把字按“表示动作”和“表示称呼”分类。',
+    cats:{'表示动作':['坐','站','走','行'], '表示称呼':['你','我','他','爸']},
+    pool:['坐','你','站','我','走','他','行','爸'],
+    tip:'坐、站、走、行是动作；你、我、他、爸是称呼。'}
+],
+u4_2: [ // 标调小法官
+  {t:'blend', q:'标调歌：“有a先找a，没a找o e，i u并列标在……”？', parts:['标调歌'], a:'后', opts:['后','前','上','下'], tip:'i u并列标在后。'},
+  {t:'blend', q:'“hǎo”（好）的声调标在哪里？', parts:['h','ao'], a:'a上', opts:['a上','o上','h上','都不标'], tip:'有a先找a → hǎo。'},
+  {t:'blend', q:'“gěi”（给）的声调标在哪里？', parts:['g','ei'], a:'e上', opts:['e上','i上','g上','都不标'], tip:'没a找o e → gěi。'},
+  {t:'blend', q:'“jiǔ”（九）的声调标在哪里？', parts:['j','iu'], a:'u上（标在后）', opts:['u上（标在后）','i上','j上','都不标'], tip:'i u并列标在后 → jiǔ。'},
+  {t:'blend', q:'“zuì”（最）的声调标在哪里？', parts:['z','ui'], a:'i上（标在后）', opts:['i上（标在后）','u上','z上','都不标'], tip:'i u并列标在后 → zuì。'},
+  {t:'blend', q:'“i”上标了声调后，上面的点要怎么样？', parts:['i'], a:'去掉点', opts:['去掉点','保留点','变成两个点','加一横'], tip:'i 加调号时，上面的点要去掉。'},
+  {t:'blend', q:'“miào”（妙）的声调标在哪里？', parts:['m','iao'], a:'a上', opts:['a上','i上','o上','m上'], tip:'有a先找a → miào。'},
+  {t:'blend', q:'“hòu”（后）的声调标在哪里？', parts:['h','ou'], a:'o上', opts:['o上','u上','h上','都不标'], tip:'没a找o e → hòu。'},
+  {t:'blend', q:'“xióng”（熊）的声调标在哪里？', parts:['x','iong'], a:'o上', opts:['o上','i上','g上','x上'], tip:'没a找o e → xióng。'},
+  {t:'blend', q:'“shuā”（刷）的声调标在哪里？', parts:['sh','ua'], a:'a上', opts:['a上','u上','sh上','都不标'], tip:'有a先找a → shuā。'},
+  {t:'blend', q:'“lǜ”的声调标在哪里？', parts:['l','ü'], a:'ü上', opts:['ü上','l上','都不标','标在两点上'], tip:'单个韵母不放过 → 标在ü上，两点保留。'},
+  {t:'blend', q:'“yī”（一）是第几声？', parts:['y','i'], a:'第一声', opts:['第一声','第二声','第三声','第四声'], tip:'yī 是第一声。'}
+],
+u4_3: [ // 韵母分类
+  {t:'group', q:'把复韵母和鼻韵母分开。',
+    cats:{'复韵母':['ai','ei','ao','ou'], '鼻韵母':['an','en','ang','eng']},
+    pool:['ai','an','ei','en','ao','ang','ou','eng'],
+    tip:'复韵母由两个单韵母组成；鼻韵母带n或ng。'},
+  {t:'group', q:'把单韵母和复韵母分开。',
+    cats:{'单韵母':['a','o','e','i'], '复韵母':['ai','ei','ui','ao']},
+    pool:['a','ai','o','ei','e','ui','i','ao'],
+    tip:'单韵母6个，复韵母8个。'},
+  {t:'group', q:'把“er”相关的知识分类：哪些能跟声母相拼？',
+    cats:{'能跟声母相拼':['a','ai','an','ang'], '不能跟声母相拼':['er']},
+    pool:['a','ai','an','ang','er'],
+    tip:'er 是特殊韵母，只能自成音节。'},
+  {t:'group', q:'把下面的音节按韵母分类。',
+    cats:{'韵母是ai':['bái','kāi'], '韵母是ei':['bèi','gěi']},
+    pool:['bái','bèi','kāi','gěi'],
+    tip:'bái、kāi 的韵母是ai；bèi、gěi 的韵母是ei。'},
+  {t:'group', q:'把音节按“声母是平舌音”和“声母是翘舌音”分类。',
+    cats:{'平舌音声母':['zǔ','cì','sān'], '翘舌音声母':['zhǔ','chī','shān']},
+    pool:['zǔ','zhǔ','cì','chī','sān','shān'],
+    tip:'z c s 平舌，zh ch sh 翘舌。'},
+  {t:'group', q:'把词语按“单韵母结尾”和“复韵母结尾”分类。',
+    cats:{'单韵母结尾':['mā','hǔ','tǔ'], '复韵母结尾':['bái','hǎo','shuǐ']},
+    pool:['mā','bái','hǔ','hǎo','tǔ','shuǐ'],
+    tip:'mā hǔ tǔ 以单韵母结尾；bái hǎo shuǐ 以复韵母结尾。'},
+  {t:'group', q:'把音节分到“三拼”和“非三拼”家里。',
+    cats:{'三拼音节':['guā','jiā','xiǎo','zhuā'], '非三拼音节':['bà','mā','hǔ','nǐ']},
+    pool:['guā','bà','jiā','mā','xiǎo','hǔ','zhuā','nǐ'],
+    tip:'三拼=声母+介母+韵母。'},
+  {t:'group', q:'把韵母按“一声韵母变身整体认读”配对分类。',
+    cats:{'对应i/u/ü':['yi','wu','yu'], '对应ie/üe/üan':['ye','yue','yuan']},
+    pool:['yi','ye','wu','yue','yu','yuan'],
+    tip:'yi= i，wu= u，yu= ü；ye= ie，yue= üe，yuan= üan。'}
+],
+u4_4: [ // 音节小医生
+  {t:'quiz', q:'“天安门”的“安”韵母是？', opts:['an（前鼻韵母）','ang（后鼻韵母）','ai','en'], a:0, tip:'天安门 an an an。'},
+  {t:'quiz', q:'“摁门铃”的“摁”韵母是？', opts:['en','eng','an','ei'], a:0, tip:'摁门铃 en en en。'},
+  {t:'quiz', q:'“老鹰”的“鹰”韵母是？', opts:['ing','in','eng','ong'], a:0, tip:'老鹰飞 ing ing ing。'},
+  {t:'quiz', q:'“敲大钟”的“钟”韵母是？', opts:['ong','eng','ang','ing'], a:0, tip:'敲大钟 ong ong ong。'},
+  {t:'quiz', q:'“白云”的“云”韵母是？', opts:['ün','un','in','ong'], a:0, tip:'白云朵 ün ün ün。'},
+  {t:'quiz', q:'“温水”的“温”韵母是？', opts:['un','ün','en','ong'], a:0, tip:'温温水 un un un。'},
+  {t:'quiz', q:'“台灯”的“灯”韵母是？', opts:['eng','en','ang','ong'], a:0, tip:'台灯 eng eng eng。'},
+  {t:'quiz', q:'“昂着头”的“昂”韵母是？', opts:['ang','an','eng','ong'], a:0, tip:'昂着头 ang ang ang。'},
+  {t:'quiz', q:'“一件花衣”的“衣”是什么音节？', opts:['整体认读音节 yi','声母y','韵母i','两拼音节'], a:0, tip:'yi 是整体认读音节。'},
+  {t:'quiz', q:'“月亮”的“月”是什么音节？', opts:['整体认读音节 yue','三拼音节','两拼音节','声母'], a:0, tip:'yue 是整体认读音节。'},
+  {t:'quiz', q:'“一寸光阴一寸金”的“金”韵母是？', opts:['in（前鼻）','ing（后鼻）','en','un'], a:0, tip:'金 jīn，前鼻韵母 in。'},
+  {t:'quiz', q:'“寸金难买寸光阴”告诉我们什么道理？', opts:['要珍惜时间','要多花钱','要多读书','要早点睡觉'], a:0, tip:'一寸光阴一寸金，寸金难买寸光阴 —— 时间最宝贵。'}
+],
+u4_5: [ // 韵母大闯关
+  {t:'quiz', q:'“白云”的拼音是？', opts:['bái yún','bái yūn','bǎi yún','bái yǔn'], a:0, tip:'白云 bái yún。'},
+  {t:'quiz', q:'“小鸟”的拼音是？', opts:['xiǎo niǎo','xiǎo niào','xiāo niǎo','sǎo niǎo'], a:0, tip:'小鸟 xiǎo niǎo。'},
+  {t:'quiz', q:'“花朵”的拼音是？', opts:['huā duǒ','huā duò','hā duǒ','huà duǒ'], a:0, tip:'花朵 huā duǒ。'},
+  {t:'quiz', q:'“风车”的拼音是？', opts:['fēng chē','fēn chē','fēng cē','fōng chē'], a:0, tip:'风车 fēng chē。'},
+  {t:'quiz', q:'“大米”的拼音是？', opts:['dà mǐ','dà mí','dá mǐ','dà nǐ'], a:0, tip:'大米 dà mǐ。'},
+  {t:'quiz', q:'“水果”的拼音是？', opts:['shuǐ guǒ','shuǐ guó','suǐ guǒ','shuǐ kuǒ'], a:0, tip:'水果 shuǐ guǒ。'},
+  {t:'quiz', q:'“山水”的拼音是？', opts:['shān shuǐ','sān suǐ','shān shuǐ（翘舌）','shān suǐ'], a:0, tip:'山水 shān shuǐ。'},
+  {t:'quiz', q:'“田地”的拼音是？', opts:['tián dì','tián tì','tán dì','tiān dì'], a:0, tip:'田地 tián dì。'},
+  {t:'quiz', q:'“我愛妈妈”的拼音是？', opts:['wǒ ài mā ma','wǒ ài mā mā','wō ài mā ma','wǒ ái mā ma'], a:0, tip:'我爱妈妈：wǒ ài mā ma。'},
+  {t:'quiz', q:'“田里有许多小草”的拼音开头是？', opts:['Tián lǐ yǒu xǔ duō xiǎo cǎo','Tián lǐ yǒu xǔ duō xiāo cǎo','Tiān lǐ yǒu xǔ duō xiǎo cǎo','Tián lì yǒu xǔ duō xiǎo cǎo'], a:0, tip:'田里有许多小草。'},
+  {t:'quiz', q:'“小白兔，白又白”的拼音是？', opts:['Xiǎo bái tù，bái yòu bái','Xiǎo bái tù，bái yǒu bái','Xiǎo bái tú，bái yòu bái','Sǎo bái tù，bái yòu bái'], a:0, tip:'小白兔，白又白。'},
+  {t:'quiz', q:'下面哪个词里有后鼻韵母？', opts:['星星（xīng）','天（tiān）','云（yún）','门（mén）'], a:0, tip:'xīng 有后鼻韵母 ing。'}
+],
+
+/* ------------------------------------------------------------------ 第五单元 */
+u5_0: [ // 课文填空《秋天》
+  {t:'fill', q:'《秋天》第一句是？', opts:['天气凉了，树叶黄了，一片片叶子从树上落下来。','天气热了，树叶绿了。','秋天到了，果子熟了。','天气冷了，雪花飘了。'], a:0, tip:'天气凉了，树叶黄了……'},
+  {t:'fill', q:'“一群大雁往南飞，一会儿排成个‘人’字，一会儿排成个？”', opts:['“一”字','“大”字','“十”字','“天”字'], a:0, tip:'一会儿排成个“人”字，一会儿排成个“一”字。'},
+  {t:'fill', q:'《秋天》最后一句是？', opts:['啊！秋天来了！','啊！冬天来了！','秋天真美啊！','我爱秋天！'], a:0, tip:'啊！秋天来了！'},
+  {t:'fill', q:'《秋天》里说“天空那么___”。', opts:['蓝，那么高','白，那么远','黑，那么静','红，那么美'], a:0, tip:'天空那么蓝，那么高。'},
+  {t:'fill', q:'大雁为什么往南飞？', opts:['南方暖和，去找温暖的地方过冬','南方有食物','南方有水','它们想旅游'], a:0, tip:'秋天到了，大雁飞到南方过冬。'},
+  {t:'fill', q:'《秋天》描写的是哪个季节？', opts:['秋天','春天','夏天','冬天'], a:0, tip:'题目就是《秋天》。'},
+  {t:'fill', q:'“一片片叶子”中的“一片片”说明叶子怎么样？', opts:['很多，连续不断地落下来','只有一片','很整齐','很小'], a:0, tip:'“一片片”表示数量多、接连不断。'},
+  {t:'fill', q:'《江南》第一句是？', opts:['江南可采莲，莲叶何田田。','江南可采菱，荷叶何圆圆。','江南可采莲，鱼戏莲叶间。','江南好，风景旧曾谙。'], a:0, tip:'江南可采莲，莲叶何田田。'},
+  {t:'fill', q:'“鱼戏莲叶间”后面接着是？', opts:['鱼戏莲叶东，鱼戏莲叶西，鱼戏莲叶南，鱼戏莲叶北。','鱼戏莲叶东，鱼戏莲叶南。','鱼戏莲叶西，鱼戏莲叶北。','鱼戏莲叶中，鱼戏莲叶边。'], a:0, tip:'东、西、南、北——写出鱼儿到处游。'},
+  {t:'fill', q:'《江南》是哪个朝代的诗歌？', opts:['汉乐府','唐代','宋代','明代'], a:0, tip:'《江南》是汉乐府诗。'}
+],
+u5_1: [ // 悯农挑战
+  {t:'fill', q:'《悯农》第一句是？', opts:['锄禾日当午，汗滴禾下土。','锄禾日当午，粒粒皆辛苦。','谁知盘中餐，汗滴禾下土。','春种一粒粟，秋收万颗子。'], a:0, tip:'锄禾日当午，汗滴禾下土。'},
+  {t:'fill', q:'“谁知盘中餐”的下一句是？', opts:['粒粒皆辛苦','汗滴禾下土','锄禾日当午','农夫犹饿死'], a:0, tip:'谁知盘中餐，粒粒皆辛苦。'},
+  {t:'fill', q:'《悯农》的作者是谁？', opts:['李绅','李白','骆宾王','杜甫'], a:0, tip:'《悯农》是唐代李绅写的。'},
+  {t:'fill', q:'“锄禾日当午”中的“锄禾”是什么意思？', opts:['在田地里锄草松土','割稻子','种禾苗','浇水'], a:0, tip:'“锄禾”指在田地里锄草、松土。'},
+  {t:'fill', q:'“汗滴禾下土”说明农民伯伯怎么样？', opts:['非常辛苦，汗水滴到泥土里','很凉快','很快乐','在洗澡'], a:0, tip:'汗水一滴滴落进泥土，说明非常辛苦。'},
+  {t:'fill', q:'《悯农》告诉我们什么道理？', opts:['要珍惜粮食，不浪费每一粒米','要多喝水','要早点睡觉','要多晒太阳'], a:0, tip:'粒粒皆辛苦 —— 要爱惜粮食。'},
+  {t:'fill', q:'“悯农”的“悯”是什么意思？', opts:['同情、怜惜','害怕','喜欢','生气'], a:0, tip:'“悯”是同情、怜惜的意思。'},
+  {t:'fill', q:'《雪地里的小画家》里，小鸡画的是什么？', opts:['竹叶','梅花','枫叶','月牙'], a:0, tip:'小鸡画竹叶，小狗画梅花，小鸭画枫叶，小马画月牙。'},
+  {t:'fill', q:'《雪地里的小画家》里，小马画的是什么？', opts:['月牙','梅花','竹叶','枫叶'], a:0, tip:'小马画月牙。'},
+  {t:'fill', q:'《雪地里的小画家》中，谁没有参加？', opts:['青蛙，他在洞里睡着啦','小鸭','小马','小狗'], a:0, tip:'青蛙为什么没参加？他在洞里睡着啦！'}
+],
+u5_2: [ // 课文大问答
+  {t:'quiz', q:'《四季》中，草芽尖尖对谁说？它是什么季节？', opts:['对小鸟说，我是春天','对青蛙说，我是夏天','对小鸟说，我是秋天','对大地说，我是冬天'], a:0, tip:'草芽尖尖，他对小鸟说：“我是春天。”'},
+  {t:'quiz', q:'《四季》中，荷叶圆圆是什么季节？', opts:['夏天','春天','秋天','冬天'], a:0, tip:'荷叶圆圆，他对青蛙说：“我是夏天。”'},
+  {t:'quiz', q:'《四季》中，谷穗弯弯是什么季节？', opts:['秋天','夏天','春天','冬天'], a:0, tip:'谷穗弯弯，他鞠着躬说：“我是秋天。”'},
+  {t:'quiz', q:'《四季》中，“雪人大肚子一挺”说自己是？', opts:['冬天','秋天','夏天','春天'], a:0, tip:'他顽皮地说：“我就是冬天。”'},
+  {t:'quiz', q:'《雪地里的小画家》里，小狗画的是什么？', opts:['梅花','竹叶','枫叶','月牙'], a:0, tip:'小狗画梅花。'},
+  {t:'quiz', q:'《雪地里的小画家》里，小鸭画的是什么？', opts:['枫叶','梅花','竹叶','月牙'], a:0, tip:'小鸭画枫叶。'},
+  {t:'quiz', q:'《秋天》里“一群大雁往南飞”的“一群”说明大雁？', opts:['很多只一起飞','只有一只','三只','五只'], a:0, tip:'“一群”表示数量多。'},
+  {t:'quiz', q:'《江南》中“莲叶何田田”形容莲叶？', opts:['又多又密','很稀疏','很黄','很小'], a:0, tip:'何田田 —— 莲叶茂盛的样子。'},
+  {t:'quiz', q:'《小小的船》中，“小小的船”其实是什么？', opts:['弯弯的月儿','一片叶子','一只小船','一朵云'], a:0, tip:'弯弯的月儿小小的船。'},
+  {t:'quiz', q:'《影子》中，影子像什么？', opts:['一条小黑狗','一只小花猫','一朵云','一棵树'], a:0, tip:'影子常常跟着我，就像一条小黑狗。'},
+  {t:'quiz', q:'《两件宝》中，人的两件宝是什么？', opts:['双手和大脑','眼睛和嘴巴','耳朵和脚','书本和铅笔'], a:0, tip:'人有两件宝，双手和大脑。'},
+  {t:'quiz', q:'《比尾巴》中，谁的尾巴好像一把伞？', opts:['松鼠','猴子','兔子','孔雀'], a:0, tip:'松鼠的尾巴好像一把伞。'}
+],
+u5_3: [ // 连词成句
+  {t:'order', q:'把词语排成一句通顺的话：', items:['弯弯的','月儿','小小的','船'], tip:'弯弯的月儿小小的船。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['我','在','小小的','船里','坐'], tip:'我在小小的船里坐。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['小鸡','画','竹叶'], tip:'小鸡画竹叶。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['天气','凉了'], tip:'天气凉了。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['一片片','叶子','从','树上','落下来'], tip:'一片片叶子从树上落下来。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['草芽','尖尖','他','对','小鸟','说','我是春天'], tip:'草芽尖尖，他对小鸟说：“我是春天。”'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['我们','向着','国旗','立正'], tip:'向着国旗，我们立正。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['五星红旗','我们的','国旗'], tip:'五星红旗，我们的国旗。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['影子','在','前','影子','在','后'], tip:'影子在前，影子在后。'},
+  {t:'order', q:'把词语排成一句通顺的话：', items:['双手','会','做工','大脑','会','思考'], tip:'双手会做工，大脑会思考。'}
+],
+u5_4: [ // 我会背
+  {t:'recite', q:'《小小的船》接龙：“弯弯的月儿小小的船，”下一句是？', opts:['小小的船儿两头尖','小小的船儿真好看','我坐在小小的船里','闪闪的星星蓝蓝的天'], a:0, tip:'弯弯的月儿小小的船，小小的船儿两头尖。'},
+  {t:'recite', q:'《小小的船》接龙：“我在小小的船里坐，”下一句是？', opts:['只看见闪闪的星星蓝蓝的天','只看见弯弯的月儿','只看见白白的云朵','只看见蓝蓝的大海'], a:0, tip:'只看见闪闪的星星蓝蓝的天。'},
+  {t:'recite', q:'《对韵歌》接龙：“云对雨，雪对风，”下一句是？', opts:['花对树，鸟对虫','山对水，柳对桃','天对地，日对月','花对草，鸟对鱼'], a:0, tip:'云对雨，雪对风。花对树，鸟对虫。'},
+  {t:'recite', q:'《对韵歌》接龙：“山清对水秀，”下一句是？', opts:['柳绿对桃红','花红对柳绿','鸟语对花香','云白对天蓝'], a:0, tip:'山清对水秀，柳绿对桃红。'},
+  {t:'recite', q:'《日月明》接龙：“日月明，田力男。”下一句是？', opts:['小大尖，小土尘','二人从，三人众','双木林，三木森','一人不成众'], a:0, tip:'日月明，田力男。小大尖，小土尘。'},
+  {t:'recite', q:'《日月明》接龙：“二人从，三人众。”下一句是？', opts:['双木林，三木森','小大尖，小土尘','一人不成众','众人一条心'], a:0, tip:'二人从，三人众。双木林，三木森。'},
+  {t:'recite', q:'《升国旗》接龙：“国歌声中，徐徐升起。”下一句是？', opts:['迎风飘扬，多么美丽','五星红旗，我们的国旗','向着国旗，我们立正','望着国旗，我们敬礼'], a:0, tip:'迎风飘扬，多么美丽。'},
+  {t:'recite', q:'《升国旗》接龙：“向着国旗，我们立正。”下一句是？', opts:['望着国旗，我们敬礼','迎风飘扬，多么美丽','五星红旗，我们的国旗','国歌声中，徐徐升起'], a:0, tip:'望着国旗，我们敬礼。'},
+  {t:'recite', q:'《比尾巴》接龙：“谁的尾巴长？谁的尾巴短？”下一句是？', opts:['谁的尾巴好像一把伞','谁的尾巴弯','谁的尾巴扁','谁的尾巴最好看'], a:0, tip:'谁的尾巴好像一把伞？'},
+  {t:'recite', q:'《比尾巴》里，谁的尾巴最好看？', opts:['孔雀','公鸡','鸭子','松鼠'], a:0, tip:'孔雀的尾巴最好看。'},
+  {t:'recite', q:'《两件宝》接龙：“人有两件宝，”下一句是？', opts:['双手和大脑','眼睛和耳朵','书本和铅笔','爸爸和妈妈'], a:0, tip:'人有两件宝，双手和大脑。'},
+  {t:'recite', q:'《两件宝》接龙：“用手不用脑，”下一句是？', opts:['事情做不好','啥也办不到','才能有创造','大脑会思考'], a:0, tip:'用手不用脑，事情做不好。用脑不用手，啥也办不到。'}
+],
+u5_5: [ // 阅读大闯关
+  {t:'quiz', q:'下面哪个词是形容“秋天”的？', opts:['树叶黄了','荷叶圆圆','雪花飘飘','草芽尖尖'], a:0, tip:'秋天——树叶黄了，大雁南飞。'},
+  {t:'quiz', q:'下面哪个词是形容“冬天”的？', opts:['雪花飘飘','谷穗弯弯','荷叶圆圆','柳绿花红'], a:0, tip:'雪人大肚子一挺是冬天。'},
+  {t:'quiz', q:'“草芽尖尖”形容的是哪个季节的景象？', opts:['春天','夏天','秋天','冬天'], a:0, tip:'草芽尖尖是春天。'},
+  {t:'quiz', q:'“荷叶圆圆”形容的是哪个季节？', opts:['夏天','春天','秋天','冬天'], a:0, tip:'荷叶圆圆是夏天。'},
+  {t:'quiz', q:'《秋天》里大雁排成的形状像什么字？', opts:['“人”字和“一”字','“十”字','“大”字','“天”字'], a:0, tip:'一会儿排成个“人”字，一会儿排成个“一”字。'},
+  {t:'quiz', q:'下面哪个词语搭配是对的？', opts:['蓝蓝的天','蓝蓝的树','蓝蓝的花','蓝蓝的草'], a:0, tip:'蓝蓝的天、蓝蓝的大海。'},
+  {t:'quiz', q:'下面哪个词语搭配是对的？', opts:['闪闪的星星','闪闪的树','闪闪的草','闪闪的书'], a:0, tip:'闪闪的星星。'},
+  {t:'quiz', q:'“弯弯的”可以用来形容什么？', opts:['月儿、小路、小河','书本、桌子','书包、铅笔','电视、电脑'], a:0, tip:'弯弯的月儿、弯弯的小路。'},
+  {t:'quiz', q:'《雪地里的小画家》中，小动物用什么画画？', opts:['用脚（脚印），不用颜料不用笔','用水彩笔','用铅笔','用手'], a:0, tip:'不用颜料不用笔，几步就成一幅画。'},
+  {t:'quiz', q:'《乌鸦喝水》中，乌鸦是怎么喝到水的？', opts:['把石子放进瓶子里，水升高了就喝到了','把瓶子打碎','直接把嘴伸进去','等下雨'], a:0, tip:'乌鸦把石子一颗一颗放进瓶子里，水渐渐升高。'},
+  {t:'quiz', q:'《雨点儿》中，大雨点儿要去哪里？', opts:['没有花没有草的地方','有花有草的地方','大海里','山顶上'], a:0, tip:'大雨点儿要去没有花没有草的地方。'},
+  {t:'quiz', q:'《雨点儿》最后，没有花没有草的地方变成了什么样？', opts:['开出了红的花，长出了绿的草','还是光秃秃的','变成了一片沙漠','变成了一片海'], a:0, tip:'开出了红的花，长出了绿的草。'}
+],
+
+/* ------------------------------------------------------------------ 第六单元 */
+u6_0: [ // 对韵歌闯关
+  {t:'quiz', q:'《对韵歌》：“云对___”', opts:['雨','雪','风','雾'], a:0, tip:'云对雨，雪对风。'},
+  {t:'quiz', q:'《对韵歌》：“雪对___”', opts:['风','雨','霜','云'], a:0, tip:'云对雨，雪对风。'},
+  {t:'quiz', q:'《对韵歌》：“花对___”', opts:['树','草','叶','果'], a:0, tip:'花对树，鸟对虫。'},
+  {t:'quiz', q:'《对韵歌》：“鸟对___”', opts:['虫','鱼','树','花'], a:0, tip:'花对树，鸟对虫。'},
+  {t:'quiz', q:'《对韵歌》：“山清对___”', opts:['水秀','柳绿','桃红','花红'], a:0, tip:'山清对水秀，柳绿对桃红。'},
+  {t:'quiz', q:'《对韵歌》：“柳绿对___”', opts:['桃红','水秀','花红','草青'], a:0, tip:'柳绿对桃红。'},
+  {t:'quiz', q:'“对韵歌”最大的特点是什么？', opts:['句子里有一对一对的词语，读起来朗朗上口','句子很长','没有标点','都是问句'], a:0, tip:'对韵歌讲究对仗，读起来有节奏。'},
+  {t:'quiz', q:'《快快乐乐》“云对雨”中的“云”和“雨”是什么关系？', opts:['相对、成对的关系','一样的东西','没有关系','是反义词'], a:0, tip:'云和雨是自然现象中成对的词。'},
+  {t:'quiz', q:'下面哪一对是“对子”？', opts:['天对地','天对云','地对雨','云对月'], a:0, tip:'天对地、日对月、今对古。'},
+  {t:'quiz', q:'下面哪一对是“对子”？', opts:['日对月','日对星','月对年','天对云'], a:0, tip:'日月照今古。'}
+],
+u6_1: [ // 日月明解密
+  {t:'quiz', q:'“日月”合起来变成什么字？', opts:['明','朋','晴','晚'], a:0, tip:'日月明 —— 日和月都很亮，合起来是“明”。'},
+  {t:'quiz', q:'“田力”合起来变成什么字？', opts:['男','甲','里','力'], a:0, tip:'田力男 —— 在田里出力的人是男。'},
+  {t:'quiz', q:'“小大”合起来变成什么字？', opts:['尖','尘','光','当'], a:0, tip:'小大尖 —— 上小下大就是尖。'},
+  {t:'quiz', q:'“小土”合起来变成什么字？', opts:['尘','尖','坐','里'], a:0, tip:'小土尘 —— 很小的土就是灰尘。'},
+  {t:'quiz', q:'“二人”合起来变成什么字？', opts:['从','众','林','森'], a:0, tip:'二人从。'},
+  {t:'quiz', q:'“三人”合起来变成什么字？', opts:['众','从','森','软'], a:0, tip:'三人众 —— 人多了就是众人。'},
+  {t:'quiz', q:'“双木”合起来变成什么字？', opts:['林','森','树','木'], a:0, tip:'双木林。'},
+  {t:'quiz', q:'“三木”合起来变成什么字？', opts:['森','林','树','果'], a:0, tip:'三木森 —— 树很多就是森林。'},
+  {t:'quiz', q:'“一人不成众，独木不成林”告诉我们什么？', opts:['人多力量大，要团结','一个人也能成功','树多了不好','不要和别人玩'], a:0, tip:'众人一条心，黄土变成金。'},
+  {t:'quiz', q:'“众人一条心，黄土变成金”是什么意思？', opts:['大家团结一心，就能创造奇迹','黄土很值钱','金子是黄色的','要一起玩土'], a:0, tip:'团结力量大。'},
+  {t:'quiz', q:'“氵+目”合起来是什么字？', opts:['泪','相','晴','海'], a:0, tip:'三点水+目=泪（眼泪从眼里流出来）。'},
+  {t:'quiz', q:'“亻+木”合起来是什么字？', opts:['休','体','林','木'], a:0, tip:'单人旁+木=休（人靠在树旁休息）。'}
+],
+u6_2: [ // 古朗月行
+  {t:'fill', q:'《古朗月行》：“小时不识月，”下一句是？', opts:['呼作白玉盘','又疑瑶台镜','疑是地上霜','月是故乡明'], a:0, tip:'小时不识月，呼作白玉盘。'},
+  {t:'fill', q:'《古朗月行》：“又疑瑶台镜，”下一句是？', opts:['飞在青云端','呼作白玉盘','疑是地上霜','月落乌啼霜满天'], a:0, tip:'又疑瑶台镜，飞在青云端。'},
+  {t:'fill', q:'《古朗月行》的作者是谁？', opts:['李白','杜甫','李绅','骆宾王'], a:0, tip:'唐代李白。'},
+  {t:'fill', q:'诗中小时候把月亮叫做什么？', opts:['白玉盘','银盘子','大圆饼','水晶球'], a:0, tip:'呼作白玉盘。'},
+  {t:'fill', q:'诗中又把月亮疑心成什么？', opts:['瑶台镜','白玉盘','小白兔','一盏灯'], a:0, tip:'又疑瑶台镜。'},
+  {t:'fill', q:'“飞在青云端”中的“青云端”指的是？', opts:['高高的蓝天上','绿色的山下','清清的水里','白云做的船'], a:0, tip:'青云端就是高高的天空。'},
+  {t:'fill', q:'这首诗描写的是什么？', opts:['月亮','太阳','星星','云朵'], a:0, tip:'整首诗都在写月亮。'},
+  {t:'fill', q:'《悯农》：“锄禾日当午，”下一句是？', opts:['汗滴禾下土','粒粒皆辛苦','谁知盘中餐','秋收万颗子'], a:0, tip:'锄禾日当午，汗滴禾下土。'}
+],
+u6_3: [ // 方位大挑战
+  {t:'pic', q:'早晨起来，面向太阳，前面是哪个方向？', opts:['东','西','南','北'], a:0, tip:'前面是东，后面是西。'},
+  {t:'pic', q:'早晨起来，面向太阳，后面是哪个方向？', opts:['西','东','南','北'], a:0, tip:'前面是东，后面是西。'},
+  {t:'pic', q:'早晨起来，面向太阳，左面是哪个方向？', opts:['北','南','东','西'], a:0, tip:'左面是北，右面是南。'},
+  {t:'pic', q:'早晨起来，面向太阳，右面是哪个方向？', opts:['南','北','东','西'], a:0, tip:'左面是北，右面是南。'},
+  {t:'pic', q:'“左”和“右”是一对？', opts:['相对词','同义词','数量词','动词'], a:0, tip:'左和右是相对的方位词。'},
+  {t:'pic', q:'“上、下、左、右、前、后”都是什么词？', opts:['方位词','数量词','人称词','动作词'], a:0, tip:'它们都表示方位。'},
+  {t:'pic', q:'“影子在前，影子在后”中“前”和“后”表示？', opts:['方位','颜色','数量','时间'], a:0, tip:'前、后都是方位词。'},
+  {t:'pic', q:'太阳升起的方向是？', opts:['东','西','南','北'], a:0, tip:'太阳从东边升起。'},
+  {t:'pic', q:'太阳落下的方向是？', opts:['西','东','南','北'], a:0, tip:'太阳从西边落下。'},
+  {t:'pic', q:'地图上通常“上北下南，左西右东”，“上”表示？', opts:['北','南','东','西'], a:0, tip:'上北下南，左西右东。'}
+],
+u6_4: [ // 偏旁找家
+  {t:'quiz', q:'“江、河、流”都带什么偏旁？', opts:['三点水（氵）','两点水（冫）','木字旁','提手旁'], a:0, tip:'三点水（氵）—— 和水有关。'},
+  {t:'quiz', q:'“说、语、认”都带什么偏旁？', opts:['言字旁（讠）','三点水','口字旁','心字底'], a:0, tip:'言字旁（讠）—— 和说话有关。'},
+  {t:'quiz', q:'“狗、猫、猪”都带什么偏旁？', opts:['反犬旁（犭）','鸟字边','虫字旁','马字旁'], a:0, tip:'反犬旁（犭）—— 和动物有关。'},
+  {t:'quiz', q:'“树、桥、村”都带什么偏旁？', opts:['木字旁','禾字旁','竹字头','提手旁'], a:0, tip:'木字旁 —— 和树木有关。'},
+  {t:'quiz', q:'“打、把、扔”都带什么偏旁？', opts:['提手旁（扌）','木字旁','口字旁','目字旁'], a:0, tip:'提手旁（扌）—— 和手的动作有关。'},
+  {t:'quiz', q:'“莲、花、草”都带什么偏旁？', opts:['草字头（艹）','竹字头','木字旁','禾字旁'], a:0, tip:'草字头（艹）—— 和植物有关。'},
+  {t:'quiz', q:'“鸭、鸡、鹅”都带什么偏旁？', opts:['鸟字边','反犬旁','虫字旁','马字旁'], a:0, tip:'鸟字边 —— 和鸟类有关。'},
+  {t:'quiz', q:'“眼、睛、睡”都带什么偏旁？', opts:['目字旁','日字旁','月字旁','口字旁'], a:0, tip:'目字旁 —— 和眼睛有关。'},
+  {t:'quiz', q:'“明、晚、早”都带什么偏旁？', opts:['日字旁','月字旁','目字旁','口字旁'], a:0, tip:'日字旁 —— 和时间有关。'},
+  {t:'quiz', q:'“爸、妈、奶”都带什么偏旁？', opts:['女字旁','父字头','单人旁','人字头'], a:0, tip:'妈、奶带女字旁。'},
+  {t:'quiz', q:'“闪、问、间”都带什么偏旁？', opts:['门字框','国字框','宝盖头','走之底'], a:0, tip:'门字框 —— 和门有关。'},
+  {t:'quiz', q:'“字、家、它”都带什么偏旁？', opts:['宝盖头（宀）','秃宝盖（冖）','穴宝盖','广字旁'], a:0, tip:'宝盖头（宀）—— 和房屋有关。'}
+],
+u6_5: [ // 识字大闯关
+  {t:'quiz', q:'小书包里有哪些学习用品？', opts:['橡皮、尺子、作业本、铅笔、转笔刀','碗、筷子、勺子','玩具车、娃娃','苹果、香蕉'], a:0, tip:'文具是我们的好朋友。'},
+  {t:'quiz', q:'我们要怎么对待小书包？', opts:['爱惜文具，摆放整齐','随便乱扔','拿来打人','不要了'], a:0, tip:'文具是我们的好朋友，要爱惜。'},
+  {t:'quiz', q:'升国旗的时候，我们应该怎么做？', opts:['立正、敬礼、目光看着国旗','说话聊天','坐下来','玩手机'], a:0, tip:'向着国旗我们立正，望着国旗我们敬礼。'},
+  {t:'quiz', q:'五星红旗上有几颗星星？', opts:['五颗','四颗','六颗','一颗'], a:0, tip:'五星红旗，五颗星。'},
+  {t:'quiz', q:'“中国、国旗、五星红旗”这三个词是什么关系？', opts:['从大到小，指的都是我们的国旗','没有关系','完全一样','都是人名'], a:0, tip:'五星红旗是中华人民共和国的国旗。'},
+  {t:'quiz', q:'“中”的拼音是？', opts:['zhōng','zōng','zhòng','cōng'], a:0, tip:'中 zhōng，翘舌音。'},
+  {t:'quiz', q:'“风”的拼音是？', opts:['fēng','fēn','fōng','hēng'], a:0, tip:'风 fēng，后鼻韵母。'},
+  {t:'quiz', q:'“立”的拼音是？', opts:['lì','nì','lí','lǐ'], a:0, tip:'立 lì。'},
+  {t:'quiz', q:'“正”的拼音是？', opts:['zhèng','zèng','zhèn','chèng'], a:0, tip:'正 zhèng，翘舌后鼻音。'},
+  {t:'quiz', q:'“工”和“厂”都是什么结构的字？', opts:['独体字','左右结构','上下结构','半包围结构'], a:0, tip:'工、厂都是独体字。'},
+  {t:'quiz', q:'“厂”字加一笔可以变成什么字？', opts:['广','厂','丁','万'], a:0, tip:'厂加一点变成广。'},
+  {t:'quiz', q:'“生”的拼音是？', opts:['shēng','sēng','shēn','shéng'], a:0, tip:'生 shēng，翘舌后鼻音。'}
+],
+
+/* ------------------------------------------------------------------ 第七单元 */
+u7_0: [ // 影子大猜想
+  {t:'quiz', q:'《影子》中，影子在什么时候出现？', opts:['有光的时候','天黑的时候','下雨的时候','刮风的时候'], a:0, tip:'有光才有影子。'},
+  {t:'quiz', q:'《影子》中，影子像什么？', opts:['一条小黑狗','一只小花猫','一朵白云','一棵小树'], a:0, tip:'影子常常跟着我，就像一条小黑狗。'},
+  {t:'quiz', q:'《影子》中，影子是什么？', opts:['我的好朋友','我的敌人','一只小狗','一棵树'], a:0, tip:'它是我的好朋友。'},
+  {t:'quiz', q:'《小小的船》中，“小小船”的“两头尖”说明月亮？', opts:['两头尖尖弯弯的','圆圆的','方方的','扁扁的'], a:0, tip:'小小的船儿两头尖。'},
+  {t:'quiz', q:'《小小的船》中，小朋友在船里看见了什么？', opts:['闪闪的星星、蓝蓝的天','白白的云','绿绿的树','红红的花'], a:0, tip:'只看见闪闪的星星蓝蓝的天。'},
+  {t:'quiz', q:'“闪闪的星星”中的“闪闪”是什么意思？', opts:['一闪一闪的，很亮','黑黑的','很大','很快'], a:0, tip:'一闪一闪亮晶晶。'},
+  {t:'quiz', q:'《小小的船》表达了小朋友怎样的心情？', opts:['快乐、喜欢夜空','害怕','难过','生气'], a:0, tip:'坐着月亮船看星星，多么快乐。'},
+  {t:'quiz', q:'下面哪句是比喻句？', opts:['弯弯的月儿像小船','月儿弯弯的','月儿在天上','我看见月儿'], a:0, tip:'“像”字就是比喻句的标志。'},
+  {t:'quiz', q:'下面哪句是比喻句？', opts:['影子就像一条小黑狗','影子跟着我','影子在前','影子是黑的'], a:0, tip:'“就像”也是比喻句的标志。'},
+  {t:'quiz', q:'下面哪句是比喻句？', opts:['松鼠的尾巴好像一把伞','松鼠有一条尾巴','尾巴长长的','松鼠在树上'], a:0, tip:'“好像”是比喻句的标志。'}
+],
+u7_1: [ // 两件宝连词
+  {t:'order', q:'把《两件宝》的句子排好：', items:['人有两件宝','双手和大脑'], tip:'人有两件宝，双手和大脑。'},
+  {t:'order', q:'把句子排好：', items:['双手','会','做工'], tip:'双手会做工。'},
+  {t:'order', q:'把句子排好：', items:['大脑','会','思考'], tip:'大脑会思考。'},
+  {t:'order', q:'把句子排好：', items:['用手','不用脑','事情','做不好'], tip:'用手不用脑，事情做不好。'},
+  {t:'order', q:'把句子排好：', items:['用脑','不用手','啥也','办不到'], tip:'用脑不用手，啥也办不到。'},
+  {t:'order', q:'把句子排好：', items:['用手','又用脑','才能','有创造'], tip:'用手又用脑，才能有创造。'},
+  {t:'order', q:'把《影子》的句子排好：', items:['影子','常常','跟着','我'], tip:'影子常常跟着我。'},
+  {t:'order', q:'把《小小的船》的句子排好：', items:['只看见','闪闪的','星星','蓝蓝的','天'], tip:'只看见闪闪的星星蓝蓝的天。'},
+  {t:'order', q:'把《对韵歌》的句子排好：', items:['云对雨','雪对风','花对树','鸟对虫'], tip:'云对雨，雪对风。花对树，鸟对虫。'},
+  {t:'order', q:'把《升国旗》的句子排好：', items:['向着','国旗','我们','立正','望着','国旗','我们','敬礼'], tip:'向着国旗，我们立正；望着国旗，我们敬礼。'}
+],
+u7_2: [ // 反义词大作战
+  {t:'quiz', q:'“大”的反义词是？', opts:['小','多','高','长'], a:0, tip:'大—小。'},
+  {t:'quiz', q:'“多”的反义词是？', opts:['少','大','高','远'], a:0, tip:'多—少。'},
+  {t:'quiz', q:'“上”的反义词是？', opts:['下','左','前','外'], a:0, tip:'上—下。'},
+  {t:'quiz', q:'“来”的反义词是？', opts:['去','回','进','走'], a:0, tip:'来—去。'},
+  {t:'quiz', q:'“开”的反义词是？', opts:['关','门','合','放'], a:0, tip:'开—关。'},
+  {t:'quiz', q:'“前”的反义词是？', opts:['后','左','右','上'], a:0, tip:'前—后。'},
+  {t:'quiz', q:'“长”的反义词是？', opts:['短','高','远','大'], a:0, tip:'长—短。'},
+  {t:'quiz', q:'“黑”的反义词是？', opts:['白','红','蓝','绿'], a:0, tip:'黑—白。'},
+  {t:'quiz', q:'“天”的反义词是？', opts:['地','日','月','山'], a:0, tip:'天地分上下 —— 天—地。'},
+  {t:'quiz', q:'“今”的反义词是？', opts:['古','日','月','年'], a:0, tip:'日月照今古 —— 今—古。'},
+  {t:'quiz', q:'“出来”的反义词是？', opts:['进去','来来','出去','回来'], a:0, tip:'出来—进去。'},
+  {t:'quiz', q:'“弯”的反义词是？', opts:['直','曲','斜','软'], a:0, tip:'弯—直。'}
+],
+u7_3: [ // 量词小博士
+  {t:'quiz', q:'一（ ）黄牛', opts:['头','只','条','匹'], a:0, tip:'一头黄牛。'},
+  {t:'quiz', q:'一（ ）猫', opts:['只','头','匹','条'], a:0, tip:'一只猫。'},
+  {t:'quiz', q:'一（ ）鸭子', opts:['群','只只','头','张'], a:0, tip:'一群鸭子。'},
+  {t:'quiz', q:'一（ ）鸟', opts:['只','头','条','片'], a:0, tip:'一只鸟。'},
+  {t:'quiz', q:'一（ ）苹果', opts:['个','条','只','把'], a:0, tip:'一个苹果。'},
+  {t:'quiz', q:'一（ ）枣', opts:['颗','个','只','张'], a:0, tip:'一颗枣。'},
+  {t:'quiz', q:'一（ ）杏子', opts:['堆','只','头','张'], a:0, tip:'一堆杏子。'},
+  {t:'quiz', q:'一（ ）桃', opts:['个','条','张','把'], a:0, tip:'一个桃。'},
+  {t:'quiz', q:'一（ ）树', opts:['棵','片','条','只'], a:0, tip:'一棵树。'},
+  {t:'quiz', q:'一（ ）纸', opts:['张','棵','条','只'], a:0, tip:'一张纸。'},
+  {t:'quiz', q:'一（ ）尺子', opts:['把','条','只','棵'], a:0, tip:'一把尺子。'},
+  {t:'quiz', q:'一（ ）伞', opts:['把','条','只','张'], a:0, tip:'一把伞。'}
+],
+u7_4: [ // 比喻句魔法
+  {t:'quiz', q:'“弯弯的月儿像小船”用了什么修辞手法？', opts:['比喻','拟人','夸张','排比'], a:0, tip:'“像”把月儿比作小船，这是比喻。'},
+  {t:'quiz', q:'“谷穗弯弯，他鞠着躬说”用了什么修辞手法？', opts:['拟人','比喻','夸张','反问'], a:0, tip:'把谷穗当成人来写，这是拟人。'},
+  {t:'quiz', q:'“雪人大肚子一挺，他顽皮地说”用了什么修辞手法？', opts:['拟人','比喻','夸张','排比'], a:0, tip:'雪人说话、顽皮，是拟人。'},
+  {t:'quiz', q:'下面哪句是比喻句？', opts:['天上的云朵像棉花糖','云朵在天上飘','云朵白白的','我看见云朵'], a:0, tip:'有“像”“好像”“就像”的才是比喻句。'},
+  {t:'quiz', q:'“影子常常跟着我，就像一条小黑狗”中，把影子比作什么？', opts:['小黑狗','小朋友','小书包','小星星'], a:0, tip:'把影子比作小黑狗。'},
+  {t:'quiz', q:'“松鼠的尾巴好像一把伞”中，把尾巴比作什么？', opts:['伞','扇子','树','花'], a:0, tip:'把尾巴比作伞。'},
+  {t:'quiz', q:'“蓝蓝的天”中，“蓝蓝的”是用来？', opts:['形容天的颜色','形容天的样子','形容天的大小','形容天的高度'], a:0, tip:'蓝蓝的——形容颜色。'},
+  {t:'quiz', q:'下面哪个词语搭配不正确？', opts:['圆圆的月儿（应为弯弯的）','圆圆的荷叶','圆圆的太阳','圆圆的眼睛'], a:0, tip:'月儿是弯弯的，荷叶、太阳、眼睛可以是圆圆的。'},
+  {t:'quiz', q:'“小小的（ ）”后面可以填什么？', opts:['船、手、鸟','山、海','天、地','路、桥'], a:0, tip:'小小的船、小小的心、小小的鸟。'},
+  {t:'quiz', q:'“大大的（ ）”后面可以填什么？', opts:['房子、眼睛、西瓜','小草','星星','铅笔'], a:0, tip:'大大的房子、眼睛、西瓜。'}
+],
+u7_5: [ // 阅读大闯关
+  {t:'quiz', q:'《小小的船》中，“我”坐在哪里？', opts:['弯弯的月儿上（把小船当月亮）','真正的小船上','树上看','屋顶上'], a:0, tip:'弯弯的月儿就像小小的船。'},
+  {t:'quiz', q:'《两件宝》告诉我们，怎样才能有创造？', opts:['用手又用脑','只用手','只用脑','什么都不做'], a:0, tip:'用手又用脑，才能有创造。'},
+  {t:'quiz', q:'《影子》里，影子什么时候在左或右？', opts:['光从右边来影子在左，光从左边来影子在右','影子自己会跑','随时都在','下雨时'], a:0, tip:'影子的位置和光的方向有关。'},
+  {t:'quiz', q:'读了《影子》，我们知道影子是我们？', opts:['形影不离的好朋友','可怕的怪物','看不见的东西','别人的影子'], a:0, tip:'影子常常陪着我，它是我的好朋友。'},
+  {t:'quiz', q:'《小小的船》里，为什么说月儿像船？', opts:['因为它们都是弯弯的、两头尖','因为月亮会漂','因为船在天上','因为它们都是白色的'], a:0, tip:'弯弯的、两头尖，形状很像。'},
+  {t:'quiz', q:'种瓜得瓜，种豆得豆。这句话告诉我们？', opts:['付出什么努力，就有什么收获','种地很辛苦','要多吃瓜','豆子很好种'], a:0, tip:'付出才有收获。'},
+  {t:'quiz', q:'“前人栽树，后人乘凉”告诉我们？', opts:['要为后来的人做好事','树要种得早','夏天很热','要多种树'], a:0, tip:'为后人造福。'},
+  {t:'quiz', q:'“千里之行，始于足下”告诉我们？', opts:['远大的目标要从眼前的第一步做起','要走一千里路','脚很重要','走得慢'], a:0, tip:'先从脚下第一步开始。'},
+  {t:'quiz', q:'“两件宝”中“宝”指的是？', opts:['非常宝贵的东西','金银财宝','玩具','好吃的东西'], a:0, tip:'“宝”就是宝贵、重要的东西。'},
+  {t:'quiz', q:'下面哪个句子最适合形容小朋友爱劳动？', opts:['双手会做工','大脑会思考','影子在前','月儿弯弯'], a:0, tip:'双手会做工——爱劳动。'}
+],
+
+/* ------------------------------------------------------------------ 第八单元 */
+u8_0: [ // 比尾巴挑战
+  {t:'quiz', q:'《比尾巴》中，谁的尾巴长？', opts:['猴子','兔子','松鼠','孔雀'], a:0, tip:'猴子的尾巴长。'},
+  {t:'quiz', q:'《比尾巴》中，谁的尾巴短？', opts:['兔子','猴子','鸭子','公鸡'], a:0, tip:'兔子的尾巴短。'},
+  {t:'quiz', q:'《比尾巴》中，谁的尾巴弯？', opts:['公鸡','鸭子','孔雀','松鼠'], a:0, tip:'公鸡的尾巴弯。'},
+  {t:'quiz', q:'《比尾巴》中，谁的尾巴扁？', opts:['鸭子','公鸡','猴子','兔子'], a:0, tip:'鸭子的尾巴扁。'},
+  {t:'quiz', q:'《比尾巴》中，谁在问问题？', opts:['小朋友（读者）在问，课文在回答','猴子','老师','鸭子'], a:0, tip:'“谁的尾巴长？”是问句，后面是回答。'},
+  {t:'quiz', q:'课文里“谁的尾巴长？”这种句子叫什么句？', opts:['问句','陈述句','感叹句','祈使句'], a:0, tip:'带“？”的是问句。'},
+  {t:'quiz', q:'“谁的尾巴好像一把伞？”这句话用了什么修辞？', opts:['比喻','拟人','夸张','反问'], a:0, tip:'把松鼠的尾巴比作伞。'},
+  {t:'quiz', q:'松鼠的尾巴有什么特点？', opts:['又大又蓬松，像一把伞','很长','很短','很扁'], a:0, tip:'好像一把伞——又大又蓬松。'},
+  {t:'quiz', q:'公鸡的尾巴和鸭子的尾巴有什么不同？', opts:['公鸡的尾巴弯，鸭子的尾巴扁','公鸡的长，鸭子的短','公鸡的白，鸭子的黑','完全一样'], a:0, tip:'公鸡尾巴弯，鸭子尾巴扁。'},
+  {t:'quiz', q:'《比尾巴》一共问了几个问题？', opts:['6个','3个','4个','5个'], a:0, tip:'长、短、像伞、弯、扁、最好看，共6个问题。'}
+],
+u8_1: [ // 乌鸦喝水
+  {t:'quiz', q:'《乌鸦喝水》中，乌鸦一开始为什么喝不到水？', opts:['瓶子里的水不多，瓶口又小','乌鸦不想喝','水太烫','瓶子太高'], a:0, tip:'瓶子里水不多，瓶口又小，乌鸦喝不着。'},
+  {t:'quiz', q:'乌鸦想出了什么办法？', opts:['把石子放进瓶子里，水升高','把瓶子推倒','用吸管','叫朋友帮忙'], a:0, tip:'放石子，水渐渐升高。'},
+  {t:'quiz', q:'“瓶子里的水渐渐升高了”中的“渐渐”是什么意思？', opts:['慢慢地、一点一点地','很快','突然','一下子'], a:0, tip:'“渐渐”就是慢慢地。'},
+  {t:'quiz', q:'乌鸦把石子放进瓶子里之前，先做了什么？', opts:['看见旁边有许多小石子','找水','叫朋友','飞走了'], a:0, tip:'乌鸦看见旁边有许多小石子，想出办法来了。'},
+  {t:'quiz', q:'《乌鸦喝水》告诉我们什么道理？', opts:['遇到困难要动脑筋想办法','要喝很多水','乌鸦很黑','瓶子很小'], a:0, tip:'遇到问题要善于观察、动脑筋。'},
+  {t:'quiz', q:'下面哪个词形容乌鸦的做法最合适？', opts:['爱动脑筋','很懒惰','很害怕','很着急'], a:0, tip:'乌鸦观察、思考、动手，很爱动脑筋。'},
+  {t:'quiz', q:'“一颗一颗”这个词语说明乌鸦？', opts:['很有耐心，一个一个地放','放得很快','只放了两颗','没有放'], a:0, tip:'一颗一颗——有耐心。'},
+  {t:'quiz', q:'“找”的拼音是？', opts:['zhǎo','zǎo','zháo','cǎo'], a:0, tip:'找 zhǎo，翘舌音。'},
+  {t:'quiz', q:'“办”的拼音是？', opts:['bàn','bǎn','pàn','bàng'], a:0, tip:'办 bàn。'},
+  {t:'quiz', q:'“办”字可以组成下面哪个词？', opts:['办法','办事','办桌','办门'], a:0, tip:'办法、办公、办事。'}
+],
+u8_2: [ // 雨点儿填空
+  {t:'fill', q:'《雨点儿》：“数不清的雨点儿，”下一句是？', opts:['从云彩里飘落下来','从天空中落下来','从云朵里掉下来','哗啦啦地下来了'], a:0, tip:'数不清的雨点儿，从云彩里飘落下来。'},
+  {t:'fill', q:'《雨点儿》中，大雨点儿问小雨点儿什么？', opts:['你要到哪里去','你从哪里来','你叫什么名字','你多大了'], a:0, tip:'大雨点儿问：“你要到哪里去？”'},
+  {t:'fill', q:'《雨点儿》中，小雨点儿要去哪里？', opts:['有花有草的地方','没有花没有草的地方','大海里','山上去'], a:0, tip:'小雨点儿要去有花有草的地方。'},
+  {t:'fill', q:'《雨点儿》中，大雨点儿要去哪里？', opts:['没有花没有草的地方','有花有草的地方','小河里','树叶上'], a:0, tip:'大雨点儿要去没有花没有草的地方。'},
+  {t:'fill', q:'《雨点儿》最后，有花有草的地方变得怎么样？', opts:['花更红了，草更绿了','花谢了','草枯了','什么都没有了'], a:0, tip:'花更红了，草更绿了。'},
+  {t:'fill', q:'“数不清”是什么意思？', opts:['非常多，数不过来','数得很清楚','只有几个','刚刚数完'], a:0, tip:'数不清就是多得数不过来。'},
+  {t:'fill', q:'《雨点儿》让我们感受到什么？', opts:['雨水能让花草长得更好，雨水很可爱','下雨很讨厌','雨点儿会说话','雨点儿很凶'], a:0, tip:'雨点儿给大地带来生机。'},
+  {t:'fill', q:'“飘落”的“飘”字说明雨点儿怎么样？', opts:['轻轻地、慢慢地落下来','很重地砸下来','很快地冲下来','不会动'], a:0, tip:'“飘”是轻轻地落下来。'}
+],
+u8_3: [ // 句子小工匠
+  {t:'order', q:'把句子排好：', items:['谁的','尾巴','长'], tip:'谁的尾巴长？'},
+  {t:'order', q:'把句子排好：', items:['松鼠的','尾巴','好像','一把伞'], tip:'松鼠的尾巴好像一把伞。'},
+  {t:'order', q:'把句子排好：', items:['乌鸦','把','石子','放进','瓶子','里'], tip:'乌鸦把石子放进瓶子里。'},
+  {t:'order', q:'把句子排好：', items:['瓶子里的','水','渐渐','升高','了'], tip:'瓶子里的水渐渐升高了。'},
+  {t:'order', q:'把句子排好：', items:['数不清的','雨点儿','从','云彩里','飘落下来'], tip:'数不清的雨点儿从云彩里飘落下来。'},
+  {t:'order', q:'把句子排好：', items:['花','更红','了','草','更绿','了'], tip:'花更红了，草更绿了。'},
+  {t:'order', q:'把句子排好：', items:['我','要','去','有花有草','的地方'], tip:'我要去有花有草的地方。'},
+  {t:'order', q:'把句子排好：', items:['孔雀的','尾巴','最好看'], tip:'孔雀的尾巴最好看。'},
+  {t:'order', q:'把句子排好：', items:['小马','在','雪地里','画','月牙'], tip:'小马在雪地里画月牙。'},
+  {t:'order', q:'“谁 + 在哪里 + 做什么”，把句子排好：', items:['小鸟','在','树上','唱歌'], tip:'小鸟在树上唱歌。'}
+],
+u8_4: [ // 汉字变魔法
+  {t:'piggy', q:'“一”加一笔可以变成什么字？', opts:['二','三','十（都对，但最少一笔是“二”）','口'], a:0, tip:'一加一笔变成二、十、七，都是对的。'},
+  {t:'piggy', q:'“十”加一笔可以变成什么字？', opts:['土','王','木','口'], a:0, tip:'十加一横变土，加一撇变千，加一点变木。'},
+  {t:'piggy', q:'“人”加一笔可以变成什么字？', opts:['大','个','天','木'], a:0, tip:'人加一横变“大”，加一竖变“个”，加两横变“天”。'},
+  {t:'piggy', q:'“三”加一笔可以变成什么字？', opts:['王','丰','干','土'], a:0, tip:'三加一竖变王。'},
+  {t:'piggy', q:'“日”加一笔可以变成什么字？', opts:['白','电','田','目'], a:0, tip:'日加一撇变白，加一竖弯钩变电。'},
+  {t:'piggy', q:'“木”加一笔可以变成什么字？', opts:['本','禾','术','未'], a:0, tip:'木加一横变本、禾、术、未。'},
+  {t:'piggy', q:'“月”加一笔可以变成什么字？', opts:['用','明','朋','肉'], a:0, tip:'月加一竖变用。'},
+  {t:'piggy', q:'“了”加一笔可以变成什么字？', opts:['子','才','也','小'], a:0, tip:'了加一横变子。'},
+  {t:'piggy', q:'“口”加一笔可以变成什么字？', opts:['中','日（都对）','田','回'], a:0, tip:'口加一竖变中，加一横变日。'},
+  {t:'piggy', q:'“女”+“子”合起来是什么字？', opts:['好','妙','妈','奶'], a:0, tip:'女+子=好。'},
+  {t:'piggy', q:'“日”+“十”合起来是什么字？', opts:['早','明','音','旱'], a:0, tip:'日+十=早。'},
+  {t:'piggy', q:'“又”+“鸟”合起来是什么字？', opts:['鸡','鸭','鹊','鹅'], a:0, tip:'又+鸟=鸡。'}
+],
+u8_5: [ // 期末大BOSS
+  {t:'boss', q:'【BOSS题】“日月”合起来是什么字？', opts:['明','朋','阳','晴'], a:0, tip:'日月明。'},
+  {t:'boss', q:'【BOSS题】“小土”合起来是什么字？', opts:['尘','尖','坐','块'], a:0, tip:'小土尘。'},
+  {t:'boss', q:'【BOSS题】“双木”合起来是什么字？', opts:['林','森','树','叶'], a:0, tip:'双木林。'},
+  {t:'boss', q:'【BOSS题】下面哪个音节是正确的？', opts:['jǔn','jǚn','jü','nǚ（去点）'], a:0, tip:'j和ü相拼要脱帽；n和ü相拼不能去点。'},
+  {t:'boss', q:'【BOSS题】“谁的尾巴好像一把伞”把尾巴比作什么？', opts:['伞','扇','云','花'], a:0, tip:'比作伞。'},
+  {t:'boss', q:'【BOSS题】《悯农》告诉我们？', opts:['粒粒皆辛苦，要爱惜粮食','要多喝水','要早睡','要多种田'], a:0, tip:'粒粒皆辛苦。'},
+  {t:'boss', q:'【BOSS题】“小手”的“小”笔顺是什么？', opts:['先中间后两边','先两边后中间','从左到右','从上到下'], a:0, tip:'小：先写竖钩，再写左右点。'},
+  {t:'boss', q:'【BOSS题】“影子在前，影子在后”中“前、后”是？', opts:['方位词','数量词','人称词','动作词'], a:0, tip:'前、后是方位词。'},
+  {t:'boss', q:'【BOSS题】j q x 遇到 ü 时，ü 的两点要？', opts:['去掉','保留','加两点','变成i'], a:0, tip:'小ü小ü有礼貌，见了j q x就脱帽。'},
+  {t:'boss', q:'【BOSS题】“一群大雁往南飞”中“一群”表示？', opts:['数量多','只有一只','两只','不知道'], a:0, tip:'“群”表示多。'},
+  {t:'boss', q:'【BOSS题】乌鸦喝水的办法说明乌鸦？', opts:['善于动脑筋','很懒','很凶','很害怕'], a:0, tip:'乌鸦善于观察和思考。'},
+  {t:'boss', q:'【BOSS题】下面哪个不是比喻句？', opts:['月儿弯弯的挂在天上','弯弯的月儿像小船','影子就像一条小黑狗','松鼠的尾巴好像一把伞'], a:0, tip:'没有“像/好像/就像”的就是普通句子。'},
+  {t:'boss', q:'【BOSS题】“金木水火土”中，哪一个是“五行”？', opts:['金、木、水、火、土都是','只有金','只有水火','都不是'], a:0, tip:'金木水火土合称五行。'},
+  {t:'boss', q:'【BOSS题】标调歌“i u 并列标在”？', opts:['后','前','上','下'], a:0, tip:'i u 并列标在后。'},
+  {t:'boss', q:'【BOSS题】下面哪个字是翘舌音声母？', opts:['山（shān）','三（sān）','四（sì）','字（zì）'], a:0, tip:'sh 是翘舌音，s、z 是平舌音。'},
+  {t:'boss', q:'【BOSS题】“一片片叶子从树上落下来”中“一片片”说明？', opts:['叶子很多，接连飘落','只有一片','叶子很大','叶子很小'], a:0, tip:'“一片片”表示多而连续。'}
+]
+
+};
+
+/* ---------- 4. 称号（按累计星星解锁） ---------- */
+const TITLES = [
+  { stars:0,   name:'语文小新芽', emoji:'🌱' },
+  { stars:15,  name:'识字小达人', emoji:'📖' },
+  { stars:40,  name:'拼音小能手', emoji:'🎵' },
+  { stars:75,  name:'阅读小书虫', emoji:'🐛' },
+  { stars:120, name:'背诵小状元', emoji:'📜' },
+  { stars:175, name:'语文小博士', emoji:'🎓' },
+  { stars:240, name:'语文大状元', emoji:'🏆' },
+  { stars:320, name:'语文超级星', emoji:'⭐' },
+  { stars:420, name:'语文传说', emoji:'👑' }
+];
+
+/* ---------- 5. 幸运宝箱奖励 ---------- */
+const CHEST_REWARDS = [
+  { type:'title',  name:'额外称号碎片', emoji:'🎖️', desc:'收集碎片可以解锁隐藏称号！' },
+  { type:'skin',   name:'星星皮肤·彩虹', emoji:'🌈', desc:'星星变成彩虹色啦！' },
+  { type:'avatar', name:'头像·小书虫', emoji:'🐛', desc:'解锁新头像！' },
+  { type:'badge',  name:'坚持勋章', emoji:'💪', desc:'连续打卡的证明！' },
+  { type:'coin',   name:'金币 ×50', emoji:'🪙', desc:'获得50枚金币！' },
+  { type:'avatar', name:'头像·小状元', emoji:'🎓', desc:'解锁新头像！' },
+  { type:'skin',   name:'卡片皮肤·金边', emoji:'✨', desc:'卡片变成金边啦！' },
+  { type:'badge',  name:'专注勋章', emoji:'🎯', desc:'20分钟专注奖励！' }
+];
+
+</script>
+<script>
+/* =========================================================================
+   语文闯关大冒险 · 主逻辑
+   ========================================================================= */
+'use strict';
+
+const SAVE_KEY = 'yw1s_adv_save_v1';
+const DAILY_GOAL_MS = 20 * 60 * 1000;   // 每天 20 分钟
+const TIME_LIMIT_MS = 25 * 60 * 1000;   // 单次上限 25 分钟
+
+/* ------------------------- 存档 ------------------------- */
+function todayKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+
+function defaultSave(){
+  return {
+    stars:0, coins:0, chests:0, chestsMilestone:0,
+    badges:[], avatars:['🐣','🦁','🐼','🐯','🦊'], avatar:'🐣',
+    wrongBook:[],            // {q, right, tip, unit, ts}
+    unitStars:{},            // unitId -> {subIndex: stars}
+    subCleared:{},           // 'u1-0' -> true
+    today:{date:todayKey(), ms:0, stars:0, count:0},
+    streak:0, lastStudyDate:'',
+    history:[],              // 每日 {date, ms, stars}
+    sound:true,
+    totalQuestions:0, totalRight:0
+  };
+}
+let S = load();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return defaultSave();
+    const o = JSON.parse(raw);
+    const d = defaultSave();
+    const m = Object.assign(d, o);
+    if(!m.today || m.today.date !== todayKey()){
+      // 新的一天：结算昨天
+      if(m.today && m.today.date){
+        m.history = m.history || [];
+        m.history.push({date:m.today.date, ms:m.today.ms, stars:m.today.stars});
+        if(m.history.length>60) m.history.shift();
+        // 连续打卡
+        const y = new Date(); y.setDate(y.getDate()-1);
+        const yk = y.getFullYear()+'-'+(y.getMonth()+1)+'-'+y.getDate();
+        if(m.today.ms >= 5*60*1000){
+          m.streak = (m.lastStudyDate===yk) ? (m.streak||0)+1 : 1;
+          m.lastStudyDate = m.today.date;
+        } else {
+          if(m.lastStudyDate !== m.today.date) m.streak = 0;
+        }
+      }
+      m.today = {date:todayKey(), ms:0, stars:0, count:0};
+    }
+    return m;
+  }catch(e){ return defaultSave(); }
+}
+let saveTimer=null;
+function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>{
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){}
+},160); }
+function saveNow(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+
+/* ------------------------- 音效（Web Audio 合成，无需素材） ------------------------- */
+let AC=null;
+function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function tone(freq,dur,type,vol,delay){
+  if(!S.sound) return;
+  const c=ac(); if(!c) return;
+  try{
+    const o=c.createOscillator(), g=c.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    const t0=c.currentTime+(delay||0);
+    g.gain.setValueAtTime(0,t0);
+    g.gain.linearRampToValueAtTime(vol||.16,t0+.012);
+    g.gain.exponentialRampToValueAtTime(.0009,t0+dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0+dur+.03);
+  }catch(e){}
+}
+const SFX={
+  tap(){ tone(560,.07,'sine',.07); },
+  right(){ tone(784,.13,'sine',.15); tone(1046,.17,'sine',.13,.09); tone(1318,.2,'sine',.1,.18); },
+  wrong(){ tone(230,.19,'triangle',.13); tone(170,.25,'triangle',.11,.13); },
+  star(){ [1046,1318,1568,2093].forEach((f,i)=>tone(f,.16,'sine',.11,i*.055)); },
+  chest(){ [523,659,784,1046,1318].forEach((f,i)=>tone(f,.22,'triangle',.11,i*.09)); },
+  levelup(){ [659,784,988,1318].forEach((f,i)=>tone(f,.24,'sine',.13,i*.1)); },
+  timeup(){ [880,784,659,523].forEach((f,i)=>tone(f,.3,'sine',.13,i*.16)); }
+};
+
+/* ------------------------- 工具 ------------------------- */
+const $=id=>document.getElementById(id);
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+let toastTimer=null;
+function toast(msg,ms){
+  const t=$('toast'); t.innerHTML=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), ms||1600);
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function confetti(n){
+  const colors=['#FFB347','#4ED08B','#6C5CE7','#F05252','#3FB8AF','#FFD93D','#FF8FB1'];
+  for(let i=0;i<(n||26);i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=Math.random()*100+'%';
+    c.style.top='-20px';
+    c.style.background=colors[i%colors.length];
+    c.style.animation='fall '+(1.5+Math.random()*1.3)+'s linear '+(Math.random()*.4)+'s forwards';
+    $('app').appendChild(c);
+    setTimeout(()=>c.remove(),3400);
+  }
+}
+function flyStar(){
+  for(let i=0;i<5;i++){
+    const s=document.createElement('div');
+    s.className='fly'; s.textContent='⭐';
+    s.style.left=(30+Math.random()*40)+'%';
+    s.style.bottom=(28+Math.random()*18)+'%';
+    s.style.animationDelay=(i*.07)+'s';
+    $('app').appendChild(s);
+    setTimeout(()=>s.remove(),1500);
+  }
+}
+
+/* ------------------------- 计时 ------------------------- */
+let tickTimer=null, sessionStart=Date.now(), sessionMs=0, sessionTimeUp=false;
+function startTick(){
+  stopTick();
+  tickTimer=setInterval(()=>{
+    const now=Date.now();
+    const delta=Math.min(1200, now-sessionStart);
+    sessionStart=now;
+    sessionMs+=delta;
+    S.today.ms+=delta;
+    if(Math.floor(S.today.ms/1000)!==Math.floor((S.today.ms-delta)/1000)) refreshHomeStats();
+    save();
+    // 单次超时保护
+    if(sessionMs>TIME_LIMIT_MS && !sessionTimeUp){ sessionTimeUp=true; onSessionTimeUp(); }
+  },1000);
+}
+function stopTick(){ if(tickTimer){ clearInterval(tickTimer); tickTimer=null; } }
+
+function todayMin(){ return Math.floor(S.today.ms/60000); }
+
+/* ------------------------- 首页渲染 ------------------------- */
+function currentTitle(){
+  let t=TITLES[0];
+  for(const x of TITLES){ if(S.stars>=x.stars) t=x; }
+  return t;
+}
+function nextTitle(){
+  for(const x of TITLES){ if(S.stars<x.stars) return x; }
+  return null;
+}
+function refreshHomeStats(){
+  const m=Math.floor(S.today.ms/60000);
+  $('todayTimer').textContent=m+' / 20 分钟';
+  $('todayBar').style.width=Math.min(100, S.today.ms/DAILY_GOAL_MS*100)+'%';
+  $('todayStars').textContent='今日 ⭐ '+S.today.stars;
+  $('streakTxt').textContent='🔥 连续 '+S.streak+' 天';
+  $('pStars').textContent=S.stars;
+  $('pCoins').textContent=S.coins;
+  $('pBadges').textContent=S.badges.length;
+  $('pChests').textContent=S.chests;
+  $('mStars').textContent=S.stars;
+  $('mCoins').textContent=S.coins;
+  const t=currentTitle(), n=nextTitle();
+  $('homeAvatar').textContent=S.avatar;
+  $('avatarBox').textContent=S.avatar;
+  $('titleName').textContent=t.emoji+' '+t.name;
+  $('titleDesc').textContent = n ? ('再获得 '+(n.stars-S.stars)+' 颗星星解锁「'+n.name+'」') : '最高的称号，你太厉害了！';
+}
+
+/* ------------------------- 关卡地图 ------------------------- */
+const LOCK_RULE=2; // 每次最多同时解锁 2 个小关，避免孩子一次性刷完
+
+function clearedCount(unitId){
+  const m=S.unitStars[unitId]||{};
+  return Object.keys(m).length;
+}
+function bestStars(unitId, idx){
+  const m=S.unitStars[unitId]||{};
+  return m[idx]||0;
+}
+/**
+ * 解锁规则：第 0 关永远开放；后面的关卡在当前已通关数量达到 idx（即前面的都过了）
+ * 或该关自己已通关时解锁。这样每完成一关就会往后开一关，保持“逐关推进”的节奏。
+ */
+function isUnlocked(unitId, idx){
+  if(idx===0) return true;
+  if(bestStars(unitId, idx)>0) return true;          // 已通关（可重玩刷星）
+  const done = clearedCount(unitId);                  // 已通关数量
+  if(done>=idx) return true;                          // 前面的已全部通过
+  return false;
+}
+/** 该小关的前置是否完成（用于提示） */
+function prevCleared(unitId, idx){
+  return idx===0 || bestStars(unitId, idx-1)>0;
+}
+function unitProgress(unitId, total){
+  const m=S.unitStars[unitId]||{};
+  let s=0; Object.values(m).forEach(v=>s+=v);
+  const got=Object.keys(m).length;
+  return { cleared:got, total:total, pct: total? Math.round(got/total*100):0, stars:s };
+}
+
+function renderMap(){
+  const box=$('mapScroll');
+  let html='';
+  LEVELS.forEach((lv,li)=>{
+    const up=unitProgress(lv.id, lv.subs.length);
+    let subsHtml='';
+    lv.subs.forEach((sb,si)=>{
+      const bs=bestStars(lv.id,si);
+      const done=bs>0;
+      const unlocked=isUnlocked(lv.id,si);
+      const starTxt = done ? '★'.repeat(bs) : '';
+      subsHtml+='<div class="sub '+(done?'done':'')+(unlocked?'':' locked')+'" onclick="enterLevel('+li+','+si+')">'
+        +'<div class="sn">'+(done?'✓':(unlocked?(si+1):'🔒'))+'</div>'
+        +'<div class="st">'+esc(sb.name)+'</div>'
+        +(starTxt&&bs<3?'<div class="star-mini">'+starTxt+'</div>':'')
+        +'</div>';
+    });
+    html+='<div class="unit" style="--uc:'+lv.color+';--uct:'+lv.color+'1F">'
+      +'<div class="unit-head">'
+      +'<div class="unit-icon">'+lv.emoji+'</div>'
+      +'<div class="unit-meta">'
+      +'<div class="unit-name">'+esc(lv.name)+'</div>'
+      +'<div class="unit-prog">已通关 '+up.cleared+'/'+up.total+' 关　⭐ '+up.stars+'</div>'
+      +'<div class="unit-progbar"><i style="width:'+up.pct+'%"></i></div>'
+      +'</div>'
+      +'<button class="icon-btn" style="width:34px;height:34px;font-size:16px;" title="知识卡" onclick="openUnitCard(\''+lv.id+'\')">📖</button>'
+      +'</div>'
+      +'<div class="subs">'+subsHtml+'</div>'
+      +'</div>';
+  });
+  // 宝箱
+  const ready = S.chests>0;
+  html+='<div class="chest-row '+(ready?'ready':'')+'" onclick="'+(ready?'openChest()':'toast(\'通关获得星级评价就能拿到宝箱哦！\')')+'">'
+    +'<div class="chest-emoji">'+(ready?'📦':'🎁')+'</div>'
+    +'<div class="chest-txt">'+(ready? ('你有 <b>'+S.chests+'</b> 个宝箱待开启！点我打开 →') : '累计满星通关会掉落宝箱<br>每获得 8 颗星星就能攒一个宝箱')+'</div>'
+    +'</div>';
+  box.innerHTML=html;
+}
+
+function startAdventure(){
+  renderMap(); show('map'); sfxTap();
+}
+function sfxTap(){ SFX.tap(); }
+function enterLevel(li,si){
+  const lv=LEVELS[li];
+  if(!isUnlocked(lv.id,si)){ toast('先完成前一关才能解锁哦 🔒'); SFX.wrong(); return; }
+  const sb=lv.subs[si];
+  startLevel(li,si);
+}
+
+/* ------------------------- 知识卡 ------------------------- */
+function openUnitCard(unitId){
+  const key = unitId;
+  const c = UNIT_CARDS[key];
+  if(!c){ toast('知识卡准备中～'); return; }
+  let html='<div class="modal-title">📖 '+esc(c.title)+'</div>';
+  html+='<div class="kc-lessons">'+c.lessons.map(x=>'<span class="kc-lesson">'+esc(x)+'</span>').join('')+'</div>';
+  c.points.forEach(p=>{ html+='<div class="kc-point">'+esc(p)+'</div>'; });
+  if(c.poems && c.poems.length){
+    c.poems.forEach(po=>{
+      html+='<div class="kc-poem"><div class="kp-t">'+esc(po.title)+'</div>'
+        +'<div class="kp-a">'+esc(po.author)+'</div>'
+        +'<div class="kp-c">'+esc(po.text)+'</div></div>';
+    });
+  }
+  html+='<div class="modal-actions"><button class="btn green" onclick="closeModal()">看完啦，去闯关！</button></div>';
+  $('modalBox').innerHTML=html; $('modal').classList.add('show');
+}
+function closeModal(){ $('modal').classList.remove('show'); }
+
+/* ------------------------- 答题流程 ------------------------- */
+let Q={ list:[], idx:0, unit:null, sub:null, levelIdx:0, subIdx:0,
+        hps:3, combo:0, maxCombo:0, rightN:0, stars:0, wrongs:[], answered:false, tStart:0, locked:false };
+
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function pickN(arr,n){ return shuffle(arr).slice(0,n); }
+
+function buildQuestionList(lv, sb, si){
+  const key = lv.id+'_'+si;
+  let pool = QUESTIONS[key] || [];
+  if(!pool.length){
+    // 兜底：从本单元其它小关抽题
+    for(const k in QUESTIONS){
+      if(k.indexOf(lv.id+'_')===0) pool=pool.concat(QUESTIONS[k]);
+    }
+  }
+  if(!pool.length) pool = QUESTIONS.u1_0;
+  // 打乱选项顺序
+  const list = shuffle(pool).slice(0,10).map(q=>{
+    const nq = JSON.parse(JSON.stringify(q));
+    if(nq.opts && nq.opts.length){
+      nq._correct = nq.opts[nq.a];
+      const sh = shuffle(nq.opts);
+      nq.opts = sh;
+      nq.a = sh.indexOf(nq._correct);
+      // 如果选项看起来是拼音/固定顺序，保留干扰项
+    }
+    return nq;
+  });
+  return list;
+}
+
+function startLevel(li,si){
+  const lv=LEVELS[li], sb=lv.subs[si];
+  Q = { list:buildQuestionList(lv,sb,si), idx:0, unit:lv, sub:sb, levelIdx:li, subIdx:si,
+        hps:3, combo:0, maxCombo:0, rightN:0, stars:0, wrongs:[], answered:false, tStart:Date.now(), locked:false };
+  $('playTitle').textContent = lv.emoji+' '+sb.name;
+  show('play');
+  if(!tickTimer) { sessionStart=Date.now(); startTick(); }
+  renderQuestion();
+}
+
+function renderQuestion(){
+  const q=Q.list[Q.idx];
+  Q.answered=false;
+  $('qIdx').textContent=Q.idx+1;
+  $('qTotal').textContent=Q.list.length;
+  $('hpHud').textContent=Q.hps;
+  $('comboHud').textContent=Q.combo;
+  $('starHud').textContent=Q.stars;
+  $('qbarFill').style.width=(Q.idx/Q.list.length*100)+'%';
+  hideFb();
+  const b=$('playBody'); b.scrollTop=0;
+
+  const t=q.t||'quiz';
+  let h='';
+  if(t==='blend' && q.parts){
+    h+='<div class="pinyin-card"><div class="py-line">'+q.parts.map(p=>'<span class="py-sp">'+esc(p)+'</span>').join('<span style="color:#C9D3E8"> - </span>')+'</div>'
+      +'<div class="py-hint">拼一拼，读出来，再选正确的音节</div></div>';
+  }
+  if(t==='piggy'){
+    const ch=q.q.match(/“(.+?)”/);
+    h+='<div class="bigchar"><div class="bc-char">'+(ch?esc(ch[1]):'?')+'</div>'
+      +(ch?'<div class="bc-py">加上笔画 / 偏旁，看看能变成什么字</div>':'')+'</div>';
+  }
+  if(t==='recite'||t==='fill'){
+    h+='<div class="bigchar" style="padding:20px 14px;background:linear-gradient(150deg,#F1EEFF,#E8E3FF);border-color:#D6CEFF;">'
+      +'<div style="font-size:15px;font-weight:900;color:#5A48D6;line-height:1.6;">📜 背诵接龙</div></div>';
+  }
+  h+='<div class="qtext">'+esc(q.q)+'</div>';
+
+  if(t==='order'){
+    h+='<div class="order-slot filled" id="slot"></div>'
+     +'<div class="pool-wrap" style="margin-top:0"><div class="pool-title">👇 按正确顺序点下面的词语</div>'
+     +'<div class="order-pool" id="pool"></div></div>'
+     +'<div style="display:flex;gap:9px;margin-top:14px;">'
+     +'<button class="btn sm gray" style="flex:1" onclick="orderReset()">🔄 重来</button>'
+     +'<button class="btn sm green" style="flex:1" onclick="orderSubmit()">✅ 确认</button></div>';
+    b.innerHTML=h;
+    Q.orderPick=[];
+    renderOrderPool(q);
+    return;
+  }
+  if(t==='group'){
+    h+='<div class="cats" id="cats"></div>';
+    h+='<div class="pool-wrap"><div class="pool-title">👇 点一下词语，再点上面的分类框</div><div class="pool-items" id="gpool"></div></div>';
+    h+='<div style="display:flex;gap:9px;margin-top:14px;">'
+     +'<button class="btn sm gray" style="flex:1" onclick="groupReset()">🔄 重来</button>'
+     +'<button class="btn sm green" style="flex:1" onclick="groupSubmit()">✅ 确认</button></div>';
+    b.innerHTML=h;
+    Q.groupState={};   // item -> catName
+    Q.groupSel=null;
+    renderGroup(q);
+    return;
+  }
+  // 选择类
+  let cols='opts';
+  const isBig = q.opts.every(o=>o.length<=3);
+  h+='<div class="'+cols+'" id="opts"></div>';
+  b.innerHTML=h;
+  const ob=$('opts');
+  q.opts.forEach((o,i)=>{
+    const btn=document.createElement('button');
+    btn.className='opt'+(isBig?' big':'');
+    btn.innerHTML=(isBig?'':'<span class="badge">'+'ABCD'[i]+'</span>')+'<span>'+esc(o)+'</span>';
+    btn.onclick=()=>answerChoice(i,btn);
+    ob.appendChild(btn);
+  });
+}
+
+/* ---- 排序题 ---- */
+function renderOrderPool(q){
+  const pool=$('pool'); pool.innerHTML='';
+  const slot=$('slot');
+  slot.innerHTML = (Q.orderPick||[]).map((w,i)=>'<button class="chip sel" onclick="orderRemove('+i+')">'+esc(w)+'</button>').join('');
+  q.items.forEach((w,i)=>{
+    const used=(Q.orderPick||[]).filter(x=>x===w).length;
+    const total=q.items.filter(x=>x===w).length;
+    const left=total-used;
+    for(let k=0;k<left;k++){
+      const b=document.createElement('button');
+      b.className='chip pool';
+      b.textContent=w;
+      b.onclick=()=>{ Q.orderPick.push(w); SFX.tap(); renderOrderPool(q); };
+      pool.appendChild(b);
+    }
+  });
+}
+function orderRemove(i){ const q=Q.list[Q.idx]; Q.orderPick.splice(i,1); SFX.tap(); renderOrderPool(q); }
+function orderReset(){ Q.orderPick=[]; SFX.tap(); renderOrderPool(Q.list[Q.idx]); }
+function orderSubmit(){
+  const q=Q.list[Q.idx];
+  const right = Q.orderPick.length===q.items.length && Q.orderPick.join('|')===q.items.join('|');
+  Q.answerText = Q.orderPick.join(' ') || '(空)';
+  Q.rightText = q.items.join(' ');
+  handleResult(right, q.tip);
+}
+
+/* ---- 分类题 ---- */
+function renderGroup(q){
+  const cats=$('cats'); cats.innerHTML='';
+  Object.keys(q.cats).forEach(cn=>{
+    const d=document.createElement('div');
+    d.className='cat'+(Q.groupSel===cn?' hot':'');
+    d.onclick=()=>{ if(Q.groupSel){ assignToCat(Q.groupSel,cn); } };
+    const items=Object.keys(Q.groupState).filter(k=>Q.groupState[k]===cn);
+    d.innerHTML='<div class="cat-title"><span class="dot"></span>'+esc(cn)+'　<b style="color:#B9C3D6">'+items.length+'</b></div>'
+      +'<div class="cat-items">'+items.map(it=>'<button class="chip sel" onclick="unassignCat(\''+esc(it).replace(/'/g,"\\'")+'\')">'+esc(it)+'</button>').join('')+'</div>';
+    cats.appendChild(d);
+  });
+  const pool=$('gpool'); pool.innerHTML='';
+  const left=q.pool.filter(it=>!Q.groupState[it]);
+  if(!left.length){ pool.innerHTML='<div style="font-size:12.5px;color:#98A5BC;font-weight:800;">全部分好啦，点「确认」检查 👍</div>'; }
+  left.forEach(it=>{
+    const b=document.createElement('button');
+    b.className='chip pool';
+    b.textContent=it;
+    b.onclick=()=>{ Q.groupSel=it; SFX.tap(); renderGroup(q); };
+    if(Q.groupSel===it){ b.className='chip'; }
+    pool.appendChild(b);
+  });
+}
+function assignToCat(item,cat){ Q.groupState[item]=cat; Q.groupSel=null; SFX.tap(); renderGroup(Q.list[Q.idx]); }
+function unassignCat(item){ delete Q.groupState[item]; SFX.tap(); renderGroup(Q.list[Q.idx]); }
+function groupReset(){ Q.groupState={}; Q.groupSel=null; SFX.tap(); renderGroup(Q.list[Q.idx]); }
+function groupSubmit(){
+  const q=Q.list[Q.idx];
+  const items=q.pool;
+  if(items.some(it=>!Q.groupState[it])){ toast('还有词语没有分类哦～'); SFX.wrong(); return; }
+  let ok=true, wrongItems=[];
+  items.forEach(it=>{
+    const should = Object.keys(q.cats).find(cn=>q.cats[cn].indexOf(it)>=0);
+    if(Q.groupState[it]!==should){ ok=false; wrongItems.push(it); }
+  });
+  Q.answerText = items.map(it=>it+'→'+(Q.groupState[it]||'未分类')).join('，');
+  Q.rightText = items.map(it=>{ const s=Object.keys(q.cats).find(cn=>q.cats[cn].indexOf(it)>=0); return it+'→'+s; }).join('，');
+  handleResult(ok, q.tip);
+  if(!ok){ // 标出错误项
+    setTimeout(()=>{
+      document.querySelectorAll('.cat-items .chip').forEach(el=>{
+        if(wrongItems.indexOf(el.textContent)>=0){ el.style.background='linear-gradient(180deg,#FF7A7A,#F05252)'; el.style.boxShadow='0 3px 0 #CE3A3A'; }
+      });
+    },60);
+  }
+}
+
+/* ---- 选择题 ---- */
+function answerChoice(i,btn){
+  if(Q.answered) return;
+  const q=Q.list[Q.idx];
+  Q.answerText=q.opts[i];
+  Q.rightText=q._correct||q.opts[q.a];
+  const ok=i===q.a;
+  if(ok){ btn.classList.add('right'); }
+  else{
+    btn.classList.add('wrong');
+    const all=document.querySelectorAll('#opts .opt');
+    if(all[q.a]) all[q.a].classList.add('right');
+    all.forEach((el,k)=>{ if(k!==i && k!==q.a) el.classList.add('dim'); });
+  }
+  handleResult(ok, q.tip);
+}
+
+/* ---- 判定 ---- */
+function handleResult(ok, tip){
+  Q.answered=true;
+  const q=Q.list[Q.idx];
+  if(ok){
+    Q.rightN++; Q.combo++; Q.maxCombo=Math.max(Q.maxCombo,Q.combo);
+    let add=1;
+    if(Q.combo>=3) add=2;      // 连对3题额外+1
+    if(Q.combo>=6) add=3;      // 连对6题及以上+3
+    Q.stars+=add;
+    SFX.right();
+    if(Q.combo>=3){ confetti(12); }
+    showFb(true, pickPraise(), tip, '继续 →');
+  } else {
+    Q.combo=0;
+    Q.hps--;
+    SFX.wrong();
+    // 记入错题本
+    S.wrongBook = S.wrongBook||[];
+    S.wrongBook.unshift({
+      q:q.q, right:Q.rightText, chosen:Q.answerText||'(未作答)',
+      tip:tip||'', unit:Q.unit.name, ts:Date.now()
+    });
+    if(S.wrongBook.length>80) S.wrongBook.pop();
+    S.totalQuestions++; saveNow();
+    const punish = punishText();
+    showFb(false,'再想一想 🤔', (tip||'')+(punish?('　'+punish):''), Q.hps<=0?'看看结果':'继续 →');
+  }
+  $('hpHud').textContent=Math.max(0,Q.hps);
+  $('comboHud').textContent=Q.combo;
+  $('starHud').textContent=Q.stars;
+  save();
+  if(Q.hps<=0){ setTimeout(()=>endLevel(true),900); }
+}
+
+const PRAISE=['太棒了！','答对啦！','好厉害！','你真聪明！','完美！','就是这样！','了不起！','正确 ✓'];
+function pickPraise(){ return PRAISE[Math.floor(Math.random()*PRAISE.length)]; }
+function punishText(){
+  const p=['（这道题已经放进错题本，别忘了复习哦）','（失去 1 颗爱心 ❤️）','（连对中断了，下一题继续加油！）'];
+  return p[Math.floor(Math.random()*p.length)];
+}
+
+function showFb(ok, head, tip, btnTxt){
+  $('fb').className='fb show '+(ok?'ok':'no');
+  $('fbHead').textContent=ok? '🎉 '+head : '😅 '+head;
+  $('fbTip').innerHTML=esc(tip||'').replace(/&#39;/g,"'");
+  $('fbBtn').textContent=btnTxt;
+  $('fbBtn').className='btn '+(ok?'green':'orange');
+  $('fbBtn').style.flex='1';
+  $('fbBtn').onclick = (Q.hps<=0 && !ok) ? ()=>endLevel(true) : nextQuestion;
+}
+function hideFb(){ $('fb').className='fb'; }
+
+function nextQuestion(){
+  hideFb();
+  if(Q.hps<=0){ endLevel(true); return; }
+  Q.idx++;
+  if(Q.idx>=Q.list.length){ endLevel(false); return; }
+  renderQuestion();
+}
+
+/* ------------------------- 结算 ------------------------- */
+function endLevel(failed){
+  stopTick();
+  const total=Q.list.length;
+  const answeredN = failed ? Math.min(total, Q.idx+1) : total;
+  const rate = Q.rightN/Math.max(1,answeredN);
+  // 星级：按答对率 + 剩余爱心
+  let stars=0;
+  if(!failed){
+    if(Q.hps===3 && rate>=0.8) stars=3;
+    else if(rate>=0.9) stars=3;
+    else if(rate>=0.6) stars=2;
+    else stars=1;
+  } else {
+    stars = rate>=0.6?1:0;
+  }
+  const key=''+Q.subIdx;
+  const prev = bestStars(Q.unit.id, Q.subIdx);
+  const isBest = stars>prev;
+
+  // 写入存档
+  let gainStars=0, gainCoins=0;
+  if(stars>0){
+    S.unitStars[Q.unit.id]=S.unitStars[Q.unit.id]||{};
+    S.unitStars[Q.unit.id][key]=Math.max(prev,stars);
+    S.subCleared[Q.unit.id+'-'+Q.subIdx]=true;
+    gainStars = Math.max(0, stars-prev);       // 只在刷新纪录时加总星
+    gainCoins = stars*3 + (isBest?5:0);        // 每次通关都给金币
+    S.stars += gainStars;
+    S.today.stars += stars;                    // 今日星星按本关得星计入
+    S.coins += gainCoins;
+  }
+  Q.gainStars=gainStars; Q.gainCoins=gainCoins;
+  S.totalQuestions += answeredN;
+  S.totalRight += Q.rightN;
+  S.today.count = (S.today.count||0)+1;
+  // 宝箱：累计总星数每 8 颗掉落一个
+  const chestShould = Math.floor(S.stars/8);
+  if(chestShould > (S.chestsMilestone||0)){
+    S.chests += (chestShould - (S.chestsMilestone||0));
+    S.chestsMilestone = chestShould;
+  }
+  saveNow();
+  showResult(stars, failed, rate);
+}
+
+function showResult(stars, failed, rate){
+  const emoji = failed ? '😢' : (stars===3?'🏆':stars===2?'🎉':stars===1?'👍':'💪');
+  let title = failed ? '爱心用完啦，再试一次吧！' : (stars===3?'三星通关！太厉害了！':stars===2?'两星通关，很棒！':stars===1?'通关啦，继续加油！':'差一点点～');
+  let html='<div class="res-inner">';
+  html+='<div class="res-star">'+emoji+'</div>';
+  html+='<div class="res-title">'+esc(title)+'</div>';
+  html+='<div class="res-sub">'+esc(Q.unit.name)+' · '+esc(Q.sub.name)+'</div>';
+
+  html+='<div style="font-size:36px;margin-top:14px;letter-spacing:5px;">';
+  for(let i=0;i<3;i++){ html+='<span style="opacity:'+(i<stars?1:.22)+'">⭐</span>'; }
+  html+='</div>';
+
+  html+='<div class="res-card">'
+    +'<div class="res-line"><span>答对题数</span><b>'+Q.rightN+' / '+Q.list.length+'</b></div>'
+    +'<div class="res-line"><span>本关得星</span><b>⭐ '+Q.stars+'</b></div>'
+    +'<div class="res-line"><span>最高连对</span><b>⚡ '+Q.maxCombo+'</b></div>'
+    +'<div class="res-line"><span>剩余爱心</span><b>'+Math.max(0,Q.hps)+' / 3</b></div>'
+    +'<div class="res-line"><span>计入总星</span><b>+'+(Q.gainStars||0)+' ⭐</b></div>'
+    +'<div class="res-line"><span>获得金币</span><b>🪙 +'+(Q.gainCoins||0)+'</b></div>'
+    +'</div>';
+
+  // 本关错题
+  const recent = (S.wrongBook||[]).filter(w=>w.unit===Q.unit.name).slice(0,3);
+  if(recent.length && !failed){
+    html+='<div class="wrong-list"><div style="font-size:13.5px;font-weight:900;color:#8895AE;margin-bottom:8px;">📕 错题回顾</div>';
+    recent.forEach(w=>{
+      html+='<div class="wrong-item"><div class="wq">'+esc(w.q)+'</div>'
+        +'<div class="wa">正确答案：'+esc(w.right)+'</div></div>';
+    });
+    html+='</div>';
+  }
+
+  html+='<div style="display:flex;gap:9px;margin-top:16px;">'
+    +'<button class="btn gray" style="flex:1" onclick="backToMap()">🏠 关卡地图</button>'
+    +'<button class="btn '+(failed?'orange':'green')+'" style="flex:1.3" onclick="'+(failed?'retryLevel()':'nextSubLevel()')+'">'+(failed?'🔄 再试一次':'➡️ 下一关')+'</button>'
+    +'</div>';
+  html+='</div>';
+  $('resInner').innerHTML=html;
+  show('result');
+  if(!failed && stars>=2){ SFX.star(); confetti(40); flyStar(); }
+  if(!failed && stars===3){ SFX.levelup(); }
+
+  // 达标检查
+  if(S.today.ms>=DAILY_GOAL_MS && !S.today.celebrated){
+    S.today.celebrated=true; saveNow();
+    setTimeout(()=>{ confetti(60); SFX.chest(); toast('🎉 今日 20 分钟学习目标达成！',2400); },1400);
+  }
+}
+function backToMap(){ renderMap(); refreshHomeStats(); show('map'); }
+function nextSubLevel(){
+  const li=Q.levelIdx, si=Q.subIdx;
+  const lv=LEVELS[li];
+  if(si+1 < lv.subs.length){
+    startLevel(li, si+1);
+  } else if(li+1 < LEVELS.length){
+    const nl=LEVELS[li+1];
+    toast('🎊 恭喜通关「'+lv.name+'」！进入新单元：'+nl.emoji+' '+nl.name, 2600);
+    setTimeout(()=>{ startLevel(li+1, 0); }, 700);
+  } else {
+    toast('🏆 全部关卡都通关啦！你太厉害了！', 2600);
+    setTimeout(backToMap, 900);
+  }
+}
+function retryLevel(){ startLevel(Q.levelIdx, Q.subIdx); }
+function quitPlay(){
+  if(Q.answered || Q.idx>0){
+    if(!confirm('确定要退出这一关吗？本关进度不会保存哦。')) return;
+  }
+  stopTick(); backToMap();
+}
+
+/* ------------------------- 宝箱 ------------------------- */
+function openChest(){
+  if(S.chests<=0){ toast('暂时没有宝箱，去闯关攒星星吧！'); return; }
+  S.chests--;
+  const r=CHEST_REWARDS[Math.floor(Math.random()*CHEST_REWARDS.length)];
+  SFX.chest();
+  let apply='';
+  if(r.type==='coin'){ S.coins+=50; apply='金币已到账！'; }
+  else if(r.type==='avatar'){ if(S.avatars.indexOf(r.emoji)<0){ S.avatars.push(r.emoji); apply='新头像已解锁！'; } else apply='又收集到一个～'; }
+  else if(r.type==='badge'){ if(S.badges.indexOf(r.name)<0){ S.badges.push(r.name); apply='勋章已挂上墙！'; } else apply='又收集到一个～'; }
+  else apply=r.desc;
+  saveNow();
+  let html='<div class="chest-open"><div class="chest-big">📦</div></div>'
+    +'<div class="chest-reward"><div class="cr-e">'+r.emoji+'</div>'
+    +'<div class="cr-n">'+esc(r.name)+'</div>'
+    +'<div class="cr-d">'+esc(apply)+'</div></div>'
+    +'<div class="modal-actions"><button class="btn green" onclick="closeModal();renderMap();refreshHomeStats();">收下啦！</button></div>';
+  $('modalBox').innerHTML=html; $('modal').classList.add('show');
+  confetti(30);
+}
+
+/* ------------------------- 勋章墙 ------------------------- */
+function allBadges(){
+  const list=[];
+  TITLES.forEach(t=>{ if(t.stars>0) list.push({emoji:t.emoji, name:t.name, on:S.stars>=t.stars}); });
+  ['坚持勋章','专注勋章','满星达人','学霸之星'].forEach(b=>{
+    list.push({emoji: b==='坚持勋章'?'💪':b==='专注勋章'?'🎯':b==='满星达人'?'🌟':'🧠', name:b, on:S.badges.indexOf(b)>=0});
+  });
+  return list;
+}
+function openWall(){
+  const list=allBadges();
+  let html='<div class="modal-title">🎖️ 我的成就</div>';
+  html+='<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;">'
+    +'<span class="pill">⭐ '+S.stars+'</span><span class="pill">🪙 '+S.coins+'</span>'
+    +'<span class="pill">🔥 '+S.streak+' 天</span><span class="pill">📖 '+(S.totalQuestions?Math.round(S.totalRight/S.totalQuestions*100):0)+'% 正确率</span></div>';
+  html+='<div class="wall">'+list.map(b=>'<div class="badge-it '+(b.on?'on':'')+'"><div class="bi-e">'+b.emoji+'</div><div class="bi-n">'+esc(b.name)+'</div></div>').join('')+'</div>';
+  html+='<div style="font-size:12.5px;font-weight:800;color:#8895AE;text-align:center;line-height:1.6;margin-top:6px;">累计获得星星越多，称号越厉害哦！<br>当前称号：'+currentTitle().emoji+' '+currentTitle().name+'</div>';
+  // 头像选择
+  html+='<div style="margin-top:16px;font-size:13.5px;font-weight:900;color:#5A6A88;">换个形象</div>';
+  html+='<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:10px;">'
+    +S.avatars.map(a=>'<button class="icon-btn" style="width:46px;height:46px;font-size:23px;'+(S.avatar===a?'border:2.5px solid #6C5CE7;':'')+'" onclick="setAvatar(\''+a+'\')">'+a+'</button>').join('')
+    +'</div>';
+  html+='<div class="modal-actions"><button class="btn" onclick="closeModal()">关闭</button></div>';
+  $('modalBox').innerHTML=html; $('modal').classList.add('show');
+}
+function setAvatar(a){ S.avatar=a; saveNow(); refreshHomeStats(); openWall(); SFX.tap(); }
+
+/* ------------------------- 错题本 ------------------------- */
+function openWrongBook(){
+  const list=(S.wrongBook||[]);
+  let html='<div class="modal-title">📕 错题本（'+list.length+'）</div>';
+  if(!list.length){
+    html+='<div style="text-align:center;font-size:14px;font-weight:800;color:#8895AE;padding:24px 8px;line-height:1.7;">还没有错题，太棒啦！<br>继续保持～ 🎉</div>';
+  } else {
+    list.slice(0,20).forEach(w=>{
+      html+='<div class="wrong-item"><div class="wq">'+esc(w.q)+'</div>'
+        +'<div class="wa">✅ '+esc(w.right)+(w.tip?('　💡 '+esc(w.tip)):'')+'</div>'
+        +'<div style="font-size:11px;color:#A8B3C7;font-weight:800;margin-top:5px;">'+esc(w.unit||'')+'</div></div>';
+    });
+  }
+  html+='<div class="modal-actions">'
+    +(list.length?'<button class="btn red sm" onclick="clearWrong()">清空</button>':'')
+    +'<button class="btn sm" style="flex:1" onclick="closeModal()">关闭</button></div>';
+  $('modalBox').innerHTML=html; $('modal').classList.add('show');
+}
+function clearWrong(){ if(confirm('确定清空错题本吗？')){ S.wrongBook=[]; saveNow(); openWrongBook(); } }
+
+/* ------------------------- 设置 ------------------------- */
+function openSettings(){
+  let html='<div class="modal-title">⚙️ 设置</div>';
+  html+='<div class="card" style="box-shadow:none;background:#F7F9FE;margin-bottom:12px;">'
+    +'<div style="font-size:14px;font-weight:900;color:#3F4E6B;margin-bottom:9px;">🗓️ 每日目标：20 分钟</div>'
+    +'<div style="font-size:12.5px;font-weight:700;color:#7C8BA6;line-height:1.6;">'
+    +'今天已学 <b style="color:#6C5CE7">'+todayMin()+'</b> 分钟<br>'
+    +'今日获得 <b style="color:#FF9524">'+S.today.stars+'</b> 颗星星</div>'
+    +'</div>';
+  html+='<div class="card" style="box-shadow:none;background:#F7F9FE;margin-bottom:12px;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;">'
+    +'<div style="font-size:14px;font-weight:900;color:#3F4E6B;">🔊 游戏音效</div>'
+    +'<button class="btn sm '+(S.sound?'green':'gray')+'" onclick="toggleSound()">'+(S.sound?'已开启':'已关闭')+'</button>'
+    +'</div></div>';
+  html+='<div class="card" style="box-shadow:none;background:#FFF7F6;margin-bottom:12px;">'
+    +'<div style="font-size:13.5px;font-weight:900;color:#C0392B;margin-bottom:8px;">👨‍👩‍👧 家长须知</div>'
+    +'<div style="font-size:12.5px;font-weight:700;color:#8A6A66;line-height:1.75;">'
+    +'· 单次游戏最多 25 分钟，到时自动结束<br>'
+    +'· 答错会扣爱心（3 颗爱心用完需重来）<br>'
+    +'· 错题自动进入错题本，方便复习<br>'
+    +'· 建议每天固定时段玩 20 分钟</div>'
+    +'</div>';
+  html+='<div class="modal-actions">'
+    +'<button class="btn red sm" onclick="resetAll()">重置进度</button>'
+    +'<button class="btn sm" style="flex:1" onclick="closeModal()">关闭</button></div>';
+  $('modalBox').innerHTML=html; $('modal').classList.add('show');
+}
+function toggleSound(){ S.sound=!S.sound; saveNow(); openSettings(); }
+function resetAll(){
+  if(!confirm('确定要清空所有进度重新开始吗？此操作不可恢复。')) return;
+  if(!confirm('真的要重置吗？星星、勋章、错题本都会清空哦。')) return;
+  S=defaultSave(); saveNow(); closeModal(); refreshHomeStats(); renderMap();
+  toast('已重置，重新开始冒险吧！');
+}
+
+/* ------------------------- 时间到 ------------------------- */
+function onSessionTimeUp(){
+  stopTick();
+  let html='<div class="timeup-emoji">⏰</div>'
+    +'<div class="timeup-title">今天学得够多啦！</div>'
+    +'<div class="timeup-desc">你已经连续学习很久了，眼睛需要休息一下。<br>'
+    +'去户外看看远处吧，明天再来闯关！🌳<br><br>'
+    +'<b style="color:#6C5CE7">今日学习：'+todayMin()+' 分钟</b><br>'
+    +'<b style="color:#FF9524">今日星星：⭐ '+S.today.stars+'</b></div>'
+    +'<div class="modal-actions"><button class="btn green" onclick="closeModal();stopTick();backToMap();">好的，我休息啦 👋</button></div>';
+  $('modalBox').innerHTML=html; $('modal').classList.add('show');
+  SFX.timeup();
+}
+
+/* ------------------------- 启动 ------------------------- */
+window.addEventListener('load',()=>{
+  refreshHomeStats();
+  renderMap();
+  sessionStart=Date.now();
+  startTick();
+  // 恢复音频上下文（移动端需要用户交互）
+  document.addEventListener('touchstart',()=>{ const c=ac(); if(c&&c.state==='suspended') c.resume(); },{once:true});
+  document.addEventListener('click',()=>{ const c=ac(); if(c&&c.state==='suspended') c.resume(); },{once:true});
+});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ stopTick(); saveNow(); }
+  else { sessionStart=Date.now(); if(!tickTimer) startTick(); refreshHomeStats(); }
+});
+window.addEventListener('beforeunload',saveNow);
+
+</script>
+</body>
+</html>
